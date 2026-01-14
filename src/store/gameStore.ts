@@ -90,47 +90,58 @@ const PLAYERS: Player[] = [
 ];
 
 const MANAGERS: Manager[] = [
-  { id: 'm1', name: 'You', teamName: 'Thunder Warriors', wins: 3, losses: 1, points: 6, activeRoster: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'p11'], bench: ['p12', 'p13', 'p14'] },
-  { id: 'm2', name: 'Rahul', teamName: 'Royal Strikers', wins: 2, losses: 2, points: 4, activeRoster: ['p15', 'p16', 'p17'], bench: [] },
-  { id: 'm3', name: 'Priya', teamName: 'Super Kings XI', wins: 3, losses: 1, points: 6, activeRoster: ['p18', 'p19', 'p20'], bench: [] },
-  { id: 'm4', name: 'Arjun', teamName: 'Titans United', wins: 1, losses: 3, points: 2, activeRoster: ['p21', 'p22', 'p23'], bench: [] },
-  { id: 'm5', name: 'Sneha', teamName: 'Galaxy Riders', wins: 2, losses: 2, points: 4, activeRoster: ['p24', 'p25', 'p26'], bench: [] },
-  { id: 'm6', name: 'Vikram', teamName: 'Storm Chasers', wins: 1, losses: 3, points: 2, activeRoster: ['p27', 'p28', 'p29'], bench: [] },
+  { id: 'm1', name: 'Abhi', teamName: 'Abhi XI', wins: 0, losses: 0, points: 0, activeRoster: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'p11'], bench: ['p12', 'p13', 'p14'] },
+  { id: 'm2', name: 'Sahith', teamName: 'Sahith XI', wins: 0, losses: 0, points: 0, activeRoster: ['p15', 'p16', 'p17'], bench: [] },
+  { id: 'm3', name: 'Jasthi', teamName: 'Jasthi XI', wins: 0, losses: 0, points: 0, activeRoster: ['p18', 'p19', 'p20'], bench: [] },
+  { id: 'm4', name: 'Vamsi', teamName: 'Vamsi XI', wins: 0, losses: 0, points: 0, activeRoster: ['p21', 'p22', 'p23'], bench: [] },
+  { id: 'm5', name: 'Krishna', teamName: 'Krishna XI', wins: 0, losses: 0, points: 0, activeRoster: ['p24', 'p25', 'p26'], bench: [] },
+  { id: 'm6', name: 'Krithik', teamName: 'Krithik XI', wins: 0, losses: 0, points: 0, activeRoster: ['p27', 'p28', 'p29'], bench: [] },
+  { id: 'm7', name: 'Akash', teamName: 'Akash XI', wins: 0, losses: 0, points: 0, activeRoster: ['p30'], bench: [] },
+  { id: 'm8', name: 'Santosh', teamName: 'Santosh XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
 ];
 
 const SCHEDULE: Match[] = [
-  { week: 1, home: 'm1', away: 'm2', homeScore: 156, awayScore: 142, completed: true },
-  { week: 1, home: 'm3', away: 'm4', homeScore: 178, awayScore: 165, completed: true },
-  { week: 1, home: 'm5', away: 'm6', homeScore: 134, awayScore: 145, completed: true },
-  { week: 2, home: 'm1', away: 'm3', homeScore: 189, awayScore: 176, completed: true },
-  { week: 2, home: 'm2', away: 'm5', homeScore: 167, awayScore: 158, completed: true },
-  { week: 2, home: 'm4', away: 'm6', homeScore: 143, awayScore: 156, completed: true },
-  { week: 3, home: 'm1', away: 'm4', homeScore: 201, awayScore: 178, completed: true },
-  { week: 3, home: 'm2', away: 'm6', homeScore: 145, awayScore: 167, completed: true },
-  { week: 3, home: 'm3', away: 'm5', homeScore: 189, awayScore: 176, completed: true },
-  { week: 4, home: 'm1', away: 'm5', homeScore: 156, awayScore: 178, completed: true },
-  { week: 4, home: 'm2', away: 'm4', homeScore: 189, awayScore: 167, completed: true },
-  { week: 4, home: 'm3', away: 'm6', homeScore: 201, awayScore: 156, completed: true },
-  { week: 5, home: 'm1', away: 'm6', completed: false },
-  { week: 5, home: 'm2', away: 'm3', completed: false },
-  { week: 5, home: 'm4', away: 'm5', completed: false },
-  { week: 6, home: 'm2', away: 'm1', completed: false },
-  { week: 6, home: 'm4', away: 'm3', completed: false },
-  { week: 6, home: 'm6', away: 'm5', completed: false },
-  { week: 7, home: 'm3', away: 'm1', completed: false },
-  { week: 7, home: 'm5', away: 'm2', completed: false },
-  { week: 7, home: 'm6', away: 'm4', completed: false },
+  // Week 1
+  { week: 1, home: 'm1', away: 'm8', completed: false }, // Abhi vs Santosh
+  { week: 1, home: 'm4', away: 'm6', completed: false }, // Vamsi vs Krithik
+  { week: 1, home: 'm7', away: 'm5', completed: false }, // Akash vs Krishna
+  { week: 1, home: 'm3', away: 'm2', completed: false }, // Jasthi vs Sahith
+  // Week 2
+  { week: 2, home: 'm1', away: 'm3', completed: false }, // Abhi vs Jasthi
+  { week: 2, home: 'm6', away: 'm2', completed: false }, // Krithik vs Sahith
+  { week: 2, home: 'm7', away: 'm4', completed: false }, // Akash vs Vamsi
+  { week: 2, home: 'm8', away: 'm5', completed: false }, // Santosh vs Krishna
+  // Week 3
+  { week: 3, home: 'm1', away: 'm2', completed: false }, // Abhi vs Sahith
+  { week: 3, home: 'm4', away: 'm5', completed: false }, // Vamsi vs Krishna
+  { week: 3, home: 'm7', away: 'm3', completed: false }, // Akash vs Jasthi
+  { week: 3, home: 'm8', away: 'm6', completed: false }, // Santosh vs Krithik
+  // Week 4
+  { week: 4, home: 'm1', away: 'm6', completed: false }, // Abhi vs Krithik
+  { week: 4, home: 'm4', away: 'm2', completed: false }, // Vamsi vs Sahith
+  { week: 4, home: 'm7', away: 'm8', completed: false }, // Akash vs Santosh
+  { week: 4, home: 'm5', away: 'm3', completed: false }, // Krishna vs Jasthi
+  // Week 5
+  { week: 5, home: 'm1', away: 'm7', completed: false }, // Abhi vs Akash
+  { week: 5, home: 'm6', away: 'm3', completed: false }, // Krithik vs Jasthi
+  { week: 5, home: 'm5', away: 'm2', completed: false }, // Krishna vs Sahith
+  { week: 5, home: 'm4', away: 'm8', completed: false }, // Vamsi vs Santosh
+  // Week 6
+  { week: 6, home: 'm1', away: 'm4', completed: false }, // Abhi vs Vamsi
+  { week: 6, home: 'm7', away: 'm2', completed: false }, // Akash vs Sahith
+  { week: 6, home: 'm5', away: 'm6', completed: false }, // Krishna vs Krithik
+  { week: 6, home: 'm8', away: 'm3', completed: false }, // Santosh vs Jasthi
+  // Week 7
+  { week: 7, home: 'm1', away: 'm5', completed: false }, // Abhi vs Krishna
+  { week: 7, home: 'm4', away: 'm3', completed: false }, // Vamsi vs Jasthi
+  { week: 7, home: 'm7', away: 'm6', completed: false }, // Akash vs Krithik
+  { week: 7, home: 'm8', away: 'm2', completed: false }, // Santosh vs Sahith
 ];
 
-const ACTIVITIES: Activity[] = [
-  { id: 'a1', timestamp: new Date(Date.now() - 3600000), type: 'add', managerId: 'm1', description: 'Thunder Warriors added Jos Buttler' },
-  { id: 'a2', timestamp: new Date(Date.now() - 7200000), type: 'drop', managerId: 'm2', description: 'Royal Strikers dropped Mayank Agarwal' },
-  { id: 'a3', timestamp: new Date(Date.now() - 10800000), type: 'trade', managerId: 'm3', description: 'Super Kings XI traded Pat Cummins to Titans United for Rashid Khan' },
-  { id: 'a4', timestamp: new Date(Date.now() - 86400000), type: 'score', managerId: 'm1', description: 'Week 4 scores updated: Thunder Warriors 156 pts' },
-];
+const ACTIVITIES: Activity[] = [];
 
 export const useGameStore = create<GameState>((set, get) => ({
-  currentWeek: 5,
+  currentWeek: 1,
   currentManagerId: 'm1',
   managers: MANAGERS,
   players: PLAYERS,
