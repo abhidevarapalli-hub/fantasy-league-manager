@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Settings, Calculator, CheckCircle, ArrowLeftRight, AlertTriangle, Trash2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Settings, Calculator, CheckCircle, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search } from 'lucide-react';
 import { useGameStore } from '@/store/gameStore';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+
+const ROSTER_CAP = 14;
 
 const Admin = () => {
-  const { managers, players, currentWeek, updateScore, finalizeWeek, resetLeague, executeTrade } = useGameStore();
+  const { managers, players, currentWeek, updateScore, finalizeWeek, resetLeague, executeTrade, addFreeAgent, getFreeAgents, getManagerRosterCount } = useGameStore();
   
   const [selectedManager, setSelectedManager] = useState('');
   const [scoreAdjustment, setScoreAdjustment] = useState('');
@@ -21,6 +23,13 @@ const Admin = () => {
   const [selectedPlayers2, setSelectedPlayers2] = useState<string[]>([]);
   
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Free Agent state
+  const [faManager, setFaManager] = useState('');
+  const [faSearch, setFaSearch] = useState('');
+  const [faTeamFilter, setFaTeamFilter] = useState('all');
+  const [selectedFreeAgent, setSelectedFreeAgent] = useState('');
+  const [dropPlayerId, setDropPlayerId] = useState('');
 
   const handleScoreUpdate = () => {
     if (selectedManager && scoreAdjustment) {
@@ -49,6 +58,48 @@ const Admin = () => {
     ? [...manager2.activeRoster, ...manager2.bench].map(id => players.find(p => p.id === id)!).filter(Boolean)
     : [];
 
+  // Free Agent logic
+  const freeAgents = getFreeAgents();
+  const faManagerData = managers.find(m => m.id === faManager);
+  const faRosterCount = faManager ? getManagerRosterCount(faManager) : 0;
+  const isAtCap = faRosterCount >= ROSTER_CAP;
+
+  const faManagerPlayers = faManagerData 
+    ? [...faManagerData.activeRoster, ...faManagerData.bench].map(id => players.find(p => p.id === id)!).filter(Boolean)
+    : [];
+
+  const uniqueTeams = useMemo(() => {
+    const teams = new Set(freeAgents.map(p => p.team));
+    return Array.from(teams).sort();
+  }, [freeAgents]);
+
+  const filteredFreeAgents = useMemo(() => {
+    return freeAgents.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(faSearch.toLowerCase());
+      const matchesTeam = faTeamFilter === 'all' || p.team === faTeamFilter;
+      return matchesSearch && matchesTeam;
+    });
+  }, [freeAgents, faSearch, faTeamFilter]);
+
+  const handleAddFreeAgent = () => {
+    if (faManager && selectedFreeAgent) {
+      if (isAtCap && !dropPlayerId) return;
+      addFreeAgent(faManager, selectedFreeAgent, isAtCap ? dropPlayerId : undefined);
+      setSelectedFreeAgent('');
+      setDropPlayerId('');
+    }
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'Batsman': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'Bowler': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'All Rounder': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+      case 'Wicket Keeper': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
@@ -64,6 +115,133 @@ const Admin = () => {
       </header>
 
       <main className="px-4 py-4 space-y-6">
+        {/* Free Agent Management */}
+        <section className="bg-card rounded-xl border border-border p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <UserPlus className="w-5 h-5 text-secondary" />
+            <h2 className="font-semibold text-foreground">Add Free Agent</h2>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <Label className="text-muted-foreground mb-2 block">Select Team</Label>
+              <Select value={faManager} onValueChange={(v) => { setFaManager(v); setDropPlayerId(''); setSelectedFreeAgent(''); }}>
+                <SelectTrigger className="bg-muted border-border">
+                  <SelectValue placeholder="Choose a team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {managers.map(m => {
+                    const count = getManagerRosterCount(m.id);
+                    return (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.teamName} ({count}/{ROSTER_CAP})
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {faManager && (
+              <>
+                {isAtCap && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                    <p className="text-sm text-destructive font-medium mb-2">
+                      Roster is full! Select a player to drop:
+                    </p>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {faManagerPlayers.map(player => (
+                        <label 
+                          key={player.id} 
+                          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                            dropPlayerId === player.id 
+                              ? 'bg-destructive/20 border border-destructive/50' 
+                              : 'bg-muted hover:bg-muted/80'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="dropPlayer"
+                            checked={dropPlayerId === player.id}
+                            onChange={() => setDropPlayerId(player.id)}
+                            className="accent-destructive"
+                          />
+                          <span className="text-sm truncate flex-1">{player.name}</span>
+                          <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
+                            {player.team}
+                          </Badge>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search players..."
+                      value={faSearch}
+                      onChange={(e) => setFaSearch(e.target.value)}
+                      className="pl-9 bg-muted border-border"
+                    />
+                  </div>
+                  <Select value={faTeamFilter} onValueChange={setFaTeamFilter}>
+                    <SelectTrigger className="w-24 bg-muted border-border">
+                      <SelectValue placeholder="Team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      {uniqueTeams.map(team => (
+                        <SelectItem key={team} value={team}>{team}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {filteredFreeAgents.slice(0, 50).map(player => (
+                    <label 
+                      key={player.id} 
+                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                        selectedFreeAgent === player.id 
+                          ? 'bg-primary/20 border border-primary/50' 
+                          : 'bg-muted hover:bg-muted/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="freeAgent"
+                        checked={selectedFreeAgent === player.id}
+                        onChange={() => setSelectedFreeAgent(player.id)}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm truncate flex-1">{player.name}</span>
+                      <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
+                        {player.role}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        {player.team}
+                      </Badge>
+                    </label>
+                  ))}
+                  {filteredFreeAgents.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No free agents found</p>
+                  )}
+                </div>
+
+                <Button 
+                  onClick={handleAddFreeAgent}
+                  disabled={!selectedFreeAgent || (isAtCap && !dropPlayerId)}
+                  className="w-full"
+                >
+                  {isAtCap ? 'Drop & Add Player' : 'Add Player'}
+                </Button>
+              </>
+            )}
+          </div>
+        </section>
+
         {/* Score Adjustment */}
         <section className="bg-card rounded-xl border border-border p-4">
           <div className="flex items-center gap-2 mb-4">
