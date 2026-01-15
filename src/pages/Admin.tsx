@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Lock, Plus, UserMinus } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check } from 'lucide-react';
 import { useGameStore } from '@/store/gameStore';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -15,13 +15,13 @@ const IPL_TEAMS = ['MI', 'KKR', 'CSK', 'RR', 'RCB', 'DC', 'GT', 'LSG', 'PBKS', '
 
 const Admin = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { 
     managers, 
     players, 
     schedule, 
     updateMatchScore, 
     finalizeWeekScores,
-    isWeekLocked,
     resetLeague, 
     executeTrade, 
     addFreeAgent, 
@@ -38,13 +38,12 @@ const Admin = () => {
   
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Free Agent state
-  const [faManager, setFaManager] = useState('');
+  // Roster Management state
+  const [rmManager, setRmManager] = useState('');
+  const [rmDropPlayer, setRmDropPlayer] = useState('none');
+  const [rmAddPlayer, setRmAddPlayer] = useState('none');
   const [faSearch, setFaSearch] = useState('');
   const [faTeamFilter, setFaTeamFilter] = useState('all');
-  const [selectedFreeAgent, setSelectedFreeAgent] = useState('');
-  const [dropPlayerId, setDropPlayerId] = useState('');
-  const [dropOnlyMode, setDropOnlyMode] = useState(false);
 
   // Score Input state
   const [selectedWeek, setSelectedWeek] = useState('1');
@@ -61,14 +60,16 @@ const Admin = () => {
     if (addPlayerId) {
       const player = players.find(p => p.id === addPlayerId);
       if (player) {
-        setSelectedFreeAgent(addPlayerId);
-        // Scroll to free agent section
+        setRmAddPlayer(addPlayerId);
+        // Clear the URL param
+        navigate('/admin', { replace: true });
+        // Scroll to roster management section
         setTimeout(() => {
-          document.getElementById('free-agent-section')?.scrollIntoView({ behavior: 'smooth' });
+          document.getElementById('roster-management-section')?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
       }
     }
-  }, [searchParams, players]);
+  }, [searchParams, players, navigate]);
 
   // Initialize match scores when week changes
   useEffect(() => {
@@ -104,14 +105,15 @@ const Admin = () => {
     ? [...manager2.activeRoster, ...manager2.bench].map(id => players.find(p => p.id === id)!).filter(Boolean)
     : [];
 
-  // Free Agent logic
+  // Roster Management logic
   const freeAgents = getFreeAgents();
-  const faManagerData = managers.find(m => m.id === faManager);
-  const faRosterCount = faManager ? getManagerRosterCount(faManager) : 0;
-  const isAtCap = faRosterCount >= ROSTER_CAP;
+  const rmManagerData = managers.find(m => m.id === rmManager);
+  const rmRosterCount = rmManager ? getManagerRosterCount(rmManager) : 0;
+  const isAtCap = rmRosterCount >= ROSTER_CAP;
+  const hasPlayers = rmRosterCount > 0;
 
-  const faManagerPlayers = faManagerData 
-    ? [...faManagerData.activeRoster, ...faManagerData.bench].map(id => players.find(p => p.id === id)!).filter(Boolean)
+  const rmManagerPlayers = rmManagerData 
+    ? [...rmManagerData.activeRoster, ...rmManagerData.bench].map(id => players.find(p => p.id === id)!).filter(Boolean)
     : [];
 
   const uniqueTeams = useMemo(() => {
@@ -127,22 +129,38 @@ const Admin = () => {
     });
   }, [freeAgents, faSearch, faTeamFilter]);
 
-  const handleAddFreeAgent = () => {
-    if (faManager && selectedFreeAgent) {
-      if (isAtCap && !dropPlayerId) return;
-      addFreeAgent(faManager, selectedFreeAgent, isAtCap ? dropPlayerId : undefined);
-      setSelectedFreeAgent('');
-      setDropPlayerId('');
+  // Determine what actions are possible
+  const canAddOnly = rmManager && !isAtCap && rmAddPlayer !== 'none';
+  const canDropOnly = rmManager && hasPlayers && rmDropPlayer !== 'none' && rmAddPlayer === 'none';
+  const canAddAndDrop = rmManager && rmAddPlayer !== 'none' && rmDropPlayer !== 'none';
+
+  const handleExecuteRosterMove = () => {
+    if (!rmManager) return;
+
+    if (canAddAndDrop) {
+      // Add & Drop
+      addFreeAgent(rmManager, rmAddPlayer, rmDropPlayer);
+    } else if (canAddOnly) {
+      // Add only
+      addFreeAgent(rmManager, rmAddPlayer);
+    } else if (canDropOnly) {
+      // Drop only
+      dropPlayerOnly(rmManager, rmDropPlayer);
     }
+
+    // Reset selections
+    setRmDropPlayer('none');
+    setRmAddPlayer('none');
   };
 
-  const handleDropOnly = () => {
-    if (faManager && dropPlayerId) {
-      dropPlayerOnly(faManager, dropPlayerId);
-      setDropPlayerId('');
-      setDropOnlyMode(false);
-    }
+  const getButtonLabel = () => {
+    if (canAddAndDrop) return 'Add & Drop Player';
+    if (canAddOnly) return 'Add Player';
+    if (canDropOnly) return 'Drop Player';
+    return 'Execute Roster Move';
   };
+
+  const isButtonEnabled = canAddOnly || canDropOnly || canAddAndDrop;
 
   const handleAddNewPlayer = () => {
     if (newPlayerName && newPlayerTeam && newPlayerRole) {
@@ -166,14 +184,11 @@ const Admin = () => {
   // Score Input Logic
   const weekNum = parseInt(selectedWeek);
   const weekMatches = schedule.filter(m => m.week === weekNum);
-  const weekLocked = isWeekLocked(weekNum);
   const allScoresEntered = weekMatches.every((_, idx) => 
     matchScores[idx]?.home && matchScores[idx]?.away
   );
 
   const handleScoreChange = (matchIndex: number, team: 'home' | 'away', value: string) => {
-    if (weekLocked) return;
-    
     setMatchScores(prev => ({
       ...prev,
       [matchIndex]: {
@@ -184,8 +199,6 @@ const Admin = () => {
   };
 
   const handleScoreBlur = (matchIndex: number) => {
-    if (weekLocked) return;
-    
     const scores = matchScores[matchIndex];
     if (scores?.home && scores?.away) {
       const homeScore = parseInt(scores.home);
@@ -234,12 +247,6 @@ const Admin = () => {
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
               <h2 className="font-semibold text-foreground italic">Score Input</h2>
-              {weekLocked && (
-                <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px]">
-                  <Lock className="w-3 h-3 mr-1" />
-                  Locked
-                </Badge>
-              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground uppercase tracking-wider">Select Week</span>
@@ -250,7 +257,7 @@ const Admin = () => {
                 <SelectContent>
                   {[1, 2, 3, 4, 5, 6, 7].map(week => (
                     <SelectItem key={week} value={week.toString()}>
-                      Week {week} {isWeekLocked(week) ? '🔒' : ''}
+                      Week {week}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -280,8 +287,7 @@ const Admin = () => {
                       onBlur={() => handleScoreBlur(idx)}
                       onFocus={(e) => e.target.select()}
                       placeholder="0"
-                      disabled={weekLocked}
-                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
+                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <span className="text-xs text-muted-foreground uppercase">vs</span>
                     <Input
@@ -291,8 +297,7 @@ const Admin = () => {
                       onBlur={() => handleScoreBlur(idx)}
                       onFocus={(e) => e.target.select()}
                       placeholder="0"
-                      disabled={weekLocked}
-                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
+                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <span className="text-sm font-medium text-foreground w-20">
                       {awayManager?.teamName}
@@ -302,16 +307,14 @@ const Admin = () => {
               );
             })}
 
-            {!weekLocked && (
-              <Button 
-                onClick={handleFinalizeWeek}
-                disabled={!allScoresEntered}
-                className="w-full"
-              >
-                <Lock className="w-4 h-4 mr-2" />
-                Finalize Week {selectedWeek}
-              </Button>
-            )}
+            <Button 
+              onClick={handleFinalizeWeek}
+              disabled={!allScoresEntered}
+              className="w-full"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Finalize Week {selectedWeek}
+            </Button>
           </div>
         </section>
 
@@ -375,196 +378,141 @@ const Admin = () => {
           </div>
         </section>
 
-        {/* Free Agent Management */}
-        <section id="free-agent-section" className="bg-card rounded-xl border border-border p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-secondary" />
-              <h2 className="font-semibold text-foreground">Add Free Agent</h2>
-            </div>
-            {faManager && faRosterCount > 0 && (
-              <Button
-                variant={dropOnlyMode ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setDropOnlyMode(!dropOnlyMode);
-                  setSelectedFreeAgent('');
-                  setDropPlayerId('');
-                }}
-              >
-                <UserMinus className="w-4 h-4 mr-1" />
-                Drop Only
-              </Button>
-            )}
+        {/* Roster Management */}
+        <section id="roster-management-section" className="bg-card rounded-xl border border-border p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <ArrowLeftRight className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold text-foreground italic">Roster Management</h2>
           </div>
           
           <div className="space-y-4">
-            <div>
-              <Label className="text-muted-foreground mb-2 block">Select Team</Label>
-              <Select value={faManager} onValueChange={(v) => { setFaManager(v); setDropPlayerId(''); setDropOnlyMode(false); }}>
-                <SelectTrigger className="bg-muted border-border">
-                  <SelectValue placeholder="Choose a team" />
-                </SelectTrigger>
-                <SelectContent>
-                  {managers.map(m => {
-                    const count = getManagerRosterCount(m.id);
-                    return (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.teamName} ({count}/{ROSTER_CAP})
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+            {/* Three dropdowns in a row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Select Manager */}
+              <div>
+                <Label className="text-muted-foreground mb-2 block uppercase text-xs tracking-wider">Select Manager</Label>
+                <Select value={rmManager} onValueChange={(v) => { setRmManager(v); setRmDropPlayer('none'); setRmAddPlayer('none'); }}>
+                  <SelectTrigger className="bg-muted border-border">
+                    <SelectValue placeholder="Choose manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {managers.map(m => {
+                      const count = getManagerRosterCount(m.id);
+                      return (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.teamName} ({count}/{ROSTER_CAP})
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Drop (Optional) - Only show if manager has players */}
+              {rmManager && hasPlayers && (
+                <div>
+                  <Label className="text-muted-foreground mb-2 block uppercase text-xs tracking-wider">Drop (Optional)</Label>
+                  <Select value={rmDropPlayer} onValueChange={setRmDropPlayer}>
+                    <SelectTrigger className="bg-muted border-border">
+                      <SelectValue placeholder="Select player to drop" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Drop (Direct Add)</SelectItem>
+                      {rmManagerPlayers.map(player => (
+                        <SelectItem key={player.id} value={player.id}>
+                          {player.name} ({player.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Add from Pool - Only show if not at cap OR if dropping */}
+              {rmManager && (!isAtCap || rmDropPlayer !== 'none') && (
+                <div>
+                  <Label className="text-muted-foreground mb-2 block uppercase text-xs tracking-wider">Add from Pool</Label>
+                  <Select value={rmAddPlayer} onValueChange={setRmAddPlayer}>
+                    <SelectTrigger className="bg-muted border-border">
+                      <SelectValue placeholder="Select player to add" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      <SelectItem value="none">No Add (Drop Only)</SelectItem>
+                      {filteredFreeAgents.slice(0, 100).map(player => (
+                        <SelectItem key={player.id} value={player.id}>
+                          {player.name} ({player.team} - {player.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
-            {faManager && (
-              <>
-                {dropOnlyMode ? (
-                  /* Drop Only Mode */
-                  <div className="space-y-4">
-                    <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                      <p className="text-sm text-destructive font-medium mb-2">
-                        Select a player to drop:
-                      </p>
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {faManagerPlayers.map(player => (
-                          <label 
-                            key={player.id} 
-                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                              dropPlayerId === player.id 
-                                ? 'bg-destructive/20 border border-destructive/50' 
-                                : 'bg-muted hover:bg-muted/80'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="dropOnlyPlayer"
-                              checked={dropPlayerId === player.id}
-                              onChange={() => setDropPlayerId(player.id)}
-                              className="accent-destructive"
-                            />
-                            <span className="text-sm truncate flex-1">{player.name}</span>
-                            <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
-                              {player.role}
-                            </Badge>
-                            <Badge variant="outline" className="text-[10px]">
-                              {player.team}
-                            </Badge>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    <Button 
-                      onClick={handleDropOnly}
-                      disabled={!dropPlayerId}
-                      variant="destructive"
-                      className="w-full"
-                    >
-                      <UserMinus className="w-4 h-4 mr-2" />
-                      Drop Player
-                    </Button>
-                  </div>
-                ) : (
-                  /* Normal Add Mode */
-                  <>
-                    {isAtCap && (
-                      <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                        <p className="text-sm text-destructive font-medium mb-2">
-                          Roster is full! Select a player to drop:
-                        </p>
-                        <div className="space-y-1 max-h-32 overflow-y-auto">
-                          {faManagerPlayers.map(player => (
-                            <label 
-                              key={player.id} 
-                              className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                                dropPlayerId === player.id 
-                                  ? 'bg-destructive/20 border border-destructive/50' 
-                                  : 'bg-muted hover:bg-muted/80'
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                name="dropPlayer"
-                                checked={dropPlayerId === player.id}
-                                onChange={() => setDropPlayerId(player.id)}
-                                className="accent-destructive"
-                              />
-                              <span className="text-sm truncate flex-1">{player.name}</span>
-                              <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
-                                {player.team}
-                              </Badge>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search players..."
-                          value={faSearch}
-                          onChange={(e) => setFaSearch(e.target.value)}
-                          className="pl-9 bg-muted border-border"
-                        />
-                      </div>
-                      <Select value={faTeamFilter} onValueChange={setFaTeamFilter}>
-                        <SelectTrigger className="w-24 bg-muted border-border">
-                          <SelectValue placeholder="Team" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All</SelectItem>
-                          {uniqueTeams.map(team => (
-                            <SelectItem key={team} value={team}>{team}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {filteredFreeAgents.slice(0, 50).map(player => (
-                        <label 
-                          key={player.id} 
-                          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                            selectedFreeAgent === player.id 
-                              ? 'bg-primary/20 border border-primary/50' 
-                              : 'bg-muted hover:bg-muted/80'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="freeAgent"
-                            checked={selectedFreeAgent === player.id}
-                            onChange={() => setSelectedFreeAgent(player.id)}
-                            className="accent-primary"
-                          />
-                          <span className="text-sm truncate flex-1">{player.name}</span>
-                          <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
-                            {player.role}
-                          </Badge>
-                          <Badge variant="outline" className="text-[10px]">
-                            {player.team}
-                          </Badge>
-                        </label>
-                      ))}
-                      {filteredFreeAgents.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4">No free agents found</p>
-                      )}
-                    </div>
-
-                    <Button 
-                      onClick={handleAddFreeAgent}
-                      disabled={!selectedFreeAgent || (isAtCap && !dropPlayerId)}
-                      className="w-full"
-                    >
-                      {isAtCap ? 'Drop & Add Player' : 'Add Player'}
-                    </Button>
-                  </>
-                )}
-              </>
+            {/* Search/Filter for free agents */}
+            {rmManager && (!isAtCap || rmDropPlayer !== 'none') && (
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search free agents..."
+                    value={faSearch}
+                    onChange={(e) => setFaSearch(e.target.value)}
+                    className="pl-9 bg-muted border-border"
+                  />
+                </div>
+                <Select value={faTeamFilter} onValueChange={setFaTeamFilter}>
+                  <SelectTrigger className="w-24 bg-muted border-border">
+                    <SelectValue placeholder="Team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {uniqueTeams.map(team => (
+                      <SelectItem key={team} value={team}>{team}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
+
+            {/* Status message */}
+            {rmManager && isAtCap && rmDropPlayer === 'none' && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                <p className="text-sm text-destructive">
+                  Roster is full ({rmRosterCount}/{ROSTER_CAP}). Select a player to drop to add someone new.
+                </p>
+              </div>
+            )}
+
+            {/* Selected player preview */}
+            {rmAddPlayer !== 'none' && (
+              <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                <p className="text-sm text-primary">
+                  Adding: {players.find(p => p.id === rmAddPlayer)?.name}
+                  {rmDropPlayer !== 'none' && (
+                    <> | Dropping: {players.find(p => p.id === rmDropPlayer)?.name}</>
+                  )}
+                </p>
+              </div>
+            )}
+
+            {rmDropPlayer !== 'none' && rmAddPlayer === 'none' && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                <p className="text-sm text-destructive">
+                  Dropping: {players.find(p => p.id === rmDropPlayer)?.name}
+                </p>
+              </div>
+            )}
+
+            {/* Execute Button */}
+            <Button 
+              onClick={handleExecuteRosterMove}
+              disabled={!isButtonEnabled}
+              className="w-full bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30"
+              variant="outline"
+            >
+              {getButtonLabel()}
+            </Button>
           </div>
         </section>
 
