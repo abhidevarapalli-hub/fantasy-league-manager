@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Settings, Calculator, CheckCircle, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search } from 'lucide-react';
 import { useGameStore } from '@/store/gameStore';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -12,10 +13,8 @@ import { Badge } from '@/components/ui/badge';
 const ROSTER_CAP = 14;
 
 const Admin = () => {
-  const { managers, players, currentWeek, updateScore, finalizeWeek, resetLeague, executeTrade, addFreeAgent, getFreeAgents, getManagerRosterCount } = useGameStore();
-  
-  const [selectedManager, setSelectedManager] = useState('');
-  const [scoreAdjustment, setScoreAdjustment] = useState('');
+  const [searchParams] = useSearchParams();
+  const { managers, players, schedule, updateMatchScore, resetLeague, executeTrade, addFreeAgent, getFreeAgents, getManagerRosterCount } = useGameStore();
   
   const [tradeManager1, setTradeManager1] = useState('');
   const [tradeManager2, setTradeManager2] = useState('');
@@ -31,12 +30,38 @@ const Admin = () => {
   const [selectedFreeAgent, setSelectedFreeAgent] = useState('');
   const [dropPlayerId, setDropPlayerId] = useState('');
 
-  const handleScoreUpdate = () => {
-    if (selectedManager && scoreAdjustment) {
-      updateScore(selectedManager, parseInt(scoreAdjustment, 10));
-      setScoreAdjustment('');
+  // Score Input state
+  const [selectedWeek, setSelectedWeek] = useState('1');
+  const [matchScores, setMatchScores] = useState<Record<number, { home: string; away: string }>>({});
+
+  // Pre-populate player from URL param
+  useEffect(() => {
+    const addPlayerId = searchParams.get('addPlayer');
+    if (addPlayerId) {
+      const player = players.find(p => p.id === addPlayerId);
+      if (player) {
+        setSelectedFreeAgent(addPlayerId);
+        // Scroll to free agent section
+        setTimeout(() => {
+          document.getElementById('free-agent-section')?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
     }
-  };
+  }, [searchParams, players]);
+
+  // Initialize match scores when week changes
+  useEffect(() => {
+    const weekNum = parseInt(selectedWeek);
+    const weekMatches = schedule.filter(m => m.week === weekNum);
+    const initialScores: Record<number, { home: string; away: string }> = {};
+    weekMatches.forEach((match, idx) => {
+      initialScores[idx] = {
+        home: match.homeScore?.toString() || '',
+        away: match.awayScore?.toString() || '',
+      };
+    });
+    setMatchScores(initialScores);
+  }, [selectedWeek, schedule]);
 
   const handleTrade = () => {
     if (tradeManager1 && tradeManager2 && selectedPlayers1.length > 0 && selectedPlayers2.length > 0) {
@@ -100,6 +125,45 @@ const Admin = () => {
     }
   };
 
+  // Score Input Logic
+  const weekNum = parseInt(selectedWeek);
+  const weekMatches = schedule.filter(m => m.week === weekNum);
+
+  const handleScoreChange = (matchIndex: number, team: 'home' | 'away', value: string) => {
+    setMatchScores(prev => ({
+      ...prev,
+      [matchIndex]: {
+        ...prev[matchIndex],
+        [team]: value,
+      },
+    }));
+
+    // Auto-save when both scores are entered
+    const otherTeam = team === 'home' ? 'away' : 'home';
+    const otherValue = matchScores[matchIndex]?.[otherTeam];
+    
+    if (value && otherValue) {
+      const homeScore = team === 'home' ? parseInt(value) : parseInt(otherValue);
+      const awayScore = team === 'away' ? parseInt(value) : parseInt(otherValue);
+      
+      if (!isNaN(homeScore) && !isNaN(awayScore)) {
+        updateMatchScore(weekNum, matchIndex, homeScore, awayScore);
+      }
+    }
+  };
+
+  const handleScoreBlur = (matchIndex: number) => {
+    const scores = matchScores[matchIndex];
+    if (scores?.home && scores?.away) {
+      const homeScore = parseInt(scores.home);
+      const awayScore = parseInt(scores.away);
+      
+      if (!isNaN(homeScore) && !isNaN(awayScore)) {
+        updateMatchScore(weekNum, matchIndex, homeScore, awayScore);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
@@ -115,8 +179,74 @@ const Admin = () => {
       </header>
 
       <main className="px-4 py-4 space-y-6">
-        {/* Free Agent Management */}
+        {/* Score Input */}
         <section className="bg-card rounded-xl border border-border p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              <h2 className="font-semibold text-foreground italic">Score Input</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">Select Week</span>
+              <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                <SelectTrigger className="w-28 bg-primary/10 border-primary/30 text-primary">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6, 7].map(week => (
+                    <SelectItem key={week} value={week.toString()}>Week {week}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="bg-muted/50 rounded-xl p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+              Week {selectedWeek} Matchups
+            </h3>
+            
+            {weekMatches.map((match, idx) => {
+              const homeManager = managers.find(m => m.id === match.home);
+              const awayManager = managers.find(m => m.id === match.away);
+              
+              return (
+                <div key={idx} className="bg-card rounded-xl p-4 border border-border">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-foreground w-20 text-right">
+                      {homeManager?.teamName}
+                    </span>
+                    <Input
+                      type="number"
+                      value={matchScores[idx]?.home || ''}
+                      onChange={(e) => handleScoreChange(idx, 'home', e.target.value)}
+                      onBlur={() => handleScoreBlur(idx)}
+                      onFocus={(e) => e.target.select()}
+                      placeholder="0"
+                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-xs text-muted-foreground uppercase">vs</span>
+                    <Input
+                      type="number"
+                      value={matchScores[idx]?.away || ''}
+                      onChange={(e) => handleScoreChange(idx, 'away', e.target.value)}
+                      onBlur={() => handleScoreBlur(idx)}
+                      onFocus={(e) => e.target.select()}
+                      placeholder="0"
+                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-sm font-medium text-foreground w-20">
+                      {awayManager?.teamName}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Free Agent Management */}
+        <section id="free-agent-section" className="bg-card rounded-xl border border-border p-4">
           <div className="flex items-center gap-2 mb-4">
             <UserPlus className="w-5 h-5 text-secondary" />
             <h2 className="font-semibold text-foreground">Add Free Agent</h2>
@@ -125,7 +255,7 @@ const Admin = () => {
           <div className="space-y-4">
             <div>
               <Label className="text-muted-foreground mb-2 block">Select Team</Label>
-              <Select value={faManager} onValueChange={(v) => { setFaManager(v); setDropPlayerId(''); setSelectedFreeAgent(''); }}>
+              <Select value={faManager} onValueChange={(v) => { setFaManager(v); setDropPlayerId(''); }}>
                 <SelectTrigger className="bg-muted border-border">
                   <SelectValue placeholder="Choose a team" />
                 </SelectTrigger>
@@ -242,70 +372,6 @@ const Admin = () => {
           </div>
         </section>
 
-        {/* Score Adjustment */}
-        <section className="bg-card rounded-xl border border-border p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Calculator className="w-5 h-5 text-primary" />
-            <h2 className="font-semibold text-foreground">Score Adjustment</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <Label className="text-muted-foreground mb-2 block">Select Team</Label>
-              <Select value={selectedManager} onValueChange={setSelectedManager}>
-                <SelectTrigger className="bg-muted border-border">
-                  <SelectValue placeholder="Choose a team" />
-                </SelectTrigger>
-                <SelectContent>
-                  {managers.map(m => (
-                    <SelectItem key={m.id} value={m.id}>{m.teamName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label className="text-muted-foreground mb-2 block">Points (+/-)</Label>
-              <Input
-                type="number"
-                value={scoreAdjustment}
-                onChange={(e) => setScoreAdjustment(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                placeholder="e.g., 10 or -5"
-                className="bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </div>
-            
-            <Button 
-              onClick={handleScoreUpdate}
-              disabled={!selectedManager || !scoreAdjustment}
-              className="w-full"
-            >
-              Apply Adjustment
-            </Button>
-          </div>
-        </section>
-
-        {/* Finalize Week */}
-        <section className="bg-card rounded-xl border border-border p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle className="w-5 h-5 text-success" />
-            <h2 className="font-semibold text-foreground">Finalize Week</h2>
-          </div>
-          
-          <p className="text-sm text-muted-foreground mb-4">
-            Complete Week {currentWeek} and advance to the next round.
-          </p>
-          
-          <Button 
-            onClick={finalizeWeek}
-            variant="outline"
-            className="w-full border-success text-success hover:bg-success hover:text-success-foreground"
-          >
-            Finalize Week {currentWeek}
-          </Button>
-        </section>
-
         {/* Trade Hub */}
         <section className="bg-card rounded-xl border border-border p-4">
           <div className="flex items-center gap-2 mb-4">
@@ -405,8 +471,8 @@ const Admin = () => {
           {!showResetConfirm ? (
             <Button 
               onClick={() => setShowResetConfirm(true)}
-              variant="destructive"
-              className="w-full"
+              variant="outline"
+              className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Reset League
@@ -414,18 +480,21 @@ const Admin = () => {
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-destructive">
-                This will reset all standings, scores, and schedules. This action cannot be undone!
+                ⚠️ This will reset all standings, scores, rosters, and activities. This cannot be undone!
               </p>
               <div className="flex gap-2">
-                <Button 
+                <Button
                   onClick={() => setShowResetConfirm(false)}
                   variant="outline"
                   className="flex-1"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  onClick={() => { resetLeague(); setShowResetConfirm(false); }}
+                <Button
+                  onClick={() => {
+                    resetLeague();
+                    setShowResetConfirm(false);
+                  }}
                   variant="destructive"
                   className="flex-1"
                 >
