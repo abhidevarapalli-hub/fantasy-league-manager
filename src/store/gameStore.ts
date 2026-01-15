@@ -624,10 +624,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   updateMatchScore: (week, matchIndex, homeScore, awayScore) => {
-    const { schedule, managers, lockedWeeks } = get();
-    
-    // Don't allow changes to locked weeks
-    if (lockedWeeks.includes(week)) return;
+    const { schedule } = get();
     
     // Find all matches for the week
     const weekMatches = schedule.filter(m => m.week === week);
@@ -648,14 +645,31 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   finalizeWeekScores: (week) => {
-    const { schedule, managers, activities, lockedWeeks } = get();
-    
-    if (lockedWeeks.includes(week)) return;
+    const { schedule, managers, activities } = get();
     
     const weekMatches = schedule.filter(m => m.week === week);
     const allHaveScores = weekMatches.every(m => m.homeScore !== undefined && m.awayScore !== undefined);
     
     if (!allHaveScores) return;
+
+    // Get previous scores for this week to calculate delta
+    const previousScores: Record<string, { wins: number; losses: number; points: number }> = {};
+    
+    // Check if week was previously finalized (has completed matches)
+    const wasFinalized = weekMatches.some(m => m.completed);
+    
+    if (wasFinalized) {
+      // We need to revert the previous standings first
+      // For simplicity, we'll recalculate from scratch for this week
+      weekMatches.forEach((match) => {
+        const prevHomeScore = match.homeScore;
+        const prevAwayScore = match.awayScore;
+        if (prevHomeScore !== undefined && prevAwayScore !== undefined) {
+          previousScores[match.home] = previousScores[match.home] || { wins: 0, losses: 0, points: 0 };
+          previousScores[match.away] = previousScores[match.away] || { wins: 0, losses: 0, points: 0 };
+        }
+      });
+    }
 
     // Calculate all standings changes
     let updatedManagers = [...managers];
@@ -674,25 +688,28 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       scoreSummary.push(`${homeManager.teamName} ${homeScore} - ${awayScore} ${awayManager.teamName}`);
 
-      updatedManagers = updatedManagers.map(m => {
-        if (m.id === match.home) {
-          return {
-            ...m,
-            wins: m.wins + (homeWins ? 1 : 0),
-            losses: m.losses + (awayWins ? 1 : 0),
-            points: m.points + homeScore,
-          };
-        }
-        if (m.id === match.away) {
-          return {
-            ...m,
-            wins: m.wins + (awayWins ? 1 : 0),
-            losses: m.losses + (homeWins ? 1 : 0),
-            points: m.points + awayScore,
-          };
-        }
-        return m;
-      });
+      // Only add standings if not previously finalized
+      if (!wasFinalized) {
+        updatedManagers = updatedManagers.map(m => {
+          if (m.id === match.home) {
+            return {
+              ...m,
+              wins: m.wins + (homeWins ? 1 : 0),
+              losses: m.losses + (awayWins ? 1 : 0),
+              points: m.points + homeScore,
+            };
+          }
+          if (m.id === match.away) {
+            return {
+              ...m,
+              wins: m.wins + (awayWins ? 1 : 0),
+              losses: m.losses + (homeWins ? 1 : 0),
+              points: m.points + awayScore,
+            };
+          }
+          return m;
+        });
+      }
     });
 
     const newActivity: Activity = {
@@ -700,7 +717,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       timestamp: new Date(),
       type: 'score',
       managerId: 'system',
-      description: `Week ${week} scores updated:\n${scoreSummary.join('\n')}`,
+      description: `Week ${week} scores ${wasFinalized ? 'updated' : 'finalized'}:\n${scoreSummary.join('\n')}`,
     };
 
     set({
@@ -712,13 +729,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       }),
       managers: updatedManagers,
       activities: [newActivity, ...activities],
-      lockedWeeks: [...lockedWeeks, week],
     });
   },
 
   isWeekLocked: (week) => {
-    const { lockedWeeks } = get();
-    return lockedWeeks.includes(week);
+    return false; // Weeks are never locked, can always be re-updated
   },
 
   addNewPlayer: (name, team, role) => {
