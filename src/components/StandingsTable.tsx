@@ -11,9 +11,10 @@ interface StandingsTableProps {
 export const StandingsTable = ({ managers, currentManagerId }: StandingsTableProps) => {
   const navigate = useNavigate();
   
+  // Sort by wins first, then by points as tiebreaker
   const sortedManagers = [...managers].sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    return b.wins - a.wins;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    return b.points - a.points;
   });
 
   return (
