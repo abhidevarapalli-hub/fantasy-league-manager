@@ -28,12 +28,21 @@ export interface Match {
   completed: boolean;
 }
 
+export interface PlayerTransaction {
+  type: 'add' | 'drop';
+  playerName: string;
+  role: string;
+  team: string;
+}
+
 export interface Activity {
   id: string;
   timestamp: Date;
   type: 'add' | 'drop' | 'trade' | 'score';
   managerId: string;
   description: string;
+  players?: PlayerTransaction[];
+  managerTeamName?: string;
 }
 
 interface GameState {
@@ -43,15 +52,20 @@ interface GameState {
   players: Player[];
   schedule: Match[];
   activities: Activity[];
+  lockedWeeks: number[];
   setCurrentManager: (id: string) => void;
   addPlayer: (managerId: string, playerId: string) => void;
   dropPlayer: (managerId: string, playerId: string) => void;
+  dropPlayerOnly: (managerId: string, playerId: string) => void;
   moveToActive: (managerId: string, playerId: string) => void;
   moveToBench: (managerId: string, playerId: string) => void;
   updateMatchScore: (week: number, matchIndex: number, homeScore: number, awayScore: number) => void;
+  finalizeWeekScores: (week: number) => void;
+  isWeekLocked: (week: number) => boolean;
   resetLeague: () => void;
   executeTrade: (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => void;
   addFreeAgent: (managerId: string, playerId: string, dropPlayerId?: string) => void;
+  addNewPlayer: (name: string, team: string, role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper') => void;
   getFreeAgents: () => Player[];
   getManagerRosterCount: (managerId: string) => number;
 }
@@ -393,6 +407,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   players: PLAYERS,
   schedule: SCHEDULE,
   activities: [],
+  lockedWeeks: [],
 
   setCurrentManager: (id) => set({ currentManagerId: id }),
 
@@ -451,6 +466,44 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  dropPlayerOnly: (managerId, playerId) => {
+    const { managers, players, activities } = get();
+    const manager = managers.find(m => m.id === managerId);
+    const player = players.find(p => p.id === playerId);
+    
+    if (!manager || !player) return;
+
+    const playerTx: PlayerTransaction = {
+      type: 'drop',
+      playerName: player.name,
+      role: player.role,
+      team: player.team,
+    };
+
+    const newActivity: Activity = {
+      id: `a${Date.now()}`,
+      timestamp: new Date(),
+      type: 'drop',
+      managerId,
+      description: `${manager.teamName} dropped ${player.name}`,
+      players: [playerTx],
+      managerTeamName: manager.teamName,
+    };
+
+    set({
+      managers: managers.map(m => 
+        m.id === managerId 
+          ? { 
+              ...m, 
+              activeRoster: m.activeRoster.filter(id => id !== playerId),
+              bench: m.bench.filter(id => id !== playerId),
+            }
+          : m
+      ),
+      activities: [newActivity, ...activities],
+    });
+  },
+
   getFreeAgents: () => {
     const { managers, players } = get();
     const rosteredIds = new Set(
@@ -477,6 +530,24 @@ export const useGameStore = create<GameState>((set, get) => ({
     const rosterCount = manager.activeRoster.length + manager.bench.length;
     if (rosterCount >= ROSTER_CAP && !dropPlayerId) return;
 
+    const playerTransactions: PlayerTransaction[] = [];
+    
+    if (dropPlayer) {
+      playerTransactions.push({
+        type: 'drop',
+        playerName: dropPlayer.name,
+        role: dropPlayer.role,
+        team: dropPlayer.team,
+      });
+    }
+    
+    playerTransactions.push({
+      type: 'add',
+      playerName: player.name,
+      role: player.role,
+      team: player.team,
+    });
+
     let description = `${manager.teamName} added ${player.name}`;
     if (dropPlayer) {
       description = `${manager.teamName} dropped ${dropPlayer.name}, added ${player.name}`;
@@ -488,6 +559,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       type: 'add',
       managerId,
       description,
+      players: playerTransactions,
+      managerTeamName: manager.teamName,
     };
 
     set({
@@ -551,90 +624,115 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   updateMatchScore: (week, matchIndex, homeScore, awayScore) => {
-    const { schedule, managers, activities } = get();
+    const { schedule, managers, lockedWeeks } = get();
+    
+    // Don't allow changes to locked weeks
+    if (lockedWeeks.includes(week)) return;
     
     // Find all matches for the week
     const weekMatches = schedule.filter(m => m.week === week);
     if (matchIndex >= weekMatches.length) return;
     
     const match = weekMatches[matchIndex];
-    const homeManager = managers.find(m => m.id === match.home);
-    const awayManager = managers.find(m => m.id === match.away);
-    
-    if (!homeManager || !awayManager) return;
-
-    // Determine winner
-    const homeWins = homeScore > awayScore;
-    const awayWins = awayScore > homeScore;
-    const tie = homeScore === awayScore;
-
-    const newActivity: Activity = {
-      id: `a${Date.now()}`,
-      timestamp: new Date(),
-      type: 'score',
-      managerId: match.home,
-      description: `Week ${week}: ${homeManager.teamName} ${homeScore} - ${awayScore} ${awayManager.teamName}`,
-    };
-
-    // Calculate the old scores to determine win/loss adjustments
     const matchGlobalIndex = schedule.findIndex(m => m.week === week && m.home === match.home && m.away === match.away);
-    const oldMatch = schedule[matchGlobalIndex];
-    const hadOldScores = oldMatch.homeScore !== undefined && oldMatch.awayScore !== undefined;
-    
-    let homeWinDelta = 0;
-    let homeLossDelta = 0;
-    let awayWinDelta = 0;
-    let awayLossDelta = 0;
 
-    // Remove old win/loss if there were previous scores
-    if (hadOldScores) {
-      const oldHomeWon = oldMatch.homeScore! > oldMatch.awayScore!;
-      const oldAwayWon = oldMatch.awayScore! > oldMatch.homeScore!;
-      if (oldHomeWon) {
-        homeWinDelta -= 1;
-        awayLossDelta -= 1;
-      } else if (oldAwayWon) {
-        awayWinDelta -= 1;
-        homeLossDelta -= 1;
-      }
-    }
-
-    // Add new win/loss
-    if (homeWins) {
-      homeWinDelta += 1;
-      awayLossDelta += 1;
-    } else if (awayWins) {
-      awayWinDelta += 1;
-      homeLossDelta += 1;
-    }
-
+    // Just update the scores without creating activity or updating standings
     set({
       schedule: schedule.map((m, idx) => {
         if (idx === matchGlobalIndex) {
-          return { ...m, homeScore, awayScore, completed: true };
+          return { ...m, homeScore, awayScore };
         }
         return m;
       }),
-      managers: managers.map(m => {
+    });
+  },
+
+  finalizeWeekScores: (week) => {
+    const { schedule, managers, activities, lockedWeeks } = get();
+    
+    if (lockedWeeks.includes(week)) return;
+    
+    const weekMatches = schedule.filter(m => m.week === week);
+    const allHaveScores = weekMatches.every(m => m.homeScore !== undefined && m.awayScore !== undefined);
+    
+    if (!allHaveScores) return;
+
+    // Calculate all standings changes
+    let updatedManagers = [...managers];
+    const scoreSummary: string[] = [];
+
+    weekMatches.forEach((match) => {
+      const homeManager = updatedManagers.find(m => m.id === match.home);
+      const awayManager = updatedManagers.find(m => m.id === match.away);
+      
+      if (!homeManager || !awayManager) return;
+
+      const homeScore = match.homeScore!;
+      const awayScore = match.awayScore!;
+      const homeWins = homeScore > awayScore;
+      const awayWins = awayScore > homeScore;
+
+      scoreSummary.push(`${homeManager.teamName} ${homeScore} - ${awayScore} ${awayManager.teamName}`);
+
+      updatedManagers = updatedManagers.map(m => {
         if (m.id === match.home) {
           return {
             ...m,
-            wins: m.wins + homeWinDelta,
-            losses: m.losses + homeLossDelta,
-            points: m.points + homeScore - (hadOldScores ? oldMatch.homeScore! : 0),
+            wins: m.wins + (homeWins ? 1 : 0),
+            losses: m.losses + (awayWins ? 1 : 0),
+            points: m.points + homeScore,
           };
         }
         if (m.id === match.away) {
           return {
             ...m,
-            wins: m.wins + awayWinDelta,
-            losses: m.losses + awayLossDelta,
-            points: m.points + awayScore - (hadOldScores ? oldMatch.awayScore! : 0),
+            wins: m.wins + (awayWins ? 1 : 0),
+            losses: m.losses + (homeWins ? 1 : 0),
+            points: m.points + awayScore,
           };
         }
         return m;
+      });
+    });
+
+    const newActivity: Activity = {
+      id: `a${Date.now()}`,
+      timestamp: new Date(),
+      type: 'score',
+      managerId: 'system',
+      description: `Week ${week} scores updated:\n${scoreSummary.join('\n')}`,
+    };
+
+    set({
+      schedule: schedule.map(m => {
+        if (m.week === week) {
+          return { ...m, completed: true };
+        }
+        return m;
       }),
+      managers: updatedManagers,
       activities: [newActivity, ...activities],
+      lockedWeeks: [...lockedWeeks, week],
+    });
+  },
+
+  isWeekLocked: (week) => {
+    const { lockedWeeks } = get();
+    return lockedWeeks.includes(week);
+  },
+
+  addNewPlayer: (name, team, role) => {
+    const { players } = get();
+    const newId = `custom_${Date.now()}`;
+    const newPlayer: Player = {
+      id: newId,
+      name,
+      team,
+      role,
+      points: 0,
+    };
+    set({
+      players: [...players, newPlayer],
     });
   },
 
@@ -644,6 +742,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       managers: MANAGERS.map(m => ({ ...m, wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] })),
       schedule: SCHEDULE.map(m => ({ ...m, completed: false, homeScore: undefined, awayScore: undefined })),
       activities: [],
+      lockedWeeks: [],
     });
   },
 

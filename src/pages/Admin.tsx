@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search } from 'lucide-react';
+import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Lock, Plus, UserMinus } from 'lucide-react';
 import { useGameStore } from '@/store/gameStore';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,25 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 
 const ROSTER_CAP = 14;
+const IPL_TEAMS = ['MI', 'KKR', 'CSK', 'RR', 'RCB', 'DC', 'GT', 'LSG', 'PBKS', 'SRH'];
 
 const Admin = () => {
   const [searchParams] = useSearchParams();
-  const { managers, players, schedule, updateMatchScore, resetLeague, executeTrade, addFreeAgent, getFreeAgents, getManagerRosterCount } = useGameStore();
+  const { 
+    managers, 
+    players, 
+    schedule, 
+    updateMatchScore, 
+    finalizeWeekScores,
+    isWeekLocked,
+    resetLeague, 
+    executeTrade, 
+    addFreeAgent, 
+    getFreeAgents, 
+    getManagerRosterCount,
+    addNewPlayer,
+    dropPlayerOnly,
+  } = useGameStore();
   
   const [tradeManager1, setTradeManager1] = useState('');
   const [tradeManager2, setTradeManager2] = useState('');
@@ -29,10 +44,16 @@ const Admin = () => {
   const [faTeamFilter, setFaTeamFilter] = useState('all');
   const [selectedFreeAgent, setSelectedFreeAgent] = useState('');
   const [dropPlayerId, setDropPlayerId] = useState('');
+  const [dropOnlyMode, setDropOnlyMode] = useState(false);
 
   // Score Input state
   const [selectedWeek, setSelectedWeek] = useState('1');
   const [matchScores, setMatchScores] = useState<Record<number, { home: string; away: string }>>({});
+
+  // Add New Player state
+  const [newPlayerName, setNewPlayerName] = useState('');
+  const [newPlayerTeam, setNewPlayerTeam] = useState('');
+  const [newPlayerRole, setNewPlayerRole] = useState<'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper' | ''>('');
 
   // Pre-populate player from URL param
   useEffect(() => {
@@ -115,6 +136,23 @@ const Admin = () => {
     }
   };
 
+  const handleDropOnly = () => {
+    if (faManager && dropPlayerId) {
+      dropPlayerOnly(faManager, dropPlayerId);
+      setDropPlayerId('');
+      setDropOnlyMode(false);
+    }
+  };
+
+  const handleAddNewPlayer = () => {
+    if (newPlayerName && newPlayerTeam && newPlayerRole) {
+      addNewPlayer(newPlayerName, newPlayerTeam, newPlayerRole);
+      setNewPlayerName('');
+      setNewPlayerTeam('');
+      setNewPlayerRole('');
+    }
+  };
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'Batsman': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
@@ -128,8 +166,14 @@ const Admin = () => {
   // Score Input Logic
   const weekNum = parseInt(selectedWeek);
   const weekMatches = schedule.filter(m => m.week === weekNum);
+  const weekLocked = isWeekLocked(weekNum);
+  const allScoresEntered = weekMatches.every((_, idx) => 
+    matchScores[idx]?.home && matchScores[idx]?.away
+  );
 
   const handleScoreChange = (matchIndex: number, team: 'home' | 'away', value: string) => {
+    if (weekLocked) return;
+    
     setMatchScores(prev => ({
       ...prev,
       [matchIndex]: {
@@ -137,22 +181,11 @@ const Admin = () => {
         [team]: value,
       },
     }));
-
-    // Auto-save when both scores are entered
-    const otherTeam = team === 'home' ? 'away' : 'home';
-    const otherValue = matchScores[matchIndex]?.[otherTeam];
-    
-    if (value && otherValue) {
-      const homeScore = team === 'home' ? parseInt(value) : parseInt(otherValue);
-      const awayScore = team === 'away' ? parseInt(value) : parseInt(otherValue);
-      
-      if (!isNaN(homeScore) && !isNaN(awayScore)) {
-        updateMatchScore(weekNum, matchIndex, homeScore, awayScore);
-      }
-    }
   };
 
   const handleScoreBlur = (matchIndex: number) => {
+    if (weekLocked) return;
+    
     const scores = matchScores[matchIndex];
     if (scores?.home && scores?.away) {
       const homeScore = parseInt(scores.home);
@@ -162,6 +195,22 @@ const Admin = () => {
         updateMatchScore(weekNum, matchIndex, homeScore, awayScore);
       }
     }
+  };
+
+  const handleFinalizeWeek = () => {
+    // Save all scores first
+    weekMatches.forEach((_, idx) => {
+      const scores = matchScores[idx];
+      if (scores?.home && scores?.away) {
+        const homeScore = parseInt(scores.home);
+        const awayScore = parseInt(scores.away);
+        if (!isNaN(homeScore) && !isNaN(awayScore)) {
+          updateMatchScore(weekNum, idx, homeScore, awayScore);
+        }
+      }
+    });
+    // Then finalize
+    finalizeWeekScores(weekNum);
   };
 
   return (
@@ -185,6 +234,12 @@ const Admin = () => {
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
               <h2 className="font-semibold text-foreground italic">Score Input</h2>
+              {weekLocked && (
+                <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px]">
+                  <Lock className="w-3 h-3 mr-1" />
+                  Locked
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground uppercase tracking-wider">Select Week</span>
@@ -194,7 +249,9 @@ const Admin = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {[1, 2, 3, 4, 5, 6, 7].map(week => (
-                    <SelectItem key={week} value={week.toString()}>Week {week}</SelectItem>
+                    <SelectItem key={week} value={week.toString()}>
+                      Week {week} {isWeekLocked(week) ? '🔒' : ''}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -223,7 +280,8 @@ const Admin = () => {
                       onBlur={() => handleScoreBlur(idx)}
                       onFocus={(e) => e.target.select()}
                       placeholder="0"
-                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      disabled={weekLocked}
+                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
                     />
                     <span className="text-xs text-muted-foreground uppercase">vs</span>
                     <Input
@@ -233,7 +291,8 @@ const Admin = () => {
                       onBlur={() => handleScoreBlur(idx)}
                       onFocus={(e) => e.target.select()}
                       placeholder="0"
-                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      disabled={weekLocked}
+                      className="w-20 text-center text-lg font-bold bg-muted border-border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
                     />
                     <span className="text-sm font-medium text-foreground w-20">
                       {awayManager?.teamName}
@@ -242,20 +301,107 @@ const Admin = () => {
                 </div>
               );
             })}
+
+            {!weekLocked && (
+              <Button 
+                onClick={handleFinalizeWeek}
+                disabled={!allScoresEntered}
+                className="w-full"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                Finalize Week {selectedWeek}
+              </Button>
+            )}
+          </div>
+        </section>
+
+        {/* Add New Player */}
+        <section className="bg-card rounded-xl border border-border p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Plus className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold text-foreground">Add New Player</h2>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <Label className="text-muted-foreground mb-2 block">Player Name</Label>
+              <Input
+                placeholder="Enter player name"
+                value={newPlayerName}
+                onChange={(e) => setNewPlayerName(e.target.value)}
+                className="bg-muted border-border"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-muted-foreground mb-2 block">IPL Team</Label>
+                <Select value={newPlayerTeam} onValueChange={setNewPlayerTeam}>
+                  <SelectTrigger className="bg-muted border-border">
+                    <SelectValue placeholder="Select team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IPL_TEAMS.map(team => (
+                      <SelectItem key={team} value={team}>{team}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-muted-foreground mb-2 block">Position</Label>
+                <Select value={newPlayerRole} onValueChange={(v) => setNewPlayerRole(v as any)}>
+                  <SelectTrigger className="bg-muted border-border">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Batsman">Batsman</SelectItem>
+                    <SelectItem value="Bowler">Bowler</SelectItem>
+                    <SelectItem value="All Rounder">All Rounder</SelectItem>
+                    <SelectItem value="Wicket Keeper">Wicket Keeper</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleAddNewPlayer}
+              disabled={!newPlayerName || !newPlayerTeam || !newPlayerRole}
+              className="w-full"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Player to Pool
+            </Button>
           </div>
         </section>
 
         {/* Free Agent Management */}
         <section id="free-agent-section" className="bg-card rounded-xl border border-border p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <UserPlus className="w-5 h-5 text-secondary" />
-            <h2 className="font-semibold text-foreground">Add Free Agent</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-secondary" />
+              <h2 className="font-semibold text-foreground">Add Free Agent</h2>
+            </div>
+            {faManager && faRosterCount > 0 && (
+              <Button
+                variant={dropOnlyMode ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setDropOnlyMode(!dropOnlyMode);
+                  setSelectedFreeAgent('');
+                  setDropPlayerId('');
+                }}
+              >
+                <UserMinus className="w-4 h-4 mr-1" />
+                Drop Only
+              </Button>
+            )}
           </div>
           
           <div className="space-y-4">
             <div>
               <Label className="text-muted-foreground mb-2 block">Select Team</Label>
-              <Select value={faManager} onValueChange={(v) => { setFaManager(v); setDropPlayerId(''); }}>
+              <Select value={faManager} onValueChange={(v) => { setFaManager(v); setDropPlayerId(''); setDropOnlyMode(false); }}>
                 <SelectTrigger className="bg-muted border-border">
                   <SelectValue placeholder="Choose a team" />
                 </SelectTrigger>
@@ -274,99 +420,149 @@ const Admin = () => {
 
             {faManager && (
               <>
-                {isAtCap && (
-                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                    <p className="text-sm text-destructive font-medium mb-2">
-                      Roster is full! Select a player to drop:
-                    </p>
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {faManagerPlayers.map(player => (
+                {dropOnlyMode ? (
+                  /* Drop Only Mode */
+                  <div className="space-y-4">
+                    <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                      <p className="text-sm text-destructive font-medium mb-2">
+                        Select a player to drop:
+                      </p>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {faManagerPlayers.map(player => (
+                          <label 
+                            key={player.id} 
+                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                              dropPlayerId === player.id 
+                                ? 'bg-destructive/20 border border-destructive/50' 
+                                : 'bg-muted hover:bg-muted/80'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="dropOnlyPlayer"
+                              checked={dropPlayerId === player.id}
+                              onChange={() => setDropPlayerId(player.id)}
+                              className="accent-destructive"
+                            />
+                            <span className="text-sm truncate flex-1">{player.name}</span>
+                            <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
+                              {player.role}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px]">
+                              {player.team}
+                            </Badge>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={handleDropOnly}
+                      disabled={!dropPlayerId}
+                      variant="destructive"
+                      className="w-full"
+                    >
+                      <UserMinus className="w-4 h-4 mr-2" />
+                      Drop Player
+                    </Button>
+                  </div>
+                ) : (
+                  /* Normal Add Mode */
+                  <>
+                    {isAtCap && (
+                      <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                        <p className="text-sm text-destructive font-medium mb-2">
+                          Roster is full! Select a player to drop:
+                        </p>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {faManagerPlayers.map(player => (
+                            <label 
+                              key={player.id} 
+                              className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                                dropPlayerId === player.id 
+                                  ? 'bg-destructive/20 border border-destructive/50' 
+                                  : 'bg-muted hover:bg-muted/80'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="dropPlayer"
+                                checked={dropPlayerId === player.id}
+                                onChange={() => setDropPlayerId(player.id)}
+                                className="accent-destructive"
+                              />
+                              <span className="text-sm truncate flex-1">{player.name}</span>
+                              <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
+                                {player.team}
+                              </Badge>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search players..."
+                          value={faSearch}
+                          onChange={(e) => setFaSearch(e.target.value)}
+                          className="pl-9 bg-muted border-border"
+                        />
+                      </div>
+                      <Select value={faTeamFilter} onValueChange={setFaTeamFilter}>
+                        <SelectTrigger className="w-24 bg-muted border-border">
+                          <SelectValue placeholder="Team" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          {uniqueTeams.map(team => (
+                            <SelectItem key={team} value={team}>{team}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {filteredFreeAgents.slice(0, 50).map(player => (
                         <label 
                           key={player.id} 
                           className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                            dropPlayerId === player.id 
-                              ? 'bg-destructive/20 border border-destructive/50' 
+                            selectedFreeAgent === player.id 
+                              ? 'bg-primary/20 border border-primary/50' 
                               : 'bg-muted hover:bg-muted/80'
                           }`}
                         >
                           <input
                             type="radio"
-                            name="dropPlayer"
-                            checked={dropPlayerId === player.id}
-                            onChange={() => setDropPlayerId(player.id)}
-                            className="accent-destructive"
+                            name="freeAgent"
+                            checked={selectedFreeAgent === player.id}
+                            onChange={() => setSelectedFreeAgent(player.id)}
+                            className="accent-primary"
                           />
                           <span className="text-sm truncate flex-1">{player.name}</span>
                           <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
+                            {player.role}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px]">
                             {player.team}
                           </Badge>
                         </label>
                       ))}
+                      {filteredFreeAgents.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">No free agents found</p>
+                      )}
                     </div>
-                  </div>
-                )}
 
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search players..."
-                      value={faSearch}
-                      onChange={(e) => setFaSearch(e.target.value)}
-                      className="pl-9 bg-muted border-border"
-                    />
-                  </div>
-                  <Select value={faTeamFilter} onValueChange={setFaTeamFilter}>
-                    <SelectTrigger className="w-24 bg-muted border-border">
-                      <SelectValue placeholder="Team" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      {uniqueTeams.map(team => (
-                        <SelectItem key={team} value={team}>{team}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {filteredFreeAgents.slice(0, 50).map(player => (
-                    <label 
-                      key={player.id} 
-                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                        selectedFreeAgent === player.id 
-                          ? 'bg-primary/20 border border-primary/50' 
-                          : 'bg-muted hover:bg-muted/80'
-                      }`}
+                    <Button 
+                      onClick={handleAddFreeAgent}
+                      disabled={!selectedFreeAgent || (isAtCap && !dropPlayerId)}
+                      className="w-full"
                     >
-                      <input
-                        type="radio"
-                        name="freeAgent"
-                        checked={selectedFreeAgent === player.id}
-                        onChange={() => setSelectedFreeAgent(player.id)}
-                        className="accent-primary"
-                      />
-                      <span className="text-sm truncate flex-1">{player.name}</span>
-                      <Badge variant="outline" className={`text-[10px] ${getRoleBadgeColor(player.role)}`}>
-                        {player.role}
-                      </Badge>
-                      <Badge variant="outline" className="text-[10px]">
-                        {player.team}
-                      </Badge>
-                    </label>
-                  ))}
-                  {filteredFreeAgents.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">No free agents found</p>
-                  )}
-                </div>
-
-                <Button 
-                  onClick={handleAddFreeAgent}
-                  disabled={!selectedFreeAgent || (isAtCap && !dropPlayerId)}
-                  className="w-full"
-                >
-                  {isAtCap ? 'Drop & Add Player' : 'Add Player'}
-                </Button>
+                      {isAtCap ? 'Drop & Add Player' : 'Add Player'}
+                    </Button>
+                  </>
+                )}
               </>
             )}
           </div>
