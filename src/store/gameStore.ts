@@ -48,8 +48,7 @@ interface GameState {
   dropPlayer: (managerId: string, playerId: string) => void;
   moveToActive: (managerId: string, playerId: string) => void;
   moveToBench: (managerId: string, playerId: string) => void;
-  updateScore: (managerId: string, points: number) => void;
-  finalizeWeek: () => void;
+  updateMatchScore: (week: number, matchIndex: number, homeScore: number, awayScore: number) => void;
   resetLeague: () => void;
   executeTrade: (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => void;
   addFreeAgent: (managerId: string, playerId: string, dropPlayerId?: string) => void;
@@ -331,14 +330,14 @@ const PLAYERS: Player[] = [
 ];
 
 const MANAGERS: Manager[] = [
-  { id: 'm1', name: 'Abhi', teamName: 'Abhi XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
-  { id: 'm2', name: 'Sahith', teamName: 'Sahith XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
-  { id: 'm3', name: 'Jasthi', teamName: 'Jasthi XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
-  { id: 'm4', name: 'Vamsi', teamName: 'Vamsi XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
-  { id: 'm5', name: 'Krishna', teamName: 'Krishna XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
-  { id: 'm6', name: 'Krithik', teamName: 'Krithik XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
-  { id: 'm7', name: 'Akash', teamName: 'Akash XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
-  { id: 'm8', name: 'Santosh', teamName: 'Santosh XI', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
+  { id: 'm1', name: 'Abhi', teamName: 'Abhi', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
+  { id: 'm2', name: 'Sahith', teamName: 'Sahith', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
+  { id: 'm3', name: 'Jasthi', teamName: 'Jasthi', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
+  { id: 'm4', name: 'Vamsi', teamName: 'Vamsi', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
+  { id: 'm5', name: 'Krishna', teamName: 'Krishna', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
+  { id: 'm6', name: 'Krithik', teamName: 'Krithik', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
+  { id: 'm7', name: 'Akash', teamName: 'Akash', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
+  { id: 'm8', name: 'Santosh', teamName: 'Santosh', wins: 0, losses: 0, points: 0, activeRoster: [], bench: [] },
 ];
 
 const SCHEDULE: Match[] = [
@@ -347,39 +346,43 @@ const SCHEDULE: Match[] = [
   { week: 1, home: 'm4', away: 'm6', completed: false }, // Vamsi vs Krithik
   { week: 1, home: 'm7', away: 'm5', completed: false }, // Akash vs Krishna
   { week: 1, home: 'm3', away: 'm2', completed: false }, // Jasthi vs Sahith
+
   // Week 2
   { week: 2, home: 'm1', away: 'm3', completed: false }, // Abhi vs Jasthi
   { week: 2, home: 'm6', away: 'm2', completed: false }, // Krithik vs Sahith
   { week: 2, home: 'm7', away: 'm4', completed: false }, // Akash vs Vamsi
   { week: 2, home: 'm8', away: 'm5', completed: false }, // Santosh vs Krishna
+
   // Week 3
   { week: 3, home: 'm1', away: 'm2', completed: false }, // Abhi vs Sahith
   { week: 3, home: 'm4', away: 'm5', completed: false }, // Vamsi vs Krishna
   { week: 3, home: 'm7', away: 'm3', completed: false }, // Akash vs Jasthi
   { week: 3, home: 'm8', away: 'm6', completed: false }, // Santosh vs Krithik
+
   // Week 4
   { week: 4, home: 'm1', away: 'm6', completed: false }, // Abhi vs Krithik
   { week: 4, home: 'm4', away: 'm2', completed: false }, // Vamsi vs Sahith
   { week: 4, home: 'm7', away: 'm8', completed: false }, // Akash vs Santosh
   { week: 4, home: 'm5', away: 'm3', completed: false }, // Krishna vs Jasthi
+
   // Week 5
   { week: 5, home: 'm1', away: 'm7', completed: false }, // Abhi vs Akash
   { week: 5, home: 'm6', away: 'm3', completed: false }, // Krithik vs Jasthi
   { week: 5, home: 'm5', away: 'm2', completed: false }, // Krishna vs Sahith
   { week: 5, home: 'm4', away: 'm8', completed: false }, // Vamsi vs Santosh
+
   // Week 6
   { week: 6, home: 'm1', away: 'm4', completed: false }, // Abhi vs Vamsi
   { week: 6, home: 'm7', away: 'm2', completed: false }, // Akash vs Sahith
   { week: 6, home: 'm5', away: 'm6', completed: false }, // Krishna vs Krithik
   { week: 6, home: 'm8', away: 'm3', completed: false }, // Santosh vs Jasthi
+
   // Week 7
   { week: 7, home: 'm1', away: 'm5', completed: false }, // Abhi vs Krishna
   { week: 7, home: 'm4', away: 'm3', completed: false }, // Vamsi vs Jasthi
   { week: 7, home: 'm7', away: 'm6', completed: false }, // Akash vs Krithik
   { week: 7, home: 'm8', away: 'm2', completed: false }, // Santosh vs Sahith
 ];
-
-const ACTIVITIES: Activity[] = [];
 
 const ROSTER_CAP = 14;
 
@@ -389,26 +392,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   managers: MANAGERS,
   players: PLAYERS,
   schedule: SCHEDULE,
-  activities: ACTIVITIES,
+  activities: [],
 
   setCurrentManager: (id) => set({ currentManagerId: id }),
-
-  getManagerRosterCount: (managerId) => {
-    const { managers } = get();
-    const manager = managers.find(m => m.id === managerId);
-    if (!manager) return 0;
-    return manager.activeRoster.length + manager.bench.length;
-  },
-
-  getFreeAgents: () => {
-    const { players, managers } = get();
-    const ownedPlayerIds = new Set<string>();
-    managers.forEach(m => {
-      m.activeRoster.forEach(id => ownedPlayerIds.add(id));
-      m.bench.forEach(id => ownedPlayerIds.add(id));
-    });
-    return players.filter(p => !ownedPlayerIds.has(p.id));
-  },
 
   addPlayer: (managerId, playerId) => {
     const { managers, players, activities } = get();
@@ -416,9 +402,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const player = players.find(p => p.id === playerId);
     
     if (!manager || !player) return;
-    
-    const totalPlayers = manager.activeRoster.length + manager.bench.length;
-    if (totalPlayers >= ROSTER_CAP) return;
+    if (manager.activeRoster.length + manager.bench.length >= ROSTER_CAP) return;
 
     const newActivity: Activity = {
       id: `a${Date.now()}`,
@@ -467,21 +451,31 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  getFreeAgents: () => {
+    const { managers, players } = get();
+    const rosteredIds = new Set(
+      managers.flatMap(m => [...m.activeRoster, ...m.bench])
+    );
+    return players.filter(p => !rosteredIds.has(p.id));
+  },
+
+  getManagerRosterCount: (managerId) => {
+    const { managers } = get();
+    const manager = managers.find(m => m.id === managerId);
+    if (!manager) return 0;
+    return manager.activeRoster.length + manager.bench.length;
+  },
+
   addFreeAgent: (managerId, playerId, dropPlayerId) => {
-    const { managers, players, activities, getFreeAgents, getManagerRosterCount } = get();
+    const { managers, players, activities } = get();
     const manager = managers.find(m => m.id === managerId);
     const player = players.find(p => p.id === playerId);
-    const freeAgents = getFreeAgents();
+    const dropPlayer = dropPlayerId ? players.find(p => p.id === dropPlayerId) : null;
     
     if (!manager || !player) return;
-    if (!freeAgents.find(p => p.id === playerId)) return; // Not a free agent
 
-    const rosterCount = getManagerRosterCount(managerId);
-    
-    // If at cap, must drop a player
+    const rosterCount = manager.activeRoster.length + manager.bench.length;
     if (rosterCount >= ROSTER_CAP && !dropPlayerId) return;
-    
-    const dropPlayer = dropPlayerId ? players.find(p => p.id === dropPlayerId) : null;
 
     let description = `${manager.teamName} added ${player.name}`;
     if (dropPlayer) {
@@ -556,39 +550,91 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
-  updateScore: (managerId, points) => {
-    const { managers, activities } = get();
-    const manager = managers.find(m => m.id === managerId);
+  updateMatchScore: (week, matchIndex, homeScore, awayScore) => {
+    const { schedule, managers, activities } = get();
     
-    if (!manager) return;
+    // Find all matches for the week
+    const weekMatches = schedule.filter(m => m.week === week);
+    if (matchIndex >= weekMatches.length) return;
+    
+    const match = weekMatches[matchIndex];
+    const homeManager = managers.find(m => m.id === match.home);
+    const awayManager = managers.find(m => m.id === match.away);
+    
+    if (!homeManager || !awayManager) return;
+
+    // Determine winner
+    const homeWins = homeScore > awayScore;
+    const awayWins = awayScore > homeScore;
+    const tie = homeScore === awayScore;
 
     const newActivity: Activity = {
       id: `a${Date.now()}`,
       timestamp: new Date(),
       type: 'score',
-      managerId,
-      description: `Score adjusted for ${manager.teamName}: ${points > 0 ? '+' : ''}${points} pts`,
+      managerId: match.home,
+      description: `Week ${week}: ${homeManager.teamName} ${homeScore} - ${awayScore} ${awayManager.teamName}`,
     };
 
-    set({
-      managers: managers.map(m => 
-        m.id === managerId 
-          ? { ...m, points: m.points + points }
-          : m
-      ),
-      activities: [newActivity, ...activities],
-    });
-  },
+    // Calculate the old scores to determine win/loss adjustments
+    const matchGlobalIndex = schedule.findIndex(m => m.week === week && m.home === match.home && m.away === match.away);
+    const oldMatch = schedule[matchGlobalIndex];
+    const hadOldScores = oldMatch.homeScore !== undefined && oldMatch.awayScore !== undefined;
+    
+    let homeWinDelta = 0;
+    let homeLossDelta = 0;
+    let awayWinDelta = 0;
+    let awayLossDelta = 0;
 
-  finalizeWeek: () => {
-    const { currentWeek, schedule } = get();
+    // Remove old win/loss if there were previous scores
+    if (hadOldScores) {
+      const oldHomeWon = oldMatch.homeScore! > oldMatch.awayScore!;
+      const oldAwayWon = oldMatch.awayScore! > oldMatch.homeScore!;
+      if (oldHomeWon) {
+        homeWinDelta -= 1;
+        awayLossDelta -= 1;
+      } else if (oldAwayWon) {
+        awayWinDelta -= 1;
+        homeLossDelta -= 1;
+      }
+    }
+
+    // Add new win/loss
+    if (homeWins) {
+      homeWinDelta += 1;
+      awayLossDelta += 1;
+    } else if (awayWins) {
+      awayWinDelta += 1;
+      homeLossDelta += 1;
+    }
+
     set({
-      schedule: schedule.map(m => 
-        m.week === currentWeek 
-          ? { ...m, completed: true, homeScore: Math.floor(Math.random() * 100) + 100, awayScore: Math.floor(Math.random() * 100) + 100 }
-          : m
-      ),
-      currentWeek: currentWeek + 1,
+      schedule: schedule.map((m, idx) => {
+        if (idx === matchGlobalIndex) {
+          return { ...m, homeScore, awayScore, completed: true };
+        }
+        return m;
+      }),
+      managers: managers.map(m => {
+        if (m.id === match.home) {
+          return {
+            ...m,
+            wins: m.wins + homeWinDelta,
+            losses: m.losses + homeLossDelta,
+            points: m.points + homeScore - (hadOldScores ? oldMatch.homeScore! : 0),
+          };
+        }
+        if (m.id === match.away) {
+          return {
+            ...m,
+            wins: m.wins + awayWinDelta,
+            losses: m.losses + awayLossDelta,
+            points: m.points + awayScore - (hadOldScores ? oldMatch.awayScore! : 0),
+          };
+        }
+        return m;
+      }),
+      activities: [newActivity, ...activities],
     });
   },
 

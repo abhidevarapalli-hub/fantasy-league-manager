@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Filter, UserPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/gameStore';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
@@ -23,40 +25,45 @@ const teamFilterColors: Record<string, string> = {
 };
 
 const Players = () => {
-  const { players, managers, currentManagerId, addPlayer } = useGameStore();
+  const navigate = useNavigate();
+  const { players, managers } = useGameStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
+  const [showOnlyFreeAgents, setShowOnlyFreeAgents] = useState(false);
 
-  const currentManager = managers.find(m => m.id === currentManagerId);
-  const ownedPlayerIds = new Set([
-    ...(currentManager?.activeRoster || []),
-    ...(currentManager?.bench || []),
-  ]);
-
-  // All rostered players across all teams
-  const allRosteredIds = new Set(
-    managers.flatMap(m => [...m.activeRoster, ...m.bench])
-  );
+  // Build a map of player ID -> manager team name
+  const playerToManagerMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    managers.forEach(manager => {
+      [...manager.activeRoster, ...manager.bench].forEach(playerId => {
+        map[playerId] = manager.teamName;
+      });
+    });
+    return map;
+  }, [managers]);
 
   const filteredPlayers = useMemo(() => {
     return players.filter(player => {
       const matchesSearch = player.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            player.team.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTeam = selectedTeam === 'All' || player.team === selectedTeam;
-      const isAvailable = !allRosteredIds.has(player.id) || ownedPlayerIds.has(player.id);
-      return matchesSearch && matchesTeam && isAvailable;
+      const isRostered = playerToManagerMap[player.id];
+      const matchesFreeAgentFilter = !showOnlyFreeAgents || !isRostered;
+      return matchesSearch && matchesTeam && matchesFreeAgentFilter;
     });
-  }, [players, searchQuery, selectedTeam, allRosteredIds, ownedPlayerIds]);
+  }, [players, searchQuery, selectedTeam, playerToManagerMap, showOnlyFreeAgents]);
 
-  const canAddMore = currentManager && 
-    (currentManager.activeRoster.length + currentManager.bench.length) < 14;
+  const handleAddPlayer = (playerId: string) => {
+    // Navigate to admin with player pre-selected
+    navigate(`/admin?addPlayer=${playerId}`);
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
         <div className="px-4 py-3">
           <h1 className="text-lg font-bold text-foreground">Player Pool</h1>
-          <p className="text-xs text-muted-foreground">{filteredPlayers.length} players available</p>
+          <p className="text-xs text-muted-foreground">{filteredPlayers.length} players</p>
         </div>
         
         {/* Search */}
@@ -78,6 +85,22 @@ const Players = () => {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Free Agent Filter */}
+        <div className="px-4 pb-2">
+          <button
+            onClick={() => setShowOnlyFreeAgents(!showOnlyFreeAgents)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+              showOnlyFreeAgents
+                ? "bg-secondary/20 text-secondary border-secondary/30"
+                : "bg-muted/50 text-muted-foreground border-border hover:border-secondary/30"
+            )}
+          >
+            <Filter className="w-3 h-3" />
+            {showOnlyFreeAgents ? 'Showing Free Agents Only' : 'Show Free Agents Only'}
+          </button>
         </div>
         
         {/* Team Filter Pills */}
@@ -104,16 +127,27 @@ const Players = () => {
       <main className="px-4 py-4">
         <div className="space-y-2">
           {filteredPlayers.map(player => {
-            const isOwned = ownedPlayerIds.has(player.id);
+            const rosteredBy = playerToManagerMap[player.id];
             
             return (
-              <PlayerCard
-                key={player.id}
-                player={player}
-                isOwned={isOwned}
-                onAdd={!isOwned && canAddMore ? () => addPlayer(currentManagerId, player.id) : undefined}
-                showActions={!isOwned && canAddMore}
-              />
+              <div key={player.id} className="relative">
+                <PlayerCard
+                  player={player}
+                  isOwned={false}
+                  showActions={!rosteredBy}
+                  onAdd={!rosteredBy ? () => handleAddPlayer(player.id) : undefined}
+                />
+                {rosteredBy && (
+                  <div className="absolute top-2 right-2">
+                    <Badge 
+                      variant="outline" 
+                      className="bg-muted/80 text-muted-foreground border-border text-[10px]"
+                    >
+                      {rosteredBy}
+                    </Badge>
+                  </div>
+                )}
+              </div>
             );
           })}
           
