@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { RefreshCw, Calendar, Trophy } from 'lucide-react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/contexts/GameContext';
 import { StandingsTable } from '@/components/StandingsTable';
 import { ScheduleList } from '@/components/ScheduleList';
 import { BottomNav } from '@/components/BottomNav';
@@ -8,13 +8,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
-  const { managers, schedule, currentWeek, currentManagerId } = useGameStore();
+  const { managers, schedule, currentWeek, currentManagerId, loading } = useGame();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 1000);
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">

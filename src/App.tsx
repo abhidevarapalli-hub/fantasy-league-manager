@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { GameProvider } from "./contexts/GameContext";
 import Dashboard from "./pages/Dashboard";
 import Roster from "./pages/Roster";
 import Players from "./pages/Players";
@@ -15,21 +16,23 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/roster" element={<Roster />} />
-          <Route path="/players" element={<Players />} />
-          <Route path="/activity" element={<Activity />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/team/:teamId" element={<TeamView />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <GameProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/roster" element={<Roster />} />
+            <Route path="/players" element={<Players />} />
+            <Route path="/activity" element={<Activity />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/team/:teamId" element={<TeamView />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </GameProvider>
   </QueryClientProvider>
 );
 

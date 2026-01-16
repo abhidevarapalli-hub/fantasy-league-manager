@@ -14,7 +14,155 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      managers: {
+        Row: {
+          bench: string[] | null
+          created_at: string
+          id: string
+          losses: number
+          name: string
+          points: number
+          roster: string[] | null
+          team_name: string
+          wins: number
+        }
+        Insert: {
+          bench?: string[] | null
+          created_at?: string
+          id?: string
+          losses?: number
+          name: string
+          points?: number
+          roster?: string[] | null
+          team_name: string
+          wins?: number
+        }
+        Update: {
+          bench?: string[] | null
+          created_at?: string
+          id?: string
+          losses?: number
+          name?: string
+          points?: number
+          roster?: string[] | null
+          team_name?: string
+          wins?: number
+        }
+        Relationships: []
+      }
+      players: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          role: string
+          team: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          role: string
+          team: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          role?: string
+          team?: string
+        }
+        Relationships: []
+      }
+      schedule: {
+        Row: {
+          away_manager_id: string | null
+          away_score: number | null
+          created_at: string
+          home_manager_id: string | null
+          home_score: number | null
+          id: string
+          is_finalized: boolean
+          week: number
+        }
+        Insert: {
+          away_manager_id?: string | null
+          away_score?: number | null
+          created_at?: string
+          home_manager_id?: string | null
+          home_score?: number | null
+          id?: string
+          is_finalized?: boolean
+          week: number
+        }
+        Update: {
+          away_manager_id?: string | null
+          away_score?: number | null
+          created_at?: string
+          home_manager_id?: string | null
+          home_score?: number | null
+          id?: string
+          is_finalized?: boolean
+          week?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_away_manager_id_fkey"
+            columns: ["away_manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_home_manager_id_fkey"
+            columns: ["home_manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          manager_id: string | null
+          manager_team_name: string | null
+          players: Json | null
+          type: string
+          week: number | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          manager_id?: string | null
+          manager_team_name?: string | null
+          players?: Json | null
+          type: string
+          week?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          manager_id?: string | null
+          manager_team_name?: string | null
+          players?: Json | null
+          type?: string
+          week?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
