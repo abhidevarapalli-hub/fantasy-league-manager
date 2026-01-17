@@ -374,5 +374,47 @@ export const useSeedDatabase = () => {
     }
   }, []);
 
-  return { seedDatabase, seeding };
+  const reseedPlayers = useCallback(async () => {
+    setSeeding(true);
+    try {
+      // First, we need to clear all manager rosters since they reference player IDs
+      const { error: clearRostersError } = await supabase
+        .from('managers')
+        .update({ roster: [], bench: [] })
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all
+      
+      if (clearRostersError) {
+        console.error('Error clearing rosters:', clearRostersError);
+        throw clearRostersError;
+      }
+
+      // Delete all existing players
+      const { error: deleteError } = await supabase
+        .from('players')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+      
+      if (deleteError) {
+        console.error('Error deleting players:', deleteError);
+        throw deleteError;
+      }
+
+      // Insert new players
+      const { error: insertError } = await supabase.from('players').insert(PLAYERS_DATA);
+      if (insertError) {
+        console.error('Error inserting players:', insertError);
+        throw insertError;
+      }
+
+      console.log('Players reseeded successfully');
+      return true;
+    } catch (error) {
+      console.error('Error reseeding players:', error);
+      return false;
+    } finally {
+      setSeeding(false);
+    }
+  }, []);
+
+  return { seedDatabase, reseedPlayers, seeding };
 };

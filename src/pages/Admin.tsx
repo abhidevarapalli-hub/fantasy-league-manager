@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check } from 'lucide-react';
+import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check, RefreshCw } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,8 @@ const Admin = () => {
     getManagerRosterCount,
     addNewPlayer,
     dropPlayerOnly,
+    reseedPlayers,
+    reseeding,
   } = useGame();
   
   const [tradeManager1, setTradeManager1] = useState('');
@@ -37,6 +39,7 @@ const Admin = () => {
   const [selectedPlayers2, setSelectedPlayers2] = useState<string[]>([]);
   
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showReseedConfirm, setShowReseedConfirm] = useState(false);
 
   // Roster Management state
   const [rmManager, setRmManager] = useState('');
@@ -612,41 +615,82 @@ const Admin = () => {
             <h2 className="font-semibold text-destructive">Danger Zone</h2>
           </div>
           
-          {!showResetConfirm ? (
-            <Button 
-              onClick={() => setShowResetConfirm(true)}
-              variant="outline"
-              className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Reset League
-            </Button>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-destructive">
-                ⚠️ This will reset all standings, scores, rosters, and activities. This cannot be undone!
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setShowResetConfirm(false)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    resetLeague();
-                    setShowResetConfirm(false);
-                  }}
-                  variant="destructive"
-                  className="flex-1"
-                >
-                  Confirm Reset
-                </Button>
+          <div className="space-y-3">
+            {/* Reseed Players */}
+            {!showReseedConfirm ? (
+              <Button 
+                onClick={() => setShowReseedConfirm(true)}
+                variant="outline"
+                disabled={reseeding}
+                className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reseed Player Database
+              </Button>
+            ) : (
+              <div className="space-y-3 p-3 bg-primary/10 rounded-lg border border-primary/30">
+                <p className="text-sm text-primary">
+                  ⚠️ This will delete all players and reload from the updated roster list. All manager rosters will be cleared!
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowReseedConfirm(false)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      await reseedPlayers();
+                      setShowReseedConfirm(false);
+                    }}
+                    disabled={reseeding}
+                    className="flex-1"
+                  >
+                    {reseeding ? 'Reseeding...' : 'Confirm Reseed'}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Reset League */}
+            {!showResetConfirm ? (
+              <Button 
+                onClick={() => setShowResetConfirm(true)}
+                variant="outline"
+                className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Reset League
+              </Button>
+            ) : (
+              <div className="space-y-3 p-3 bg-destructive/10 rounded-lg border border-destructive/30">
+                <p className="text-sm text-destructive">
+                  ⚠️ This will reset all standings, scores, rosters, and activities. This cannot be undone!
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowResetConfirm(false)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      resetLeague();
+                      setShowResetConfirm(false);
+                    }}
+                    variant="destructive"
+                    className="flex-1"
+                  >
+                    Confirm Reset
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       </main>
 
