@@ -118,7 +118,7 @@ export const ActivityTimeline = ({ activities }: ActivityTimelineProps) => {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-foreground leading-relaxed">
+                <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
                   {activity.description}
                 </p>
               )}
