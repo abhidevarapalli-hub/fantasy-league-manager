@@ -204,39 +204,37 @@ export const DraftPickDialog = ({
           </div>
 
           {/* Player Selection - Scrollable List with PlayerCards */}
-          <div className="space-y-1.5 flex-1 overflow-hidden flex flex-col min-h-0">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="space-y-1.5 flex-1 flex flex-col min-h-0 overflow-hidden">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-shrink-0">
               Select Player ({filteredPlayers.length} available)
             </label>
             
-            <ScrollArea className="flex-1 border border-border rounded-lg h-[200px]">
-              <div className="p-2 space-y-2">
-                {filteredPlayers.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <p className="text-sm text-muted-foreground">No players found</p>
+            <div className="flex-1 overflow-y-auto border border-border rounded-lg p-2 space-y-2 min-h-[200px] max-h-[300px]">
+              {filteredPlayers.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-sm text-muted-foreground">No players found</p>
+                </div>
+              ) : (
+                filteredPlayers.map(player => (
+                  <div
+                    key={player.id}
+                    onClick={() => setSelectedPlayerId(player.id)}
+                    className={cn(
+                      "cursor-pointer rounded-xl transition-all",
+                      selectedPlayerId === player.id
+                        ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                        : "hover:opacity-80"
+                    )}
+                  >
+                    <PlayerCard
+                      player={player}
+                      showActions={false}
+                      variant="compact"
+                    />
                   </div>
-                ) : (
-                  filteredPlayers.map(player => (
-                    <div
-                      key={player.id}
-                      onClick={() => setSelectedPlayerId(player.id)}
-                      className={cn(
-                        "cursor-pointer rounded-xl transition-all",
-                        selectedPlayerId === player.id
-                          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                          : "hover:opacity-80"
-                      )}
-                    >
-                      <PlayerCard
-                        player={player}
-                        showActions={false}
-                        variant="compact"
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
+                ))
+              )}
+            </div>
           </div>
 
           {/* Selected Player Preview */}
