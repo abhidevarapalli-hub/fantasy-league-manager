@@ -86,10 +86,15 @@ export const ActivityTimeline = ({ activities }: ActivityTimelineProps) => {
             <div className="p-4">
               {hasPlayerDetails ? (
                 <div className="space-y-3">
-                  {activity.players!.map((playerTx, idx) => (
+                  {[...activity.players!].sort((a, b) => {
+                    // Sort 'add' before 'drop'
+                    if (a.type === 'add' && b.type === 'drop') return -1;
+                    if (a.type === 'drop' && b.type === 'add') return 1;
+                    return 0;
+                  }).map((playerTx, idx) => (
                     <div key={idx} className="flex items-center gap-3">
                       <div className={cn(
-                        "flex items-center gap-1 text-xs font-semibold uppercase tracking-wider",
+                        "w-12 flex items-center gap-1 text-xs font-semibold uppercase tracking-wider",
                         playerTx.type === 'add' ? 'text-success' : 'text-destructive'
                       )}>
                         {playerTx.type === 'add' ? (
