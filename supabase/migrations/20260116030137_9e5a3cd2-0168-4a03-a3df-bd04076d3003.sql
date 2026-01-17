@@ -63,8 +63,14 @@ CREATE POLICY "Anyone can insert schedule" ON public.schedule FOR INSERT WITH CH
 CREATE POLICY "Anyone can view transactions" ON public.transactions FOR SELECT USING (true);
 CREATE POLICY "Anyone can insert transactions" ON public.transactions FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Anyone can delete players" ON public.players 
-FOR DELETE USING (true);
+CREATE POLICY "Enable delete for all users" ON public.players 
+FOR DELETE 
+USING (true);
+
+DROP POLICY IF EXISTS "Anyone can insert players" ON public.players;
+CREATE POLICY "Anyone can insert players" ON public.players 
+FOR INSERT 
+WITH CHECK (true);
 
 -- Enable realtime for all tables
 ALTER PUBLICATION supabase_realtime ADD TABLE public.players;
