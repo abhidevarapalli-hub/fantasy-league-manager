@@ -1,4 +1,4 @@
-import { Plus, Minus, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Minus, ArrowUp, ArrowDown, Swords, Target, User, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,28 @@ const teamColors: Record<string, string> = {
   LSG: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
 };
 
+const roleStyles: Record<string, string> = {
+  'Batsman': 'bg-blue-500/20 text-blue-400',
+  'Bowler': 'bg-green-500/20 text-green-400',
+  'All Rounder': 'bg-purple-500/20 text-purple-400',
+  'Wicket Keeper': 'bg-orange-500/20 text-orange-400',
+};
+
+const getRoleIcon = (role: string) => {
+  switch (role) {
+    case 'Batsman':
+      return <Swords className="w-5 h-5" />;
+    case 'Bowler':
+      return <Target className="w-5 h-5" />;
+    case 'All Rounder':
+      return <User className="w-5 h-5" />;
+    case 'Wicket Keeper':
+      return <Shield className="w-5 h-5" />;
+    default:
+      return <User className="w-5 h-5" />;
+  }
+};
+
 export const PlayerCard = ({ 
   player, 
   onAdd, 
@@ -42,6 +64,14 @@ export const PlayerCard = ({
       "flex items-center gap-3 p-3 bg-card rounded-xl border border-border transition-all hover:border-primary/30",
       variant === 'compact' && "p-2"
     )}>
+      {/* Role Icon */}
+      <div className={cn(
+        "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+        roleStyles[player.role] || 'bg-muted text-muted-foreground'
+      )}>
+        {getRoleIcon(player.role)}
+      </div>
+      
       <div className="flex-1 min-w-0">
         <p className={cn(
           "font-semibold text-foreground truncate",
