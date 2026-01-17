@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
+const PLAYER_ROLES = ['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'];
 
 const teamFilterColors: Record<string, string> = {
   All: 'bg-primary/20 text-primary border-primary/30',
@@ -24,11 +25,20 @@ const teamFilterColors: Record<string, string> = {
   LSG: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
 };
 
+const roleFilterColors: Record<string, string> = {
+  All: 'bg-primary/20 text-primary border-primary/30',
+  Batsman: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  Bowler: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+  'All Rounder': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  'Wicket Keeper': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+};
+
 const Players = () => {
   const navigate = useNavigate();
   const { players, managers } = useGame();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
+  const [selectedRole, setSelectedRole] = useState('All');
   const [showOnlyFreeAgents, setShowOnlyFreeAgents] = useState(false);
 
   // Build a map of player ID -> manager team name
@@ -47,11 +57,12 @@ const Players = () => {
       const matchesSearch = player.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            player.team.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTeam = selectedTeam === 'All' || player.team === selectedTeam;
+      const matchesRole = selectedRole === 'All' || player.role === selectedRole;
       const isRostered = playerToManagerMap[player.id];
       const matchesFreeAgentFilter = !showOnlyFreeAgents || !isRostered;
-      return matchesSearch && matchesTeam && matchesFreeAgentFilter;
+      return matchesSearch && matchesTeam && matchesRole && matchesFreeAgentFilter;
     });
-  }, [players, searchQuery, selectedTeam, playerToManagerMap, showOnlyFreeAgents]);
+  }, [players, searchQuery, selectedTeam, selectedRole, playerToManagerMap, showOnlyFreeAgents]);
 
   const handleAddPlayer = (playerId: string) => {
     // Navigate to admin with player pre-selected
@@ -104,7 +115,8 @@ const Players = () => {
         </div>
         
         {/* Team Filter Pills */}
-        <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
+        <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
+          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Team</p>
           <div className="flex gap-2">
             {IPL_TEAMS.map((team) => (
               <button
@@ -118,6 +130,27 @@ const Players = () => {
                 )}
               >
                 {team}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Role Filter Pills */}
+        <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
+          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Position</p>
+          <div className="flex gap-2">
+            {PLAYER_ROLES.map((role) => (
+              <button
+                key={role}
+                onClick={() => setSelectedRole(role)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
+                  selectedRole === role 
+                    ? roleFilterColors[role] 
+                    : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                )}
+              >
+                {role}
               </button>
             ))}
           </div>
