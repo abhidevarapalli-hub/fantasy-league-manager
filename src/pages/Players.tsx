@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Search, X, Filter, UserPlus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Search, X, Filter } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { RosterManagementDialog } from '@/components/RosterManagementDialog';
+import { Player } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
 
 const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
@@ -34,12 +35,13 @@ const roleFilterColors: Record<string, string> = {
 };
 
 const Players = () => {
-  const navigate = useNavigate();
   const { players, managers } = useGame();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
   const [selectedRole, setSelectedRole] = useState('All');
   const [showOnlyFreeAgents, setShowOnlyFreeAgents] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   // Build a map of player ID -> manager team name
   const playerToManagerMap = useMemo(() => {
@@ -65,8 +67,11 @@ const Players = () => {
   }, [players, searchQuery, selectedTeam, selectedRole, playerToManagerMap, showOnlyFreeAgents]);
 
   const handleAddPlayer = (playerId: string) => {
-    // Navigate to admin with player pre-selected
-    navigate(`/admin?addPlayer=${playerId}`);
+    const player = players.find(p => p.id === playerId);
+    if (player) {
+      setSelectedPlayer(player);
+      setDialogOpen(true);
+    }
   };
 
   return (
@@ -193,6 +198,12 @@ const Players = () => {
       </main>
 
       <BottomNav />
+      
+      <RosterManagementDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        player={selectedPlayer}
+      />
     </div>
   );
 };
