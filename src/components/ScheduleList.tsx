@@ -48,25 +48,25 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
                     <div className="flex-1 min-w-0">
                       <p className={cn(
                         "font-medium truncate",
-                        match.completed && match.homeScore! > match.awayScore! && "text-success"
+                        match.homeScore !== undefined && match.awayScore !== undefined && match.homeScore > match.awayScore && "text-success"
                       )}>
                         {homeManager?.teamName}
                       </p>
                     </div>
                     
                     <div className="flex items-center gap-2 px-4">
-                      {match.completed ? (
+                      {match.homeScore !== undefined && match.awayScore !== undefined ? (
                         <>
                           <span className={cn(
                             "font-bold min-w-[32px] text-center",
-                            match.homeScore! > match.awayScore! ? "text-success" : "text-muted-foreground"
+                            match.homeScore > match.awayScore ? "text-success" : "text-muted-foreground"
                           )}>
                             {match.homeScore}
                           </span>
                           <span className="text-muted-foreground">-</span>
                           <span className={cn(
                             "font-bold min-w-[32px] text-center",
-                            match.awayScore! > match.homeScore! ? "text-success" : "text-muted-foreground"
+                            match.awayScore > match.homeScore ? "text-success" : "text-muted-foreground"
                           )}>
                             {match.awayScore}
                           </span>
@@ -79,7 +79,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
                     <div className="flex-1 min-w-0 text-right">
                       <p className={cn(
                         "font-medium truncate",
-                        match.completed && match.awayScore! > match.homeScore! && "text-success"
+                        match.homeScore !== undefined && match.awayScore !== undefined && match.awayScore > match.homeScore && "text-success"
                       )}>
                         {awayManager?.teamName}
                       </p>
