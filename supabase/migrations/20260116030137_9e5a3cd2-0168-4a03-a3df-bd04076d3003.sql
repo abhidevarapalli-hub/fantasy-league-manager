@@ -51,8 +51,6 @@ ALTER TABLE public.schedule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for public read access (fantasy league is public)
-CREATE POLICY "Anyone can view players" ON public.players FOR SELECT USING (true);
-CREATE POLICY "Anyone can insert players" ON public.players FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "Anyone can view managers" ON public.managers FOR SELECT USING (true);
 CREATE POLICY "Anyone can update managers" ON public.managers FOR UPDATE USING (true);
