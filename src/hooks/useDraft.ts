@@ -204,23 +204,8 @@ export const useDraft = () => {
     }
   }, [getPick]);
 
-  // Finalize draft - clear all rosters and assign drafted players
+  // Finalize draft - update rosters for managers with drafted players (partial draft allowed)
   const finalizeDraft = useCallback(async () => {
-    // Validate all positions have managers
-    const unassignedPositions = draftOrder.filter(o => !o.managerId);
-    if (unassignedPositions.length > 0) {
-      toast.error('All draft positions must have a manager assigned');
-      return false;
-    }
-
-    // Check if all 112 picks (8 teams x 14 rounds) are made
-    const totalExpectedPicks = 8 * 14;
-    const actualPicks = draftPicks.filter(p => p.playerId);
-    if (actualPicks.length < totalExpectedPicks) {
-      toast.error(`Only ${actualPicks.length}/${totalExpectedPicks} picks made. Complete the draft first.`);
-      return false;
-    }
-
     try {
       // Group picks by manager
       const picksByManager = new Map<string, string[]>();
@@ -231,6 +216,11 @@ export const useDraft = () => {
           existing.push(pick.playerId);
           picksByManager.set(pick.managerId, existing);
         }
+      }
+
+      if (picksByManager.size === 0) {
+        toast.error('No picks have been made yet');
+        return false;
       }
 
       // Update each manager's roster (first 11 active, rest on bench)
@@ -253,7 +243,7 @@ export const useDraft = () => {
       // Log draft finalization transaction
       await supabase.from('transactions').insert({
         type: 'trade',
-        description: 'Draft finalized - all rosters updated',
+        description: `Draft finalized - ${picksByManager.size} team rosters updated`,
         manager_id: null,
         manager_team_name: null,
         week: null,
@@ -267,14 +257,14 @@ export const useDraft = () => {
           .eq('id', draftState.id);
       }
 
-      toast.success('Draft finalized! All rosters have been updated.');
+      toast.success(`Draft finalized! ${picksByManager.size} team rosters have been updated.`);
       return true;
     } catch (error) {
       console.error('Failed to finalize draft:', error);
       toast.error('Failed to finalize draft');
       return false;
     }
-  }, [draftOrder, draftPicks, draftState]);
+  }, [draftPicks, draftState]);
 
   // Reset draft
   const resetDraft = useCallback(async () => {

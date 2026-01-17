@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Edit2, User } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { useDraft } from '@/hooks/useDraft';
-import { Manager, Player } from '@/lib/supabase-types';
+import type { Manager, Player } from '@/lib/supabase-types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,29 +12,40 @@ import { cn } from '@/lib/utils';
 const ROUNDS = 14;
 const POSITIONS = 8;
 
-// Color scheme for positions/columns - different colors for visual distinction
-const positionColors = [
-  'bg-blue-500/20 border-blue-500/30 text-blue-300',
-  'bg-emerald-500/20 border-emerald-500/30 text-emerald-300',
-  'bg-purple-500/20 border-purple-500/30 text-purple-300',
-  'bg-amber-500/20 border-amber-500/30 text-amber-300',
-  'bg-pink-500/20 border-pink-500/30 text-pink-300',
-  'bg-cyan-500/20 border-cyan-500/30 text-cyan-300',
-  'bg-orange-500/20 border-orange-500/30 text-orange-300',
-  'bg-indigo-500/20 border-indigo-500/30 text-indigo-300',
-];
+// Default color for empty cells
+const defaultCellColor = 'bg-muted/50 border-border text-muted-foreground';
+
+// Team colors based on IPL teams (using exact colors from reference)
+const teamColors: Record<string, string> = {
+  SRH: 'bg-[#FF822A] border-[#FF822A] text-white',
+  CSK: 'bg-[#FFCB05] border-[#FFCB05] text-black',
+  KKR: 'bg-[#3A225D] border-[#3A225D] text-white',
+  RR: 'bg-[#EB71A6] border-[#EB71A6] text-white',
+  RCB: 'bg-[#CB2431] border-[#CB2431] text-white',
+  MI: 'bg-[#004B91] border-[#004B91] text-white',
+  GT: 'bg-[#1B223D] border-[#1B223D] text-white',
+  LSG: 'bg-[#2ABFCB] border-[#2ABFCB] text-white',
+  PBKS: 'bg-[#B71E24] border-[#B71E24] text-white',
+  DC: 'bg-[#000080] border-[#000080] text-white',
+};
+
+// Helper to get cell color based on player's team
+const getCellColor = (player: Player | null): string => {
+  if (!player) return defaultCellColor;
+  return teamColors[player.team] || defaultCellColor;
+};
 
 const teamBadgeColors: Record<string, string> = {
-  CSK: 'bg-amber-500 text-amber-950',
-  MI: 'bg-blue-500 text-blue-950',
-  RCB: 'bg-red-500 text-red-950',
-  KKR: 'bg-purple-500 text-purple-950',
-  DC: 'bg-blue-600 text-blue-950',
-  RR: 'bg-pink-500 text-pink-950',
-  PBKS: 'bg-red-600 text-red-950',
-  SRH: 'bg-orange-500 text-orange-950',
-  GT: 'bg-cyan-500 text-cyan-950',
-  LSG: 'bg-sky-500 text-sky-950',
+  CSK: 'bg-black/20 text-black',
+  MI: 'bg-white/20 text-white',
+  RCB: 'bg-white/20 text-white',
+  KKR: 'bg-white/20 text-white',
+  DC: 'bg-white/20 text-white',
+  RR: 'bg-white/20 text-white',
+  PBKS: 'bg-white/20 text-white',
+  SRH: 'bg-white/20 text-white',
+  GT: 'bg-white/20 text-white',
+  LSG: 'bg-white/20 text-white',
 };
 
 interface DraftCellProps {
@@ -74,9 +85,14 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
       )}
 
       {player ? (
-        <div className="pt-3">
-          <p className="font-semibold text-sm truncate leading-tight">
-            {player.name.split(' ').slice(-1)[0]}
+        <div className="pt-3 flex flex-col items-center justify-center text-center">
+          {/* First name */}
+          <p className="font-medium text-xs truncate leading-tight w-full">
+            {player.name.split(' ')[0]}
+          </p>
+          {/* Last name */}
+          <p className="font-bold text-sm truncate leading-tight w-full">
+            {player.name.split(' ').slice(1).join(' ')}
           </p>
           <Badge 
             className={cn(
@@ -84,7 +100,7 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
               teamBadgeColors[player.team] || 'bg-muted text-muted-foreground'
             )}
           >
-            {player.role.slice(0, 3).toUpperCase()} - {player.team}
+            {player.role.slice(0, 3).toUpperCase()}
           </Badge>
         </div>
       ) : (
@@ -216,7 +232,7 @@ export const DraftBoard = () => {
                   pickNumber={pickNumber}
                   isFinalized={draftState?.isFinalized || false}
                   onCellClick={() => handleCellClick(round, position)}
-                  colorClass={positionColors[position - 1]}
+                  colorClass={getCellColor(player)}
                 />
               );
             });
