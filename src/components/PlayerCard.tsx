@@ -30,14 +30,14 @@ const teamCardColors: Record<string, string> = {
 const teamBadgeColors: Record<string, string> = {
   SRH: 'bg-[#FF822A]/30 text-[#FF822A] border-[#FF822A]/40',
   CSK: 'bg-[#FFCB05]/30 text-[#FFCB05] border-[#FFCB05]/40',
-  KKR: 'bg-[#3A225D]/30 text-[#a855f7] border-[#3A225D]/40',
+  KKR: 'bg-[#3A225D]/30 text-[#3A225D] border-[#3A225D]/40',
   RR: 'bg-[#EB71A6]/30 text-[#EB71A6] border-[#EB71A6]/40',
-  RCB: 'bg-[#800000]/30 text-[#dc2626] border-[#800000]/40',
-  MI: 'bg-[#004B91]/30 text-[#3b82f6] border-[#004B91]/40',
-  GT: 'bg-[#1B223D]/30 text-[#06b6d4] border-[#1B223D]/40',
+  RCB: 'bg-[#800000]/30 text-[#800000] border-[#800000]/40',
+  MI: 'bg-[#004B91]/30 text-[#004B91] border-[#004B91]/40',
+  GT: 'bg-[#1B223D]/30 text-[#1B223D] border-[#1B223D]/40',
   LSG: 'bg-[#2ABFCB]/30 text-[#2ABFCB] border-[#2ABFCB]/40',
-  PBKS: 'bg-[#B71E24]/30 text-[#ef4444] border-[#B71E24]/40',
-  DC: 'bg-[#000080]/30 text-[#6366f1] border-[#000080]/40',
+  PBKS: 'bg-[#B71E24]/30 text-[#B71E24] border-[#B71E24]/40',
+  DC: 'bg-[#000080]/30 text-[#000080] border-[#000080]/40',
 };
 
 const roleStyles: Record<string, string> = {
