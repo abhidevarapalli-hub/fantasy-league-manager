@@ -14,16 +14,16 @@ const PLAYER_ROLES = ['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'
 
 const teamFilterColors: Record<string, string> = {
   All: 'bg-primary/20 text-primary border-primary/30',
-  CSK: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  MI: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  RCB: 'bg-red-500/20 text-red-400 border-red-500/30',
-  KKR: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  DC: 'bg-blue-600/20 text-blue-300 border-blue-600/30',
-  RR: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
-  PBKS: 'bg-red-600/20 text-red-300 border-red-600/30',
-  SRH: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  GT: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  LSG: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
+  SRH: 'bg-[#FF822A]/20 text-[#FF822A] border-[#FF822A]/30',
+  CSK: 'bg-[#FFCB05]/20 text-[#FFCB05] border-[#FFCB05]/30',
+  KKR: 'bg-[#3A225D]/20 text-[#3A225D] border-[#3A225D]/30',
+  RR: 'bg-[#EB71A6]/20 text-[#EB71A6] border-[#EB71A6]/30',
+  RCB: 'bg-[#800000]/20 text-[#800000] border-[#800000]/30',
+  MI: 'bg-[#004B91]/20 text-[#004B91] border-[#004B91]/30',
+  GT: 'bg-[#1B223D]/20 text-[#1B223D] border-[#1B223D]/30',
+  LSG: 'bg-[#2ABFCB]/20 text-[#2ABFCB] border-[#2ABFCB]/30',
+  PBKS: 'bg-[#B71E24]/20 text-[#B71E24] border-[#B71E24]/30',
+  DC: 'bg-[#000080]/20 text-[#000080] border-[#000080]/30',
 };
 
 const roleFilterColors: Record<string, string> = {
