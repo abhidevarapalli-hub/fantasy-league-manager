@@ -15,29 +15,29 @@ interface PlayerCardProps {
 }
 
 const teamCardColors: Record<string, string> = {
-  SRH: 'bg-[#FF822A]/15 border-[#FF822A]/30 hover:border-[#FF822A]/50',
-  CSK: 'bg-[#FFCB05]/15 border-[#FFCB05]/30 hover:border-[#FFCB05]/50',
-  KKR: 'bg-[#3A225D]/15 border-[#3A225D]/30 hover:border-[#3A225D]/50',
-  RR: 'bg-[#EB71A6]/15 border-[#EB71A6]/30 hover:border-[#EB71A6]/50',
-  RCB: 'bg-[#800000]/15 border-[#800000]/30 hover:border-[#800000]/50',
-  MI: 'bg-[#004B91]/15 border-[#004B91]/30 hover:border-[#004B91]/50',
-  GT: 'bg-[#1B223D]/15 border-[#1B223D]/30 hover:border-[#1B223D]/50',
-  LSG: 'bg-[#2ABFCB]/15 border-[#2ABFCB]/30 hover:border-[#2ABFCB]/50',
-  PBKS: 'bg-[#B71E24]/15 border-[#B71E24]/30 hover:border-[#B71E24]/50',
-  DC: 'bg-[#000080]/15 border-[#000080]/30 hover:border-[#000080]/50',
+  SRH: 'bg-[#FF822A]/75 border-[#FF822A] hover:border-[#FF822A]',
+  CSK: 'bg-[#FFCB05]/75 border-[#FFCB05] hover:border-[#FFCB05]',
+  KKR: 'bg-[#3A225D]/75 border-[#3A225D] hover:border-[#3A225D]',
+  RR: 'bg-[#EB71A6]/75 border-[#EB71A6] hover:border-[#EB71A6]',
+  RCB: 'bg-[#800000]/75 border-[#800000] hover:border-[#800000]',
+  MI: 'bg-[#004B91]/75 border-[#004B91] hover:border-[#004B91]',
+  GT: 'bg-[#1B223D]/75 border-[#1B223D] hover:border-[#1B223D]',
+  LSG: 'bg-[#2ABFCB]/75 border-[#2ABFCB] hover:border-[#2ABFCB]',
+  PBKS: 'bg-[#B71E24]/75 border-[#B71E24] hover:border-[#B71E24]',
+  DC: 'bg-[#000080]/75 border-[#000080] hover:border-[#000080]',
 };
 
 const teamBadgeColors: Record<string, string> = {
-  SRH: 'bg-[#FF822A]/30 text-[#FF822A] border-[#FF822A]/40',
-  CSK: 'bg-[#FFCB05]/30 text-[#FFCB05] border-[#FFCB05]/40',
-  KKR: 'bg-[#3A225D]/30 text-[#3A225D] border-[#3A225D]/40',
-  RR: 'bg-[#EB71A6]/30 text-[#EB71A6] border-[#EB71A6]/40',
-  RCB: 'bg-[#800000]/30 text-[#800000] border-[#800000]/40',
-  MI: 'bg-[#004B91]/30 text-[#004B91] border-[#004B91]/40',
-  GT: 'bg-[#1B223D]/30 text-[#1B223D] border-[#1B223D]/40',
-  LSG: 'bg-[#2ABFCB]/30 text-[#2ABFCB] border-[#2ABFCB]/40',
-  PBKS: 'bg-[#B71E24]/30 text-[#B71E24] border-[#B71E24]/40',
-  DC: 'bg-[#000080]/30 text-[#000080] border-[#000080]/40',
+  SRH: 'bg-[#FF822A] text-black border-[#FF822A]',
+  CSK: 'bg-[#FFCB05] text-black border-[#FFCB05]',
+  KKR: 'bg-[#3A225D] text-white border-[#3A225D]',
+  RR: 'bg-[#EB71A6] text-black border-[#EB71A6]',
+  RCB: 'bg-[#800000] text-white border-[#800000]',
+  MI: 'bg-[#004B91] text-white border-[#004B91]',
+  GT: 'bg-[#1B223D] text-white border-[#1B223D]',
+  LSG: 'bg-[#2ABFCB] text-black border-[#2ABFCB]',
+  PBKS: 'bg-[#B71E24] text-white border-[#B71E24]',
+  DC: 'bg-[#000080] text-white border-[#000080]',
 };
 
 const roleStyles: Record<string, string> = {
@@ -88,8 +88,10 @@ export const PlayerCard = ({
       
       <div className="flex-1 min-w-0">
         <p className={cn(
-          "font-semibold text-foreground truncate",
-          variant === 'compact' && "text-sm"
+          "font-semibold truncate",
+          variant === 'compact' && "text-sm",
+          // Use white text for dark backgrounds, black for light
+          ['KKR', 'RCB', 'MI', 'GT', 'PBKS', 'DC'].includes(player.team) ? 'text-white' : 'text-black'
         )}>
           {player.name}
         </p>
@@ -100,7 +102,10 @@ export const PlayerCard = ({
           )}>
             {player.team}
           </span>
-          <span className="text-xs text-muted-foreground">{player.role}</span>
+          <span className={cn(
+            "text-xs",
+            ['KKR', 'RCB', 'MI', 'GT', 'PBKS', 'DC'].includes(player.team) ? 'text-white/70' : 'text-black/70'
+          )}>{player.role}</span>
         </div>
       </div>
       
