@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Manager } from '@/store/gameStore';
+import { Manager } from '@/lib/supabase-types';
 import { ChevronRight } from 'lucide-react';
 
 interface StandingsTableProps {

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/contexts/GameContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
 import { Users, UserMinus, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const Roster = () => {
-  const { managers, players, getManagerRosterCount, moveToActive, moveToBench, dropPlayer } = useGameStore();
+  const { managers, players, getManagerRosterCount, moveToActive, moveToBench, dropPlayerOnly } = useGame();
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
   
   const selectedManager = managers.find(m => m.id === selectedManagerId);
@@ -116,7 +116,7 @@ const Roster = () => {
                   player={player}
                   isOwned
                   onMoveDown={benchPlayers.length < 3 ? () => moveToBench(selectedManagerId, player.id) : undefined}
-                  onDrop={() => dropPlayer(selectedManagerId, player.id)}
+                  onDrop={() => dropPlayerOnly(selectedManagerId, player.id)}
                 />
               ))
             )}
@@ -147,7 +147,7 @@ const Roster = () => {
                   player={player}
                   isOwned
                   onMoveUp={activePlayers.length < 11 ? () => moveToActive(selectedManagerId, player.id) : undefined}
-                  onDrop={() => dropPlayer(selectedManagerId, player.id)}
+                  onDrop={() => dropPlayerOnly(selectedManagerId, player.id)}
                 />
               ))
             )}

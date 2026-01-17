@@ -1,10 +1,10 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/contexts/GameContext';
 import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { BottomNav } from '@/components/BottomNav';
 import { Activity as ActivityIcon } from 'lucide-react';
 
 const Activity = () => {
-  const { activities } = useGameStore();
+  const { activities } = useGame();
 
   return (
     <div className="min-h-screen bg-background pb-20">

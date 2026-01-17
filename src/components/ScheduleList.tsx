@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Match, Manager } from '@/store/gameStore';
+import { Match, Manager } from '@/lib/supabase-types';
 import { Calendar, Trophy } from 'lucide-react';
 
 interface ScheduleListProps {

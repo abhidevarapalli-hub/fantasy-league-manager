@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Search, X, Filter, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/contexts/GameContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,7 @@ const teamFilterColors: Record<string, string> = {
 
 const Players = () => {
   const navigate = useNavigate();
-  const { players, managers } = useGameStore();
+  const { players, managers } = useGame();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
   const [showOnlyFreeAgents, setShowOnlyFreeAgents] = useState(false);
