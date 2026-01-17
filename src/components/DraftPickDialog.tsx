@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { PlayerCard } from '@/components/PlayerCard';
 import { cn } from '@/lib/utils';
 
 interface DraftPickDialogProps {
@@ -117,17 +118,17 @@ export const DraftPickDialog = ({
             </div>
           </div>
 
-          {/* Player Selection - Scrollable List */}
+          {/* Player Selection - Scrollable List with PlayerCards */}
           <div className="space-y-2 flex-1 overflow-hidden flex flex-col min-h-0">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Select Player ({availablePlayers.length} available)
             </label>
             
             <ScrollArea className="flex-1 border border-border rounded-lg">
-              <div className="p-2 space-y-3">
+              <div className="p-3 space-y-4">
                 {[...playersByTeam.entries()].map(([team, teamPlayers]) => (
-                  <div key={team} className="space-y-1">
-                    <div className="sticky top-0 bg-card/95 backdrop-blur px-2 py-1 z-10">
+                  <div key={team} className="space-y-2">
+                    <div className="sticky top-0 bg-card/95 backdrop-blur px-1 py-1 z-10">
                       <Badge 
                         variant="outline"
                         className={cn(
@@ -138,30 +139,24 @@ export const DraftPickDialog = ({
                         {team} ({teamPlayers.length})
                       </Badge>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       {teamPlayers.map(player => (
-                        <button
+                        <div
                           key={player.id}
                           onClick={() => setSelectedPlayerId(player.id)}
                           className={cn(
-                            "w-full flex items-center justify-between p-2 rounded-md border transition-all text-left",
+                            "cursor-pointer rounded-xl transition-all",
                             selectedPlayerId === player.id
-                              ? "bg-primary/10 border-primary"
-                              : "bg-muted/30 border-transparent hover:bg-muted/50 hover:border-border"
+                              ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                              : "hover:opacity-80"
                           )}
                         >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-foreground truncate">
-                              {player.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {roleAbbreviations[player.role] || player.role}
-                            </p>
-                          </div>
-                          {selectedPlayerId === player.id && (
-                            <Check className="w-4 h-4 text-primary flex-shrink-0 ml-2" />
-                          )}
-                        </button>
+                          <PlayerCard
+                            player={player}
+                            showActions={false}
+                            variant="compact"
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
