@@ -324,31 +324,11 @@ export const useRealtimeGame = () => {
 
       if (homeManager && awayManager) {
         scoreSummary.push(`${homeManager.teamName} ${match.homeScore} - ${match.awayScore} ${awayManager.teamName}`);
-
-        if (!wasFinalized) {
-          const homeWins = match.homeScore! > match.awayScore!;
-          const awayWins = match.awayScore! > match.homeScore!;
-
-          await supabase
-            .from("managers")
-            .update({
-              wins: homeManager.wins + (homeWins ? 1 : 0),
-              losses: homeManager.losses + (awayWins ? 1 : 0),
-              points: homeManager.points + match.homeScore!,
-            })
-            .eq("id", match.home);
-
-          await supabase
-            .from("managers")
-            .update({
-              wins: awayManager.wins + (awayWins ? 1 : 0),
-              losses: awayManager.losses + (homeWins ? 1 : 0),
-              points: awayManager.points + match.awayScore!,
-            })
-            .eq("id", match.away);
-        }
       }
     }
+
+    // Always recalculate all standings from all finalized matches
+    await recalculateAllStandings();
 
     await supabase.from("transactions").insert({
       type: "score" as const,
@@ -357,6 +337,59 @@ export const useRealtimeGame = () => {
       description: `Week ${week} scores ${wasFinalized ? "updated" : "finalized"}:\n${scoreSummary.join("\n")}`,
       week,
     });
+  };
+
+  const recalculateAllStandings = async () => {
+    // Fetch all finalized matches
+    const { data: allMatches, error } = await supabase
+      .from("schedule")
+      .select("*")
+      .eq("is_finalized", true);
+
+    if (error || !allMatches) {
+      console.error("Error fetching matches for recalculation:", error);
+      return;
+    }
+
+    // Calculate standings for each manager
+    const standings: Record<string, { wins: number; losses: number; points: number }> = {};
+
+    // Initialize all managers with zero
+    for (const manager of managers) {
+      standings[manager.id] = { wins: 0, losses: 0, points: 0 };
+    }
+
+    // Process all finalized matches
+    for (const match of allMatches) {
+      const homeId = match.home_manager_id;
+      const awayId = match.away_manager_id;
+      const homeScore = match.home_score ?? 0;
+      const awayScore = match.away_score ?? 0;
+
+      if (homeId && standings[homeId]) {
+        standings[homeId].points += homeScore;
+        if (homeScore > awayScore) standings[homeId].wins += 1;
+        else if (homeScore < awayScore) standings[homeId].losses += 1;
+      }
+
+      if (awayId && standings[awayId]) {
+        standings[awayId].points += awayScore;
+        if (awayScore > homeScore) standings[awayId].wins += 1;
+        else if (awayScore < homeScore) standings[awayId].losses += 1;
+      }
+    }
+
+    // Update all managers with recalculated standings
+    for (const [managerId, stats] of Object.entries(standings)) {
+      await supabase
+        .from("managers")
+        .update({
+          wins: stats.wins,
+          losses: stats.losses,
+          points: stats.points,
+        })
+        .eq("id", managerId);
+    }
   };
 
   const addNewPlayer = async (
