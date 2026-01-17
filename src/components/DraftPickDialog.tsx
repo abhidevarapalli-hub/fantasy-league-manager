@@ -209,7 +209,7 @@ export const DraftPickDialog = ({
               Select Player ({filteredPlayers.length} available)
             </label>
             
-            <ScrollArea className="flex-1 border border-border rounded-lg">
+            <ScrollArea className="flex-1 border border-border rounded-lg h-[200px]">
               <div className="p-2 space-y-2">
                 {filteredPlayers.length === 0 ? (
                   <div className="py-8 text-center">
