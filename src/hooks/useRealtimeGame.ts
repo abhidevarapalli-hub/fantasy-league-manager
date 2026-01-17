@@ -293,10 +293,24 @@ export const useRealtimeGame = () => {
   };
 
   const finalizeWeekScores = async (week: number) => {
-    const weekMatches = schedule.filter((m) => m.week === week);
+    // Fetch fresh schedule data from database to avoid stale state issues
+    const { data: freshSchedule, error: scheduleError } = await supabase
+      .from("schedule")
+      .select("*")
+      .eq("week", week);
+
+    if (scheduleError || !freshSchedule) {
+      console.error("Error fetching schedule:", scheduleError);
+      return;
+    }
+
+    const weekMatches = freshSchedule.map(mapDbSchedule);
     const allHaveScores = weekMatches.every((m) => m.homeScore !== undefined && m.awayScore !== undefined);
 
-    if (!allHaveScores) return;
+    if (!allHaveScores) {
+      console.log("Not all matches have scores yet");
+      return;
+    }
 
     const wasFinalized = weekMatches.some((m) => m.completed);
     const scoreSummary: string[] = [];
