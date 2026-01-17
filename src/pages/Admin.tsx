@@ -452,31 +452,6 @@ const Admin = () => {
               )}
             </div>
 
-            {/* Search/Filter for free agents */}
-            {rmManager && (!isAtCap || rmDropPlayer !== 'none') && (
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search free agents..."
-                    value={faSearch}
-                    onChange={(e) => setFaSearch(e.target.value)}
-                    className="pl-9 bg-muted border-border"
-                  />
-                </div>
-                <Select value={faTeamFilter} onValueChange={setFaTeamFilter}>
-                  <SelectTrigger className="w-24 bg-muted border-border">
-                    <SelectValue placeholder="Team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    {uniqueTeams.map(team => (
-                      <SelectItem key={team} value={team}>{team}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             {/* Status message */}
             {rmManager && isAtCap && rmDropPlayer === 'none' && (
