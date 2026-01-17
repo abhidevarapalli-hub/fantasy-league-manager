@@ -14,6 +14,101 @@ export type Database = {
   }
   public: {
     Tables: {
+      draft_order: {
+        Row: {
+          created_at: string
+          id: string
+          manager_id: string | null
+          position: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manager_id?: string | null
+          position: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manager_id?: string | null
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_order_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      draft_picks: {
+        Row: {
+          created_at: string
+          id: string
+          manager_id: string | null
+          pick_position: number
+          player_id: string | null
+          round: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manager_id?: string | null
+          pick_position: number
+          player_id?: string | null
+          round: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manager_id?: string | null
+          pick_position?: number
+          player_id?: string | null
+          round?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_picks_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_picks_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      draft_state: {
+        Row: {
+          created_at: string
+          finalized_at: string | null
+          id: string
+          is_finalized: boolean
+        }
+        Insert: {
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          is_finalized?: boolean
+        }
+        Update: {
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          is_finalized?: boolean
+        }
+        Relationships: []
+      }
       managers: {
         Row: {
           bench: string[] | null
