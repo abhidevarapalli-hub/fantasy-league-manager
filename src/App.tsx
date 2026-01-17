@@ -10,6 +10,7 @@ import Players from "./pages/Players";
 import Activity from "./pages/Activity";
 import Admin from "./pages/Admin";
 import TeamView from "./pages/TeamView";
+import Draft from "./pages/Draft";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/players" element={<Players />} />
             <Route path="/activity" element={<Activity />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/draft" element={<Draft />} />
             <Route path="/team/:teamId" element={<TeamView />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
