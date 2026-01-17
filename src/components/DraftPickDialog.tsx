@@ -22,14 +22,14 @@ interface DraftPickDialogProps {
 const teamColors: Record<string, string> = {
   SRH: 'bg-[#FF822A]/20 border-[#FF822A] text-[#FF822A]',
   CSK: 'bg-[#FFCB05]/20 border-[#FFCB05] text-[#FFCB05]',
-  KKR: 'bg-[#3A225D]/20 border-[#3A225D] text-[#a855f7]',
+  KKR: 'bg-[#3A225D]/20 border-[#3A225D] text-[#3A225D]',
   RR: 'bg-[#EB71A6]/20 border-[#EB71A6] text-[#EB71A6]',
-  RCB: 'bg-[#800000]/20 border-[#800000] text-[#dc2626]',
-  MI: 'bg-[#004B91]/20 border-[#004B91] text-[#3b82f6]',
-  GT: 'bg-[#1B223D]/20 border-[#1B223D] text-[#06b6d4]',
+  RCB: 'bg-[#800000]/20 border-[#800000] text-[#800000]',
+  MI: 'bg-[#004B91]/20 border-[#004B91] text-[#004B91]',
+  GT: 'bg-[#1B223D]/20 border-[#1B223D] text-[#1B223D]',
   LSG: 'bg-[#2ABFCB]/20 border-[#2ABFCB] text-[#2ABFCB]',
-  PBKS: 'bg-[#B71E24]/20 border-[#B71E24] text-[#ef4444]',
-  DC: 'bg-[#000080]/20 border-[#000080] text-[#6366f1]',
+  PBKS: 'bg-[#B71E24]/20 border-[#B71E24] text-[#B71E24]',
+  DC: 'bg-[#000080]/20 border-[#000080] text-[#000080]',
 };
 
 const roleAbbreviations: Record<string, string> = {
