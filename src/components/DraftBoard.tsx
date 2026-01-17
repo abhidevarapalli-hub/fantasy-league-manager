@@ -21,12 +21,20 @@ const teamColors: Record<string, string> = {
   CSK: 'bg-[#FFCB05] border-[#FFCB05] text-black',
   KKR: 'bg-[#3A225D] border-[#3A225D] text-white',
   RR: 'bg-[#EB71A6] border-[#EB71A6] text-white',
-  RCB: 'bg-[#CB2431] border-[#CB2431] text-white',
+  RCB: 'bg-[#800000] border-[#800000] text-white',
   MI: 'bg-[#004B91] border-[#004B91] text-white',
   GT: 'bg-[#1B223D] border-[#1B223D] text-white',
   LSG: 'bg-[#2ABFCB] border-[#2ABFCB] text-white',
   PBKS: 'bg-[#B71E24] border-[#B71E24] text-white',
   DC: 'bg-[#000080] border-[#000080] text-white',
+};
+
+// Role to abbreviation mapping
+const roleAbbreviations: Record<string, string> = {
+  'Bowler': 'BOWL',
+  'Batsman': 'BAT',
+  'Wicket Keeper': 'WK',
+  'All Rounder': 'AR',
 };
 
 // Helper to get cell color based on player's team
@@ -100,7 +108,7 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
               teamBadgeColors[player.team] || 'bg-muted text-muted-foreground'
             )}
           >
-            {player.role.slice(0, 3).toUpperCase()}
+            {roleAbbreviations[player.role] || player.role}
           </Badge>
         </div>
       ) : (

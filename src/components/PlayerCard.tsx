@@ -15,29 +15,29 @@ interface PlayerCardProps {
 }
 
 const teamCardColors: Record<string, string> = {
-  CSK: 'bg-amber-500/15 border-amber-500/30 hover:border-amber-500/50',
-  MI: 'bg-blue-500/15 border-blue-500/30 hover:border-blue-500/50',
-  RCB: 'bg-red-500/15 border-red-500/30 hover:border-red-500/50',
-  KKR: 'bg-purple-500/15 border-purple-500/30 hover:border-purple-500/50',
-  DC: 'bg-blue-600/15 border-blue-600/30 hover:border-blue-600/50',
-  RR: 'bg-pink-500/15 border-pink-500/30 hover:border-pink-500/50',
-  PBKS: 'bg-red-600/15 border-red-600/30 hover:border-red-600/50',
-  SRH: 'bg-orange-500/15 border-orange-500/30 hover:border-orange-500/50',
-  GT: 'bg-cyan-500/15 border-cyan-500/30 hover:border-cyan-500/50',
-  LSG: 'bg-sky-500/15 border-sky-500/30 hover:border-sky-500/50',
+  SRH: 'bg-[#FF822A]/15 border-[#FF822A]/30 hover:border-[#FF822A]/50',
+  CSK: 'bg-[#FFCB05]/15 border-[#FFCB05]/30 hover:border-[#FFCB05]/50',
+  KKR: 'bg-[#3A225D]/15 border-[#3A225D]/30 hover:border-[#3A225D]/50',
+  RR: 'bg-[#EB71A6]/15 border-[#EB71A6]/30 hover:border-[#EB71A6]/50',
+  RCB: 'bg-[#800000]/15 border-[#800000]/30 hover:border-[#800000]/50',
+  MI: 'bg-[#004B91]/15 border-[#004B91]/30 hover:border-[#004B91]/50',
+  GT: 'bg-[#1B223D]/15 border-[#1B223D]/30 hover:border-[#1B223D]/50',
+  LSG: 'bg-[#2ABFCB]/15 border-[#2ABFCB]/30 hover:border-[#2ABFCB]/50',
+  PBKS: 'bg-[#B71E24]/15 border-[#B71E24]/30 hover:border-[#B71E24]/50',
+  DC: 'bg-[#000080]/15 border-[#000080]/30 hover:border-[#000080]/50',
 };
 
 const teamBadgeColors: Record<string, string> = {
-  CSK: 'bg-amber-500/30 text-amber-400 border-amber-500/40',
-  MI: 'bg-blue-500/30 text-blue-400 border-blue-500/40',
-  RCB: 'bg-red-500/30 text-red-400 border-red-500/40',
-  KKR: 'bg-purple-500/30 text-purple-400 border-purple-500/40',
-  DC: 'bg-blue-600/30 text-blue-300 border-blue-600/40',
-  RR: 'bg-pink-500/30 text-pink-400 border-pink-500/40',
-  PBKS: 'bg-red-600/30 text-red-300 border-red-600/40',
-  SRH: 'bg-orange-500/30 text-orange-400 border-orange-500/40',
-  GT: 'bg-cyan-500/30 text-cyan-400 border-cyan-500/40',
-  LSG: 'bg-sky-500/30 text-sky-400 border-sky-500/40',
+  SRH: 'bg-[#FF822A]/30 text-[#FF822A] border-[#FF822A]/40',
+  CSK: 'bg-[#FFCB05]/30 text-[#FFCB05] border-[#FFCB05]/40',
+  KKR: 'bg-[#3A225D]/30 text-[#a855f7] border-[#3A225D]/40',
+  RR: 'bg-[#EB71A6]/30 text-[#EB71A6] border-[#EB71A6]/40',
+  RCB: 'bg-[#800000]/30 text-[#dc2626] border-[#800000]/40',
+  MI: 'bg-[#004B91]/30 text-[#3b82f6] border-[#004B91]/40',
+  GT: 'bg-[#1B223D]/30 text-[#06b6d4] border-[#1B223D]/40',
+  LSG: 'bg-[#2ABFCB]/30 text-[#2ABFCB] border-[#2ABFCB]/40',
+  PBKS: 'bg-[#B71E24]/30 text-[#ef4444] border-[#B71E24]/40',
+  DC: 'bg-[#000080]/30 text-[#6366f1] border-[#000080]/40',
 };
 
 const roleStyles: Record<string, string> = {
