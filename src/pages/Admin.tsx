@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check } from 'lucide-react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/contexts/GameContext';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,7 @@ const Admin = () => {
     getManagerRosterCount,
     addNewPlayer,
     dropPlayerOnly,
-  } = useGameStore();
+  } = useGame();
   
   const [tradeManager1, setTradeManager1] = useState('');
   const [tradeManager2, setTradeManager2] = useState('');

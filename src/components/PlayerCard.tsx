@@ -1,6 +1,6 @@
 import { Plus, Minus, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Player } from '@/store/gameStore';
+import { Player } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
 
 interface PlayerCardProps {

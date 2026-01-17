@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/contexts/GameContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 const TeamView = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
-  const { managers, players } = useGameStore();
+  const { managers, players } = useGame();
   
   const manager = managers.find(m => m.id === teamId);
   

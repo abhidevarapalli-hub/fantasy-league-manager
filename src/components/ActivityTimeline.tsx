@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Activity } from '@/store/gameStore';
+import { Activity } from '@/lib/supabase-types';
 import { Plus, Minus, ArrowLeftRight, Calculator, Swords, Target, User, Shield } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
