@@ -24,13 +24,15 @@ interface GameContextType {
   executeTrade: (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => Promise<void>;
   resetLeague: () => Promise<void>;
   isWeekLocked: (week: number) => boolean;
+  reseedPlayers: () => Promise<boolean>;
+  reseeding: boolean;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const game = useRealtimeGame();
-  const { seedDatabase, seeding } = useSeedDatabase();
+  const { seedDatabase, reseedPlayers, seeding } = useSeedDatabase();
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isLoading = game.loading || seeding || !initialized;
 
   return (
-    <GameContext.Provider value={{ ...game, loading: isLoading }}>
+    <GameContext.Provider value={{ ...game, loading: isLoading, reseedPlayers, reseeding: seeding }}>
       {children}
     </GameContext.Provider>
   );
