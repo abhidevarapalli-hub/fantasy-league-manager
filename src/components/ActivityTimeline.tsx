@@ -71,7 +71,10 @@ export const ActivityTimeline = ({ activities }: ActivityTimelineProps) => {
                 <div className={cn("w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0", className)}>
                   <Icon className="w-3 h-3" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground">{relativeStr}</span>
+                {activity.managerTeamName && (
+                  <span className="text-sm font-semibold text-foreground">{activity.managerTeamName}</span>
+                )}
+                <span className="text-xs text-muted-foreground">{relativeStr}</span>
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">{timeStr} EST</p>
@@ -111,11 +114,6 @@ export const ActivityTimeline = ({ activities }: ActivityTimelineProps) => {
                       </div>
                     </div>
                   ))}
-                  {activity.managerTeamName && (
-                    <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-                      {activity.managerTeamName}
-                    </p>
-                  )}
                 </div>
               ) : (
                 <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
