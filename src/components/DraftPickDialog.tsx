@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
-import { UserPlus, Search } from 'lucide-react';
+import { UserPlus, Check } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { Player, Manager } from '@/lib/supabase-types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface DraftPickDialogProps {
   open: boolean;
@@ -19,17 +19,24 @@ interface DraftPickDialogProps {
   onConfirm: (playerId: string) => void;
 }
 
-const teamBadgeColors: Record<string, string> = {
-  CSK: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  MI: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  RCB: 'bg-red-500/20 text-red-400 border-red-500/30',
-  KKR: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  DC: 'bg-blue-600/20 text-blue-300 border-blue-600/30',
-  RR: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
-  PBKS: 'bg-red-600/20 text-red-300 border-red-600/30',
-  SRH: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  GT: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  LSG: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
+const teamColors: Record<string, string> = {
+  SRH: 'bg-[#FF822A]/20 border-[#FF822A] text-[#FF822A]',
+  CSK: 'bg-[#FFCB05]/20 border-[#FFCB05] text-[#FFCB05]',
+  KKR: 'bg-[#3A225D]/20 border-[#3A225D] text-[#a855f7]',
+  RR: 'bg-[#EB71A6]/20 border-[#EB71A6] text-[#EB71A6]',
+  RCB: 'bg-[#800000]/20 border-[#800000] text-[#dc2626]',
+  MI: 'bg-[#004B91]/20 border-[#004B91] text-[#3b82f6]',
+  GT: 'bg-[#1B223D]/20 border-[#1B223D] text-[#06b6d4]',
+  LSG: 'bg-[#2ABFCB]/20 border-[#2ABFCB] text-[#2ABFCB]',
+  PBKS: 'bg-[#B71E24]/20 border-[#B71E24] text-[#ef4444]',
+  DC: 'bg-[#000080]/20 border-[#000080] text-[#6366f1]',
+};
+
+const roleAbbreviations: Record<string, string> = {
+  'Bowler': 'BOWL',
+  'Batsman': 'BAT',
+  'Wicket Keeper': 'WK',
+  'All Rounder': 'AR',
 };
 
 export const DraftPickDialog = ({
@@ -44,13 +51,11 @@ export const DraftPickDialog = ({
 }: DraftPickDialogProps) => {
   const { players } = useGame();
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
       setSelectedPlayerId(currentPlayerId || '');
-      setSearchQuery('');
     }
   }, [open, currentPlayerId]);
 
@@ -64,16 +69,16 @@ export const DraftPickDialog = ({
     });
   }, [players, draftedPlayerIds, currentPlayerId]);
 
-  // Filter by search
-  const filteredPlayers = useMemo(() => {
-    if (!searchQuery) return availablePlayers;
-    const query = searchQuery.toLowerCase();
-    return availablePlayers.filter(p => 
-      p.name.toLowerCase().includes(query) || 
-      p.team.toLowerCase().includes(query) ||
-      p.role.toLowerCase().includes(query)
-    );
-  }, [availablePlayers, searchQuery]);
+  // Group players by team
+  const playersByTeam = useMemo(() => {
+    const grouped = new Map<string, Player[]>();
+    for (const player of availablePlayers) {
+      const existing = grouped.get(player.team) || [];
+      grouped.set(player.team, [...existing, player]);
+    }
+    // Sort teams alphabetically
+    return new Map([...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+  }, [availablePlayers]);
 
   const selectedPlayer = useMemo(() => {
     return players.find(p => p.id === selectedPlayerId) || null;
@@ -90,7 +95,7 @@ export const DraftPickDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+      <DialogContent className="sm:max-w-lg bg-card border-border max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <UserPlus className="w-5 h-5 text-primary" />
@@ -98,7 +103,7 @@ export const DraftPickDialog = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 pt-2 flex-1 overflow-hidden flex flex-col">
           {/* Manager (read-only) */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -112,45 +117,62 @@ export const DraftPickDialog = ({
             </div>
           </div>
 
-          {/* Player Selection */}
-          <div className="space-y-2">
+          {/* Player Selection - Scrollable List */}
+          <div className="space-y-2 flex-1 overflow-hidden flex flex-col min-h-0">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Select Player
+              Select Player ({availablePlayers.length} available)
             </label>
             
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search players..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-muted border-border"
-              />
-            </div>
-
-            <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId}>
-              <SelectTrigger className="bg-muted border-border">
-                <SelectValue placeholder="Choose a player..." />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                {filteredPlayers.map(player => (
-                  <SelectItem key={player.id} value={player.id}>
-                    <span className="flex items-center gap-2">
-                      {player.name}
-                      <span className="text-muted-foreground text-xs">
-                        {player.team} • {player.role}
-                      </span>
-                    </span>
-                  </SelectItem>
+            <ScrollArea className="flex-1 border border-border rounded-lg">
+              <div className="p-2 space-y-3">
+                {[...playersByTeam.entries()].map(([team, teamPlayers]) => (
+                  <div key={team} className="space-y-1">
+                    <div className="sticky top-0 bg-card/95 backdrop-blur px-2 py-1 z-10">
+                      <Badge 
+                        variant="outline"
+                        className={cn(
+                          "text-xs font-semibold border",
+                          teamColors[team] || 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {team} ({teamPlayers.length})
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      {teamPlayers.map(player => (
+                        <button
+                          key={player.id}
+                          onClick={() => setSelectedPlayerId(player.id)}
+                          className={cn(
+                            "w-full flex items-center justify-between p-2 rounded-md border transition-all text-left",
+                            selectedPlayerId === player.id
+                              ? "bg-primary/10 border-primary"
+                              : "bg-muted/30 border-transparent hover:bg-muted/50 hover:border-border"
+                          )}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-foreground truncate">
+                              {player.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {roleAbbreviations[player.role] || player.role}
+                            </p>
+                          </div>
+                          {selectedPlayerId === player.id && (
+                            <Check className="w-4 h-4 text-primary flex-shrink-0 ml-2" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            </ScrollArea>
           </div>
 
           {/* Selected Player Preview */}
           {selectedPlayer && (
-            <div className="space-y-2">
+            <div className="space-y-2 flex-shrink-0">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Selected Player
               </label>
@@ -160,11 +182,16 @@ export const DraftPickDialog = ({
                   <div className="flex items-center gap-2 mt-1">
                     <Badge 
                       variant="outline" 
-                      className={`text-[10px] ${teamBadgeColors[selectedPlayer.team] || 'bg-muted text-muted-foreground'}`}
+                      className={cn(
+                        "text-[10px] border",
+                        teamColors[selectedPlayer.team] || 'bg-muted text-muted-foreground'
+                      )}
                     >
                       {selectedPlayer.team}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">{selectedPlayer.role}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {roleAbbreviations[selectedPlayer.role] || selectedPlayer.role}
+                    </span>
                   </div>
                 </div>
                 <UserPlus className="w-5 h-5 text-primary" />
@@ -173,7 +200,7 @@ export const DraftPickDialog = ({
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2 pt-2 flex-shrink-0">
             <Button 
               variant="outline" 
               className="flex-1"
