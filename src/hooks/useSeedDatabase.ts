@@ -95,7 +95,7 @@ const PLAYERS_DATA = [
   { name: "Tushar Deshpande", team: "RR", role: "Bowler" },
   { name: "Shubham Dubey", team: "RR", role: "Batsman" },
   { name: "Vignesh Puthur", team: "RR", role: "Bowler" },
-  { name: "Aman Rao Perala", team: "RR", role: "All Rounder" },
+  { name: "Aman Rao Perala", team: "RR", role: "Batsman" },
   { name: "Lhuan-Dre Pretorious", team: "RR", role: "Wicket Keeper" },
   { name: "Donovan Ferreira", team: "RR", role: "Wicket Keeper" },
   { name: "Nandre Burger", team: "RR", role: "Bowler" },
