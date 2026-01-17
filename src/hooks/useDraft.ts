@@ -99,12 +99,21 @@ export const useDraft = () => {
     const orderItem = draftOrder.find(o => o.position === position);
     if (!orderItem) return;
 
+    // Optimistic update
+    setDraftOrder(prev => prev.map(o => 
+      o.position === position ? { ...o, managerId } : o
+    ));
+
     const { error } = await supabase
       .from('draft_order')
       .update({ manager_id: managerId })
       .eq('id', orderItem.id);
 
     if (error) {
+      // Revert on error
+      setDraftOrder(prev => prev.map(o => 
+        o.position === position ? { ...o, managerId: orderItem.managerId } : o
+      ));
       toast.error('Failed to assign manager');
       console.error(error);
     }
@@ -121,30 +130,60 @@ export const useDraft = () => {
     const existingPick = getPick(round, position);
 
     if (existingPick) {
-      // Update existing pick
+      // Optimistic update for existing pick
+      const oldPlayerId = existingPick.playerId;
+      setDraftPicks(prev => prev.map(p => 
+        p.id === existingPick.id ? { ...p, playerId, managerId: orderItem.managerId } : p
+      ));
+
       const { error } = await supabase
         .from('draft_picks')
         .update({ player_id: playerId, manager_id: orderItem.managerId })
         .eq('id', existingPick.id);
 
       if (error) {
+        // Revert on error
+        setDraftPicks(prev => prev.map(p => 
+          p.id === existingPick.id ? { ...p, playerId: oldPlayerId } : p
+        ));
         toast.error('Failed to update pick');
         console.error(error);
       }
     } else {
-      // Insert new pick
-      const { error } = await supabase
+      // Optimistic insert - create temporary ID
+      const tempId = `temp-${round}-${position}`;
+      const newPick = {
+        id: tempId,
+        round,
+        pickPosition: position,
+        managerId: orderItem.managerId,
+        playerId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      setDraftPicks(prev => [...prev, newPick]);
+
+      const { data, error } = await supabase
         .from('draft_picks')
         .insert({
           round,
           pick_position: position,
           manager_id: orderItem.managerId,
           player_id: playerId,
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
+        // Revert on error
+        setDraftPicks(prev => prev.filter(p => p.id !== tempId));
         toast.error('Failed to make pick');
         console.error(error);
+      } else if (data) {
+        // Replace temp pick with real one
+        setDraftPicks(prev => prev.map(p => 
+          p.id === tempId ? mapDbDraftPick(data as unknown as DbDraftPick) : p
+        ));
       }
     }
   }, [draftOrder, getPick]);
