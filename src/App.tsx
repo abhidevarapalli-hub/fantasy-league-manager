@@ -11,6 +11,7 @@ import Activity from "./pages/Activity";
 import Admin from "./pages/Admin";
 import TeamView from "./pages/TeamView";
 import Draft from "./pages/Draft";
+import LeagueHistory from "./pages/LeagueHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/activity" element={<Activity />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/draft" element={<Draft />} />
+            <Route path="/history" element={<LeagueHistory />} />
             <Route path="/team/:teamId" element={<TeamView />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
