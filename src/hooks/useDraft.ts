@@ -204,7 +204,7 @@ export const useDraft = () => {
     }
   }, [getPick]);
 
-  // Finalize draft - update rosters for managers with drafted players (partial draft allowed)
+  // Finalize draft - clear all rosters first, then update with drafted players
   const finalizeDraft = useCallback(async () => {
     try {
       // Group picks by manager
@@ -223,7 +223,19 @@ export const useDraft = () => {
         return false;
       }
 
-      // Update each manager's roster (first 11 active, rest on bench)
+      // First, clear ALL manager rosters
+      const { error: clearError } = await supabase
+        .from('managers')
+        .update({ roster: [], bench: [] })
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all managers
+
+      if (clearError) {
+        console.error('Failed to clear rosters:', clearError);
+        toast.error('Failed to clear existing rosters');
+        return false;
+      }
+
+      // Update each manager's roster with drafted players (first 11 active, rest on bench)
       for (const [managerId, playerIds] of picksByManager) {
         const activeRoster = playerIds.slice(0, 11);
         const bench = playerIds.slice(11);
@@ -243,7 +255,7 @@ export const useDraft = () => {
       // Log draft finalization transaction
       await supabase.from('transactions').insert({
         type: 'trade',
-        description: `Draft finalized - ${picksByManager.size} team rosters updated`,
+        description: `Draft finalized - All rosters cleared, ${picksByManager.size} team rosters updated`,
         manager_id: null,
         manager_team_name: null,
         week: null,
@@ -257,7 +269,7 @@ export const useDraft = () => {
           .eq('id', draftState.id);
       }
 
-      toast.success(`Draft finalized! ${picksByManager.size} team rosters have been updated.`);
+      toast.success(`Draft finalized! All rosters cleared and ${picksByManager.size} teams updated.`);
       return true;
     } catch (error) {
       console.error('Failed to finalize draft:', error);

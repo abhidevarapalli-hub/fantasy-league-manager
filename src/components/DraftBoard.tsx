@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, User } from 'lucide-react';
+import { Edit2, User, Plane } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { useDraft } from '@/hooks/useDraft';
 import type { Manager, Player } from '@/lib/supabase-types';
@@ -85,8 +85,15 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
         {pickNumber}
       </div>
 
-      {/* Edit icon for finalized picks */}
-      {isFinalized && player && (
+      {/* International player icon */}
+      {player?.isInternational && (
+        <div className="absolute top-1 left-1">
+          <Plane className="w-3 h-3 opacity-80" />
+        </div>
+      )}
+
+      {/* Edit icon for finalized picks - only show if not international */}
+      {isFinalized && player && !player.isInternational && (
         <div className="absolute top-1 left-1">
           <Edit2 className="w-3 h-3 opacity-60" />
         </div>
@@ -218,21 +225,25 @@ export const DraftBoard = () => {
         <div className="grid grid-cols-8 gap-2 min-w-[640px]">
           {Array.from({ length: ROUNDS }, (_, roundIdx) => {
             const round = roundIdx + 1;
-            // Snake draft order: odd rounds L-R, even rounds R-L
-            const positions = round % 2 === 1 
-              ? Array.from({ length: POSITIONS }, (_, i) => i + 1)
-              : Array.from({ length: POSITIONS }, (_, i) => POSITIONS - i);
+            // Snake draft order: odd rounds L-R (1,2,3...), even rounds R-L (8,7,6...)
+            const isSnakeRound = round % 2 === 0;
 
-            return positions.map((position, posIdx) => {
+            return Array.from({ length: POSITIONS }, (_, colIdx) => {
+              // Column index is 0-7, representing visual columns left to right
+              // For odd rounds: position = colIdx + 1 (1,2,3,4,5,6,7,8)
+              // For even rounds: position = POSITIONS - colIdx (8,7,6,5,4,3,2,1)
+              const position = isSnakeRound ? POSITIONS - colIdx : colIdx + 1;
+              
               const manager = getManagerAtPosition(position);
               const pick = getPick(round, position);
               const player = getPlayerForPick(pick);
-              const overallPick = (round - 1) * POSITIONS + posIdx + 1;
-              const pickNumber = `${round}.${position}`;
+              
+              // Pick number shows round.visualColumn (1-indexed)
+              const pickNumber = `${round}.${colIdx + 1}`;
 
               return (
                 <DraftCell
-                  key={`${round}-${position}`}
+                  key={`${round}-${colIdx}`}
                   round={round}
                   position={position}
                   manager={manager}
