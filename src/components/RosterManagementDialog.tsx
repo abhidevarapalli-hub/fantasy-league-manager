@@ -12,6 +12,7 @@ interface RosterManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   player: Player | null;
+  preselectedManagerId?: string;
 }
 
 const teamBadgeColors: Record<string, string> = {
@@ -27,7 +28,7 @@ const teamBadgeColors: Record<string, string> = {
   LSG: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
 };
 
-export const RosterManagementDialog = ({ open, onOpenChange, player }: RosterManagementDialogProps) => {
+export const RosterManagementDialog = ({ open, onOpenChange, player, preselectedManagerId }: RosterManagementDialogProps) => {
   const { managers, players, addFreeAgent, getManagerRosterCount } = useGame();
   const [selectedManagerId, setSelectedManagerId] = useState<string>('');
   const [dropPlayerId, setDropPlayerId] = useState<string>('none');
@@ -36,10 +37,10 @@ export const RosterManagementDialog = ({ open, onOpenChange, player }: RosterMan
   // Reset state when dialog opens/closes or player changes
   useEffect(() => {
     if (open) {
-      setSelectedManagerId('');
+      setSelectedManagerId(preselectedManagerId || '');
       setDropPlayerId('none');
     }
-  }, [open, player?.id]);
+  }, [open, player?.id, preselectedManagerId]);
 
   const selectedManager = useMemo(() => {
     return managers.find(m => m.id === selectedManagerId);
