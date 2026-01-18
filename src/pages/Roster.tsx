@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
-import { Users, UserMinus, ChevronRight, AlertCircle, Plane } from 'lucide-react';
+import { Users, UserMinus, ChevronRight, AlertCircle, Plane, ArrowLeftRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { 
@@ -12,9 +12,17 @@ import {
   BENCH_SIZE,
   MAX_INTERNATIONAL_PLAYERS,
   sortPlayersByRole,
+  canSwapInActive,
 } from '@/lib/roster-validation';
 import { Player } from '@/lib/supabase-types';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const roleIcons: Record<string, string> = {
   'Wicket Keeper': '🧤',
@@ -26,8 +34,10 @@ const roleIcons: Record<string, string> = {
 };
 
 const Roster = () => {
-  const { managers, players, getManagerRosterCount, moveToActive, moveToBench, dropPlayerOnly } = useGame();
+  const { managers, players, getManagerRosterCount, moveToActive, moveToBench, dropPlayerOnly, swapPlayers } = useGame();
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [playerToSwap, setPlayerToSwap] = useState<{ player: Player; from: 'active' | 'bench' } | null>(null);
   
   const selectedManager = managers.find(m => m.id === selectedManagerId);
   
@@ -107,13 +117,46 @@ const Roster = () => {
     const result = await moveToActive(selectedManagerId, playerId);
     if (!result.success && result.error) {
       toast.error(result.error);
+    } else {
+      toast.success('Player moved to active roster');
     }
+  };
+
+  const handleStartSwap = (player: Player, from: 'active' | 'bench') => {
+    setPlayerToSwap({ player, from });
+    setSwapDialogOpen(true);
+  };
+
+  const handleSwap = async (targetPlayer: Player) => {
+    if (!playerToSwap || !selectedManagerId) return;
+    
+    // Validate the swap if moving to active
+    if (playerToSwap.from === 'bench') {
+      // Swapping bench player into active - validate
+      const validation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer);
+      if (!validation.isValid) {
+        toast.error(validation.errors[0] || 'Invalid swap');
+        return;
+      }
+    }
+    
+    const result = await swapPlayers(selectedManagerId, playerToSwap.player.id, targetPlayer.id);
+    if (!result.success && result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Players swapped successfully');
+    }
+    
+    setSwapDialogOpen(false);
+    setPlayerToSwap(null);
   };
 
   const handleMoveToBench = async (playerId: string) => {
     const result = await moveToBench(selectedManagerId, playerId);
     if (!result.success && result.error) {
       toast.error(result.error);
+    } else {
+      toast.success('Player moved to bench');
     }
   };
 
@@ -181,6 +224,7 @@ const Roster = () => {
                   key={slot.player.id}
                   player={slot.player}
                   isOwned
+                  onSwap={benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
                   onMoveDown={benchPlayers.length < BENCH_SIZE ? () => handleMoveToBench(slot.player!.id) : undefined}
                   onDrop={() => dropPlayerOnly(selectedManagerId, slot.player!.id)}
                 />
@@ -218,24 +262,94 @@ const Roster = () => {
           </div>
           
           <div className="space-y-2">
-            {benchPlayers.length === 0 ? (
-              <div className="p-6 text-center bg-card rounded-xl border border-dashed border-border">
-                <p className="text-sm text-muted-foreground">No bench players</p>
+            {/* Show bench players */}
+            {sortedBench.map(player => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                isOwned
+                onSwap={activePlayers.length > 0 ? () => handleStartSwap(player, 'bench') : undefined}
+                onMoveUp={activePlayers.length < ACTIVE_ROSTER_SIZE ? () => handleMoveToActive(player.id) : undefined}
+                onDrop={() => dropPlayerOnly(selectedManagerId, player.id)}
+              />
+            ))}
+            
+            {/* Show empty bench slots */}
+            {Array.from({ length: BENCH_SIZE - benchPlayers.length }).map((_, index) => (
+              <div 
+                key={`empty-bench-${index}`}
+                className="p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3"
+              >
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
+                  👤
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Empty Bench Slot</p>
+                  <p className="text-xs text-muted-foreground/70">Any position</p>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  Reserve
+                </Badge>
               </div>
-            ) : (
-              sortedBench.map(player => (
-                <PlayerCard
-                  key={player.id}
-                  player={player}
-                  isOwned
-                  onMoveUp={activePlayers.length < ACTIVE_ROSTER_SIZE ? () => handleMoveToActive(player.id) : undefined}
-                  onDrop={() => dropPlayerOnly(selectedManagerId, player.id)}
-                />
-              ))
-            )}
+            ))}
           </div>
         </section>
       </main>
+
+      {/* Swap Dialog */}
+      <Dialog open={swapDialogOpen} onOpenChange={(open) => {
+        setSwapDialogOpen(open);
+        if (!open) setPlayerToSwap(null);
+      }}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="w-5 h-5" />
+              Swap {playerToSwap?.player.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground mb-4">
+              Select a player from {playerToSwap?.from === 'active' ? 'bench' : 'active roster'} to swap with:
+            </p>
+            {playerToSwap && (
+              (playerToSwap.from === 'active' ? sortedBench : sortPlayersByRole(activePlayers)).map(player => {
+                // If swapping from bench to active, check if valid
+                const isValidSwap = playerToSwap.from === 'bench' 
+                  ? canSwapInActive(activePlayers, playerToSwap.player, player).isValid
+                  : true;
+                
+                return (
+                  <button
+                    key={player.id}
+                    onClick={() => isValidSwap && handleSwap(player)}
+                    disabled={!isValidSwap}
+                    className={cn(
+                      "w-full text-left p-3 rounded-lg border transition-colors",
+                      isValidSwap 
+                        ? "border-border hover:border-primary bg-card" 
+                        : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
+                        {roleIcons[player.role] || '👤'}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground">{player.name}</p>
+                        <p className="text-xs text-muted-foreground">{player.team} • {player.role}</p>
+                      </div>
+                      {player.isInternational && (
+                        <Plane className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <BottomNav />
     </div>
