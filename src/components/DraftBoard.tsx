@@ -225,25 +225,22 @@ export const DraftBoard = () => {
         <div className="grid grid-cols-8 gap-2 min-w-[640px]">
           {Array.from({ length: ROUNDS }, (_, roundIdx) => {
             const round = roundIdx + 1;
-            // Snake draft order: odd rounds L-R (1,2,3...), even rounds R-L (8,7,6...)
-            const isSnakeRound = round % 2 === 0;
 
+            // Each column represents a fixed manager position (1-8)
+            // Snake draft affects the ORDER picks are made, not the display layout
             return Array.from({ length: POSITIONS }, (_, colIdx) => {
-              // Column index is 0-7, representing visual columns left to right
-              // For odd rounds: position = colIdx + 1 (1,2,3,4,5,6,7,8)
-              // For even rounds: position = POSITIONS - colIdx (8,7,6,5,4,3,2,1)
-              const position = isSnakeRound ? POSITIONS - colIdx : colIdx + 1;
+              const position = colIdx + 1; // Column 1 = position 1, Column 4 = position 4, etc.
               
               const manager = getManagerAtPosition(position);
               const pick = getPick(round, position);
               const player = getPlayerForPick(pick);
               
-              // Pick number shows round.visualColumn (1-indexed)
-              const pickNumber = `${round}.${colIdx + 1}`;
+              // Pick number shows round.position (matches the column/manager position)
+              const pickNumber = `${round}.${position}`;
 
               return (
                 <DraftCell
-                  key={`${round}-${colIdx}`}
+                  key={`${round}-${position}`}
                   round={round}
                   position={position}
                   manager={manager}
