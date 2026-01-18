@@ -4,6 +4,7 @@ export interface DbPlayer {
   name: string;
   team: string;
   role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper';
+  is_international: boolean;
   created_at: string;
 }
 
@@ -54,6 +55,7 @@ export interface Player {
   name: string;
   team: string;
   role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper';
+  isInternational: boolean;
 }
 
 export interface Manager {
@@ -93,6 +95,7 @@ export const mapDbPlayer = (db: DbPlayer): Player => ({
   name: db.name,
   team: db.team,
   role: db.role,
+  isInternational: db.is_international,
 });
 
 export const mapDbManager = (db: DbManager): Manager => ({

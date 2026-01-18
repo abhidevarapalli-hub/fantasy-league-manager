@@ -11,6 +11,7 @@ const mapDbPlayer = (db: Tables<"players">): Player => ({
   name: db.name,
   team: db.team,
   role: db.role as Player["role"],
+  isInternational: db.is_international ?? false,
 });
 
 const mapDbManager = (db: Tables<"managers">): Manager => ({

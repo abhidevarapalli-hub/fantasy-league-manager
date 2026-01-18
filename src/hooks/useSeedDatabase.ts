@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { isInternationalPlayer } from "@/lib/international-players";
 
 // Initial data
 const PLAYERS_DATA = [
@@ -292,7 +293,12 @@ export const useSeedDatabase = () => {
 
       // Seed players
       if (!existingPlayers || existingPlayers.length === 0) {
-        const { error: playersError } = await supabase.from("players").insert(PLAYERS_DATA);
+        // Add is_international flag to players data
+        const playersWithInternational = PLAYERS_DATA.map(player => ({
+          ...player,
+          is_international: isInternationalPlayer(player.name),
+        }));
+        const { error: playersError } = await supabase.from("players").insert(playersWithInternational);
         if (playersError) {
           console.error("Error seeding players:", playersError);
           throw playersError;

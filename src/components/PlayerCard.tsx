@@ -1,4 +1,4 @@
-import { Plus, Minus, ArrowUp, ArrowDown, Swords, Target, User, Shield } from 'lucide-react';
+import { Plus, Minus, ArrowUp, ArrowDown, Swords, Target, User, Shield, Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
@@ -87,14 +87,22 @@ export const PlayerCard = ({
       </div>
       
       <div className="flex-1 min-w-0">
-        <p className={cn(
-          "font-semibold truncate",
-          variant === 'compact' && "text-sm",
-          // Use white text for dark backgrounds, black for light
-          ['KKR', 'RCB', 'MI', 'GT', 'PBKS', 'DC'].includes(player.team) ? 'text-white' : 'text-black'
-        )}>
-          {player.name}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className={cn(
+            "font-semibold truncate",
+            variant === 'compact' && "text-sm",
+            // Use white text for dark backgrounds, black for light
+            ['KKR', 'RCB', 'MI', 'GT', 'PBKS', 'DC'].includes(player.team) ? 'text-white' : 'text-black'
+          )}>
+            {player.name}
+          </p>
+          {player.isInternational && (
+            <Plane className={cn(
+              "w-3.5 h-3.5 flex-shrink-0",
+              ['KKR', 'RCB', 'MI', 'GT', 'PBKS', 'DC'].includes(player.team) ? 'text-white/80' : 'text-black/80'
+            )} />
+          )}
+        </div>
         <div className="flex items-center gap-2 mt-1">
           <span className={cn(
             "px-2 py-0.5 text-xs font-medium rounded-md border",
