@@ -4,6 +4,7 @@ import { useGame } from '@/contexts/GameContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
+import { ACTIVE_ROSTER_SIZE, BENCH_SIZE } from '@/lib/roster-validation';
 
 const TeamView = () => {
   const { teamId } = useParams();
@@ -22,6 +23,7 @@ const TeamView = () => {
 
   const activePlayers = manager.activeRoster.map(id => players.find(p => p.id === id)!).filter(Boolean);
   const benchPlayers = manager.bench.map(id => players.find(p => p.id === id)!).filter(Boolean);
+  const totalPlayers = activePlayers.length + benchPlayers.length;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -38,7 +40,7 @@ const TeamView = () => {
           <div>
             <h1 className="text-lg font-bold text-foreground">{manager.teamName}</h1>
             <p className="text-xs text-muted-foreground">
-              Managed by {manager.name} • {manager.wins}W - {manager.losses}L
+              Managed by {manager.name} • {manager.wins}W - {manager.losses}L • {totalPlayers}/{ACTIVE_ROSTER_SIZE + BENCH_SIZE} players
             </p>
           </div>
         </div>

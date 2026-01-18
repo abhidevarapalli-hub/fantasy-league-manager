@@ -330,6 +330,41 @@ export const useRealtimeGame = () => {
     return { success: true };
   };
 
+  const swapPlayers = async (
+    managerId: string, 
+    player1Id: string, 
+    player2Id: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const manager = managers.find((m) => m.id === managerId);
+    if (!manager) return { success: false, error: "Manager not found" };
+
+    const player1InActive = manager.activeRoster.includes(player1Id);
+    const player2InActive = manager.activeRoster.includes(player2Id);
+
+    // Swap the players
+    let newRoster = [...manager.activeRoster];
+    let newBench = [...manager.bench];
+
+    if (player1InActive && !player2InActive) {
+      // Player 1 is in active, player 2 is in bench -> swap them
+      newRoster = newRoster.filter(id => id !== player1Id);
+      newRoster.push(player2Id);
+      newBench = newBench.filter(id => id !== player2Id);
+      newBench.push(player1Id);
+    } else if (!player1InActive && player2InActive) {
+      // Player 1 is in bench, player 2 is in active -> swap them
+      newRoster = newRoster.filter(id => id !== player2Id);
+      newRoster.push(player1Id);
+      newBench = newBench.filter(id => id !== player1Id);
+      newBench.push(player2Id);
+    } else {
+      return { success: false, error: "Players must be in different sections to swap" };
+    }
+
+    await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
+    return { success: true };
+  };
+
   const updateMatchScore = async (week: number, matchIndex: number, homeScore: number, awayScore: number) => {
     const weekMatches = schedule.filter((m) => m.week === week);
     if (matchIndex >= weekMatches.length) return;
@@ -525,6 +560,7 @@ export const useRealtimeGame = () => {
     dropPlayerOnly,
     moveToActive,
     moveToBench,
+    swapPlayers,
     updateMatchScore,
     finalizeWeekScores,
     addNewPlayer,

@@ -12,6 +12,7 @@ import { sortPlayersByPriority } from '@/lib/player-order';
 
 const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
 const PLAYER_ROLES = ['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'];
+const NATIONALITY_FILTERS = ['All', 'Domestic', 'International'];
 
 const teamFilterColors: Record<string, string> = {
   All: 'bg-primary/20 text-primary border-primary/30',
@@ -35,11 +36,18 @@ const roleFilterColors: Record<string, string> = {
   'Wicket Keeper': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
 };
 
+const nationalityFilterColors: Record<string, string> = {
+  All: 'bg-primary/20 text-primary border-primary/30',
+  Domestic: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+  International: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
+};
+
 const Players = () => {
   const { players, managers } = useGame();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
   const [selectedRole, setSelectedRole] = useState('All');
+  const [selectedNationality, setSelectedNationality] = useState('All');
   const [showOnlyFreeAgents, setShowOnlyFreeAgents] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -61,13 +69,16 @@ const Players = () => {
                            player.team.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTeam = selectedTeam === 'All' || player.team === selectedTeam;
       const matchesRole = selectedRole === 'All' || player.role === selectedRole;
+      const matchesNationality = selectedNationality === 'All' || 
+                                 (selectedNationality === 'International' && player.isInternational) ||
+                                 (selectedNationality === 'Domestic' && !player.isInternational);
       const isRostered = playerToManagerMap[player.id];
       const matchesFreeAgentFilter = !showOnlyFreeAgents || !isRostered;
-      return matchesSearch && matchesTeam && matchesRole && matchesFreeAgentFilter;
+      return matchesSearch && matchesTeam && matchesRole && matchesNationality && matchesFreeAgentFilter;
     });
     
     return sortPlayersByPriority(filtered);
-  }, [players, searchQuery, selectedTeam, selectedRole, playerToManagerMap, showOnlyFreeAgents]);
+  }, [players, searchQuery, selectedTeam, selectedRole, selectedNationality, playerToManagerMap, showOnlyFreeAgents]);
 
   const handleAddPlayer = (playerId: string) => {
     const player = players.find(p => p.id === playerId);
@@ -144,7 +155,7 @@ const Players = () => {
         </div>
 
         {/* Role Filter Pills */}
-        <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
+        <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
           <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Position</p>
           <div className="flex gap-2">
             {PLAYER_ROLES.map((role) => (
@@ -159,6 +170,27 @@ const Players = () => {
                 )}
               >
                 {role}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Nationality Filter Pills */}
+        <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
+          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Nationality</p>
+          <div className="flex gap-2">
+            {NATIONALITY_FILTERS.map((nationality) => (
+              <button
+                key={nationality}
+                onClick={() => setSelectedNationality(nationality)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
+                  selectedNationality === nationality 
+                    ? nationalityFilterColors[nationality] 
+                    : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                )}
+              >
+                {nationality}
               </button>
             ))}
           </div>

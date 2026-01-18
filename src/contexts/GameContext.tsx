@@ -23,6 +23,7 @@ interface GameContextType {
   dropPlayerOnly: (managerId: string, playerId: string) => Promise<void>;
   moveToActive: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
   moveToBench: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
+  swapPlayers: (managerId: string, player1Id: string, player2Id: string) => Promise<RosterMoveResult>;
   updateMatchScore: (week: number, matchIndex: number, homeScore: number, awayScore: number) => Promise<void>;
   finalizeWeekScores: (week: number) => Promise<void>;
   addNewPlayer: (name: string, team: string, role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper') => Promise<void>;
