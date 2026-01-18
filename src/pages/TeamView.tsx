@@ -320,11 +320,8 @@ const TeamView = () => {
             ))}
           </div>
         </div>
-      </header>
-
-      <main className="px-4 py-4 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="px-4 py-3 grid grid-cols-3 gap-3">
           <div className="bg-card rounded-xl border border-border p-3 text-center">
             <p className="text-2xl font-bold text-success">{manager.wins}</p>
             <p className="text-xs text-muted-foreground">Wins</p>
@@ -338,6 +335,112 @@ const TeamView = () => {
             <p className="text-xs text-muted-foreground">Points</p>
           </div>
         </div>
+
+        {/* Separator */}
+        <div className="border-b border-border" />
+        
+        {/* Search */}
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search players..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10 bg-muted border-border"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted-foreground/20"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Free Agent Filter */}
+        <div className="px-4 pb-2">
+          <button
+            onClick={() => setShowOnlyFreeAgents(!showOnlyFreeAgents)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+              showOnlyFreeAgents
+                ? "bg-secondary/20 text-secondary border-secondary/30"
+                : "bg-muted/50 text-muted-foreground border-border hover:border-secondary/30"
+            )}
+          >
+            <Filter className="w-3 h-3" />
+            {showOnlyFreeAgents ? 'Showing Free Agents Only' : 'Show Free Agents Only'}
+          </button>
+        </div>
+        
+        {/* Team Filter Pills */}
+        <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
+          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Team</p>
+          <div className="flex gap-2">
+            {IPL_TEAMS.map((team) => (
+              <button
+                key={team}
+                onClick={() => setSelectedTeam(team)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
+                  selectedTeam === team 
+                    ? teamFilterColors[team] 
+                    : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                )}
+              >
+                {team}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Role Filter Pills */}
+        <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
+          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Position</p>
+          <div className="flex gap-2">
+            {PLAYER_ROLES.map((role) => (
+              <button
+                key={role}
+                onClick={() => setSelectedRole(role)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
+                  selectedRole === role 
+                    ? roleFilterColors[role] 
+                    : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                )}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Nationality Filter Pills */}
+        <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
+          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Nationality</p>
+          <div className="flex gap-2">
+            {NATIONALITY_FILTERS.map((nationality) => (
+              <button
+                key={nationality}
+                onClick={() => setSelectedNationality(nationality)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
+                  selectedNationality === nationality 
+                    ? nationalityFilterColors[nationality] 
+                    : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                )}
+              >
+                {nationality}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <main className="px-4 py-4 space-y-6">
 
         {/* Validation Errors */}
         {!validation.isValid && validation.errors.length > 0 && (
