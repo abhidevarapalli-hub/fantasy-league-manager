@@ -2,8 +2,9 @@ import { Player } from './supabase-types';
 
 // Roster constraints
 export const ACTIVE_ROSTER_SIZE = 11;
-export const BENCH_SIZE = 14;
-export const TOTAL_ROSTER_CAP = ACTIVE_ROSTER_SIZE + BENCH_SIZE; // 25 total (11 active + 14 bench)
+export const TOTAL_ROSTER_SIZE = 14; // Maximum total players per team
+export const BENCH_SIZE = TOTAL_ROSTER_SIZE - ACTIVE_ROSTER_SIZE; // 3 bench spots
+export const TOTAL_ROSTER_CAP = TOTAL_ROSTER_SIZE; // Alias for backwards compatibility
 
 // Active 11 constraints
 export const MIN_WICKET_KEEPERS = 1;

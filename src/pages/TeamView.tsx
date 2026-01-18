@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowLeftRight } from 'lucide-react';
+import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowLeftRight, Trophy } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   ACTIVE_ROSTER_SIZE, 
-  BENCH_SIZE,
+  TOTAL_ROSTER_SIZE,
   MAX_INTERNATIONAL_PLAYERS,
   getActiveRosterSlots,
   validateActiveRoster,
@@ -45,6 +45,16 @@ const TeamView = () => {
   
   const manager = managers.find(m => m.id === teamId);
   
+  // Calculate standings position
+  const standingsPosition = useMemo(() => {
+    if (!manager) return 0;
+    const sortedManagers = [...managers].sort((a, b) => {
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return b.points - a.points;
+    });
+    return sortedManagers.findIndex(m => m.id === manager.id) + 1;
+  }, [managers, manager]);
+  
   if (!manager) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -60,6 +70,9 @@ const TeamView = () => {
     .map(id => players.find(p => p.id === id))
     .filter((p): p is Player => p !== undefined);
   const totalPlayers = activePlayers.length + benchPlayers.length;
+  
+  // Calculate max bench size based on active roster
+  const maxBenchSize = TOTAL_ROSTER_SIZE - ACTIVE_ROSTER_SIZE;
 
   const validation = validateActiveRoster(activePlayers);
   const slots = getActiveRosterSlots(activePlayers);
@@ -127,7 +140,7 @@ const TeamView = () => {
           <div className="flex-1">
             <h1 className="text-lg font-bold text-foreground">{manager.teamName}</h1>
             <p className="text-xs text-muted-foreground">
-              {manager.name} • {totalPlayers}/{ACTIVE_ROSTER_SIZE + BENCH_SIZE} players
+              {manager.name} • {totalPlayers}/{TOTAL_ROSTER_SIZE} players
             </p>
           </div>
           <div className={cn(
@@ -144,7 +157,14 @@ const TeamView = () => {
 
       <main className="px-4 py-4 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
+          <div className="bg-card rounded-xl border border-border p-3 text-center">
+            <div className="flex items-center justify-center gap-1">
+              <Trophy className="w-4 h-4 text-amber-500" />
+              <p className="text-2xl font-bold text-amber-500">{standingsPosition}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">Rank</p>
+          </div>
           <div className="bg-card rounded-xl border border-border p-3 text-center">
             <p className="text-2xl font-bold text-success">{manager.wins}</p>
             <p className="text-xs text-muted-foreground">Wins</p>
@@ -199,7 +219,7 @@ const TeamView = () => {
                   player={slot.player}
                   isOwned
                   onSwap={benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
-                  onMoveDown={benchPlayers.length < BENCH_SIZE ? () => handleMoveToBench(slot.player!.id) : undefined}
+                  onMoveDown={benchPlayers.length < maxBenchSize ? () => handleMoveToBench(slot.player!.id) : undefined}
                   onDrop={() => dropPlayerOnly(teamId!, slot.player!.id)}
                 />
               ) : (
@@ -231,7 +251,7 @@ const TeamView = () => {
             </div>
             <div>
               <h2 className="font-semibold text-foreground">Bench</h2>
-              <p className="text-xs text-muted-foreground">Reserve players ({benchPlayers.length}/{BENCH_SIZE})</p>
+              <p className="text-xs text-muted-foreground">Reserve players ({benchPlayers.length}/{maxBenchSize})</p>
             </div>
           </div>
           
@@ -248,7 +268,7 @@ const TeamView = () => {
             ))}
             
             {/* Empty bench slots */}
-            {Array.from({ length: BENCH_SIZE - benchPlayers.length }).map((_, index) => (
+            {Array.from({ length: maxBenchSize - benchPlayers.length }).map((_, index) => (
               <div 
                 key={`empty-bench-${index}`}
                 className="p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3"

@@ -478,8 +478,9 @@ export const useRealtimeGame = () => {
     name: string,
     team: string,
     role: "Batsman" | "Bowler" | "All Rounder" | "Wicket Keeper",
+    isInternational: boolean = false,
   ) => {
-    await supabase.from("players").insert({ name, team, role });
+    await supabase.from("players").insert({ name, team, role, is_international: isInternational });
   };
 
   const executeTrade = async (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => {

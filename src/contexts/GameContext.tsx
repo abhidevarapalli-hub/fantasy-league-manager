@@ -26,7 +26,7 @@ interface GameContextType {
   swapPlayers: (managerId: string, player1Id: string, player2Id: string) => Promise<RosterMoveResult>;
   updateMatchScore: (week: number, matchIndex: number, homeScore: number, awayScore: number) => Promise<void>;
   finalizeWeekScores: (week: number) => Promise<void>;
-  addNewPlayer: (name: string, team: string, role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper') => Promise<void>;
+  addNewPlayer: (name: string, team: string, role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper', isInternational?: boolean) => Promise<void>;
   executeTrade: (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => Promise<void>;
   resetLeague: () => Promise<void>;
   isWeekLocked: (week: number) => boolean;
