@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { RosterManagementDialog } from '@/components/RosterManagementDialog';
 import { Player } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
+import { sortPlayersByPriority } from '@/lib/player-order';
 
 const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
 const PLAYER_ROLES = ['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'];
@@ -55,7 +56,7 @@ const Players = () => {
   }, [managers]);
 
   const filteredPlayers = useMemo(() => {
-    return players.filter(player => {
+    const filtered = players.filter(player => {
       const matchesSearch = player.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            player.team.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTeam = selectedTeam === 'All' || player.team === selectedTeam;
@@ -64,6 +65,8 @@ const Players = () => {
       const matchesFreeAgentFilter = !showOnlyFreeAgents || !isRostered;
       return matchesSearch && matchesTeam && matchesRole && matchesFreeAgentFilter;
     });
+    
+    return sortPlayersByPriority(filtered);
   }, [players, searchQuery, selectedTeam, selectedRole, playerToManagerMap, showOnlyFreeAgents]);
 
   const handleAddPlayer = (playerId: string) => {

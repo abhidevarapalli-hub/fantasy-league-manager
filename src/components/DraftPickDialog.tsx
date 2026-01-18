@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { PlayerCard } from '@/components/PlayerCard';
 import { cn } from '@/lib/utils';
+import { sortPlayersByPriority } from '@/lib/player-order';
 
 interface DraftPickDialogProps {
   open: boolean;
@@ -79,9 +80,9 @@ export const DraftPickDialog = ({
     }
   }, [open, currentPlayerId]);
 
-  // Get available players (not drafted) with filters applied
+  // Get available players (not drafted) with filters applied, sorted by priority
   const filteredPlayers = useMemo(() => {
-    return players.filter(p => {
+    const filtered = players.filter(p => {
       // Include current player if editing
       const isCurrentPlayer = p.id === currentPlayerId;
       // Exclude already drafted players (unless it's the current player being edited)
@@ -101,6 +102,8 @@ export const DraftPickDialog = ({
       
       return matchesSearch && matchesTeam && matchesRole;
     });
+    
+    return sortPlayersByPriority(filtered);
   }, [players, draftedPlayerIds, currentPlayerId, searchQuery, selectedTeam, selectedRole]);
 
   const selectedPlayer = useMemo(() => {
