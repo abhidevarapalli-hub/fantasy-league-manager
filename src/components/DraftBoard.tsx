@@ -98,8 +98,8 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
         </div>
       )}
 
-      {/* X icon to clear pick - only show if player exists and not international */}
-      {player && !player.isInternational && (
+      {/* X icon to clear pick */}
+      {player && (
         <button
           onClick={handleClearClick}
           className="absolute top-1 left-1 p-0.5 rounded hover:bg-black/20 transition-colors"
