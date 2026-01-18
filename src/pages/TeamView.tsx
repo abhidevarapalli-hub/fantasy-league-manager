@@ -307,9 +307,11 @@ const TeamView = () => {
             </p>
             {playerToSwap && (
               (playerToSwap.from === 'active' ? sortedBench : sortPlayersByRole(activePlayers)).map(player => {
+                // When swapping from active to bench: check if bringing bench player TO active is valid
+                // When swapping from bench to active: check if bringing bench player TO active is valid
                 const isValidSwap = playerToSwap.from === 'bench' 
                   ? canSwapInActive(activePlayers, playerToSwap.player, player).isValid
-                  : true;
+                  : canSwapInActive(activePlayers, player, playerToSwap.player).isValid;
                 
                 return (
                   <button
