@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, History } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -7,6 +7,7 @@ const navItems = [
   { icon: Users, label: 'Rosters', path: '/roster' },
   { icon: UsersRound, label: 'Players', path: '/players' },
   { icon: Activity, label: 'Activity', path: '/activity' },
+  { icon: History, label: 'History', path: '/history' },
   { icon: ClipboardList, label: 'Draft', path: '/draft' },
   { icon: Settings, label: 'Admin', path: '/admin' },
 ];

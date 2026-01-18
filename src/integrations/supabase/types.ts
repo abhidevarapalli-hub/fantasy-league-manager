@@ -109,6 +109,69 @@ export type Database = {
         }
         Relationships: []
       }
+      head_to_head: {
+        Row: {
+          created_at: string
+          id: string
+          manager1_name: string
+          manager1_wins: number
+          manager2_name: string
+          manager2_wins: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manager1_name: string
+          manager1_wins?: number
+          manager2_name: string
+          manager2_wins?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manager1_name?: string
+          manager1_wins?: number
+          manager2_name?: string
+          manager2_wins?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      historical_records: {
+        Row: {
+          championships: number
+          created_at: string
+          historical_losses: number
+          historical_wins: number
+          id: string
+          manager_name: string
+          top_3_finishes: number
+          updated_at: string
+        }
+        Insert: {
+          championships?: number
+          created_at?: string
+          historical_losses?: number
+          historical_wins?: number
+          id?: string
+          manager_name: string
+          top_3_finishes?: number
+          updated_at?: string
+        }
+        Update: {
+          championships?: number
+          created_at?: string
+          historical_losses?: number
+          historical_wins?: number
+          id?: string
+          manager_name?: string
+          top_3_finishes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       managers: {
         Row: {
           bench: string[] | null
