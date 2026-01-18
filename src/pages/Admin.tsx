@@ -56,6 +56,7 @@ const Admin = () => {
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerTeam, setNewPlayerTeam] = useState('');
   const [newPlayerRole, setNewPlayerRole] = useState<'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper' | ''>('');
+  const [newPlayerIsInternational, setNewPlayerIsInternational] = useState(false);
 
   // Pre-populate player from URL param
   useEffect(() => {
@@ -165,12 +166,13 @@ const Admin = () => {
 
   const isButtonEnabled = canAddOnly || canDropOnly || canAddAndDrop;
 
-  const handleAddNewPlayer = () => {
+  const handleAddNewPlayer = async () => {
     if (newPlayerName && newPlayerTeam && newPlayerRole) {
-      addNewPlayer(newPlayerName, newPlayerTeam, newPlayerRole);
+      await addNewPlayer(newPlayerName, newPlayerTeam, newPlayerRole, newPlayerIsInternational);
       setNewPlayerName('');
       setNewPlayerTeam('');
       setNewPlayerRole('');
+      setNewPlayerIsInternational(false);
     }
   };
 
@@ -368,6 +370,17 @@ const Admin = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is-international"
+                checked={newPlayerIsInternational}
+                onCheckedChange={(checked) => setNewPlayerIsInternational(checked as boolean)}
+              />
+              <Label htmlFor="is-international" className="text-muted-foreground cursor-pointer">
+                International Player
+              </Label>
             </div>
 
             <Button 

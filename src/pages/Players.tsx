@@ -154,45 +154,50 @@ const Players = () => {
           </div>
         </div>
 
-        {/* Role Filter Pills */}
-        <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
-          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Position</p>
-          <div className="flex gap-2">
-            {PLAYER_ROLES.map((role) => (
-              <button
-                key={role}
-                onClick={() => setSelectedRole(role)}
-                className={cn(
-                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                  selectedRole === role 
-                    ? roleFilterColors[role] 
-                    : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
-                )}
-              >
-                {role}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Nationality Filter Pills */}
+        {/* Role and Nationality Filter Pills - Same Row */}
         <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
-          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Nationality</p>
-          <div className="flex gap-2">
-            {NATIONALITY_FILTERS.map((nationality) => (
-              <button
-                key={nationality}
-                onClick={() => setSelectedNationality(nationality)}
-                className={cn(
-                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                  selectedNationality === nationality 
-                    ? nationalityFilterColors[nationality] 
-                    : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
-                )}
-              >
-                {nationality}
-              </button>
-            ))}
+          <div className="flex items-start gap-6">
+            {/* Role Filter */}
+            <div className="flex-shrink-0">
+              <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Position</p>
+              <div className="flex gap-2">
+                {PLAYER_ROLES.map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => setSelectedRole(role)}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
+                      selectedRole === role 
+                        ? roleFilterColors[role] 
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                    )}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Nationality Filter */}
+            <div className="flex-shrink-0">
+              <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Nationality</p>
+              <div className="flex gap-2">
+                {NATIONALITY_FILTERS.map((nationality) => (
+                  <button
+                    key={nationality}
+                    onClick={() => setSelectedNationality(nationality)}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
+                      selectedNationality === nationality 
+                        ? nationalityFilterColors[nationality] 
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                    )}
+                  >
+                    {nationality}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </header>
