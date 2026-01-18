@@ -93,7 +93,7 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
 
       {/* International player icon */}
       {player?.isInternational && (
-        <div className="absolute top-1 left-1">
+        <div className="absolute bottom-1 right-1">
           <Plane className="w-3 h-3 opacity-80" />
         </div>
       )}
