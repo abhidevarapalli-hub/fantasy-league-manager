@@ -3,9 +3,10 @@ import { useGame } from '@/contexts/GameContext';
 import { BottomNav } from '@/components/BottomNav';
 import { User, Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ACTIVE_ROSTER_SIZE, BENCH_SIZE, sortPlayersByRole } from '@/lib/roster-validation';
+import { ACTIVE_ROSTER_SIZE, BENCH_SIZE, getActiveRosterSlots, sortPlayersByRole } from '@/lib/roster-validation';
 import { Badge } from '@/components/ui/badge';
 import { Player, Manager } from '@/lib/supabase-types';
+import { SlotRequirement } from '@/lib/roster-validation';
 
 // Team colors based on IPL teams (same as draft page)
 const teamColors: Record<string, string> = {
@@ -41,6 +42,17 @@ const roleAbbreviations: Record<string, string> = {
   'Batsman': 'BAT',
   'Wicket Keeper': 'WK',
   'All Rounder': 'AR',
+  'WK/BAT': 'WK/BAT',
+  'AR/BWL': 'AR/BWL',
+};
+
+const roleIcons: Record<string, string> = {
+  'Wicket Keeper': '🧤',
+  'Batsman': '🏏',
+  'All Rounder': '⚡',
+  'Bowler': '🎯',
+  'WK/BAT': '🏏',
+  'AR/BWL': '⚡',
 };
 
 const getCellColor = (player: Player | null): string => {
@@ -49,13 +61,13 @@ const getCellColor = (player: Player | null): string => {
 };
 
 interface RosterCellProps {
-  player: Player | null;
-  slotLabel: string;
+  slot: SlotRequirement;
   isBench?: boolean;
 }
 
-const RosterCell = ({ player, slotLabel, isBench }: RosterCellProps) => {
-  const colorClass = getCellColor(player);
+const RosterCell = ({ slot, isBench }: RosterCellProps) => {
+  const player = slot.player || null;
+  const colorClass = player ? (teamColors[player.team] || defaultCellColor) : defaultCellColor;
   
   return (
     <div
@@ -98,8 +110,12 @@ const RosterCell = ({ player, slotLabel, isBench }: RosterCellProps) => {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center h-full pt-2">
-          <User className="w-6 h-6 opacity-30" />
-          <span className="text-[10px] opacity-50 mt-1">{slotLabel}</span>
+          <div className="text-lg opacity-50">
+            {roleIcons[slot.role] || '👤'}
+          </div>
+          <span className="text-[9px] opacity-50 mt-1 text-center leading-tight">
+            {slot.label}
+          </span>
         </div>
       )}
     </div>
@@ -110,49 +126,41 @@ const Roster = () => {
   const navigate = useNavigate();
   const { managers, players } = useGame();
 
-  // Get player objects for a manager's roster
-  const getManagerPlayers = (manager: Manager): { active: Player[]; bench: Player[] } => {
+  // Get roster slots for a manager using the same logic as TeamView
+  const getRosterSlots = (manager: Manager): { activeSlots: SlotRequirement[]; benchSlots: SlotRequirement[] } => {
     const rosterIds = manager.activeRoster || [];
     const benchIds = manager.bench || [];
     
-    const activeRaw = rosterIds
+    const activePlayers = rosterIds
       .map(id => players.find(p => p.id === id))
       .filter((p): p is Player => p !== undefined);
     
-    const benchRaw = benchIds
+    const benchPlayers = benchIds
       .map(id => players.find(p => p.id === id))
       .filter((p): p is Player => p !== undefined);
     
-    return {
-      active: sortPlayersByRole(activeRaw),
-      bench: sortPlayersByRole(benchRaw),
-    };
-  };
-
-  // Create roster slots for display (11 active + 3 bench)
-  const getRosterSlots = (manager: Manager): { player: Player | null; label: string; isBench: boolean }[] => {
-    const { active, bench } = getManagerPlayers(manager);
-    const slots: { player: Player | null; label: string; isBench: boolean }[] = [];
+    // Use getActiveRosterSlots for active roster (shows position requirements)
+    const activeSlots = getActiveRosterSlots(activePlayers);
     
-    // Active 11 slots
-    for (let i = 0; i < ACTIVE_ROSTER_SIZE; i++) {
-      slots.push({
-        player: active[i] || null,
-        label: `Active ${i + 1}`,
-        isBench: false,
+    // For bench, show filled players sorted + empty slots
+    const sortedBench = sortPlayersByRole(benchPlayers);
+    const benchSlots: SlotRequirement[] = sortedBench.map(player => ({
+      role: player.role,
+      label: player.role,
+      filled: true,
+      player,
+    }));
+    
+    // Add empty bench slots
+    for (let i = benchPlayers.length; i < BENCH_SIZE; i++) {
+      benchSlots.push({
+        role: 'WK/BAT', // Any position for bench
+        label: 'Reserve',
+        filled: false,
       });
     }
     
-    // Bench slots
-    for (let i = 0; i < BENCH_SIZE; i++) {
-      slots.push({
-        player: bench[i] || null,
-        label: `Bench ${i + 1}`,
-        isBench: true,
-      });
-    }
-    
-    return slots;
+    return { activeSlots, benchSlots };
   };
 
   const totalRosterSize = ACTIVE_ROSTER_SIZE + BENCH_SIZE;
@@ -192,15 +200,19 @@ const Roster = () => {
                 style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}
               >
                 {managers.map(manager => {
-                  const slots = getRosterSlots(manager);
-                  const slot = slots[rowIdx];
+                  const { activeSlots, benchSlots } = getRosterSlots(manager);
+                  const isActiveSLot = rowIdx < ACTIVE_ROSTER_SIZE;
+                  const slot = isActiveSLot 
+                    ? activeSlots[rowIdx] 
+                    : benchSlots[rowIdx - ACTIVE_ROSTER_SIZE];
+                  
+                  if (!slot) return null;
                   
                   return (
                     <RosterCell
                       key={`${manager.id}-${rowIdx}`}
-                      player={slot.player}
-                      slotLabel={slot.label}
-                      isBench={slot.isBench}
+                      slot={slot}
+                      isBench={!isActiveSLot}
                     />
                   );
                 })}
