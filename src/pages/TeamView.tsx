@@ -105,12 +105,19 @@ const TeamView = () => {
   const handleSwap = async (targetPlayer: Player) => {
     if (!playerToSwap || !teamId) return;
     
+    // Validate the swap - determine which player is going TO active
+    let swapValidation;
     if (playerToSwap.from === 'bench') {
-      const swapValidation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer);
-      if (!swapValidation.isValid) {
-        toast.error(swapValidation.errors[0] || 'Invalid swap');
-        return;
-      }
+      // Bench player going to active, target (active) player leaving
+      swapValidation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer);
+    } else {
+      // Active player going to bench, target (bench) player coming to active
+      swapValidation = canSwapInActive(activePlayers, targetPlayer, playerToSwap.player);
+    }
+    
+    if (!swapValidation.isValid) {
+      toast.error(swapValidation.errors[0] || 'Invalid swap');
+      return;
     }
     
     const result = await swapPlayers(teamId, playerToSwap.player.id, targetPlayer.id);
