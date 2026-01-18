@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, User, Plane } from 'lucide-react';
+import { X, User, Plane } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { useDraft } from '@/hooks/useDraft';
 import type { Manager, Player } from '@/lib/supabase-types';
@@ -64,11 +64,17 @@ interface DraftCellProps {
   pickNumber: string;
   isFinalized: boolean;
   onCellClick: () => void;
+  onClearPick: () => void;
   colorClass: string;
 }
 
-const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, onCellClick, colorClass }: DraftCellProps) => {
+const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, onCellClick, onClearPick, colorClass }: DraftCellProps) => {
   const isEmpty = !player;
+
+  const handleClearClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClearPick();
+  };
   
   return (
     <div
@@ -92,11 +98,14 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
         </div>
       )}
 
-      {/* Edit icon for finalized picks - only show if not international */}
-      {isFinalized && player && !player.isInternational && (
-        <div className="absolute top-1 left-1">
-          <Edit2 className="w-3 h-3 opacity-60" />
-        </div>
+      {/* X icon to clear pick - only show if player exists and not international */}
+      {player && !player.isInternational && (
+        <button
+          onClick={handleClearClick}
+          className="absolute top-1 left-1 p-0.5 rounded hover:bg-black/20 transition-colors"
+        >
+          <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+        </button>
       )}
 
       {player ? (
@@ -138,6 +147,7 @@ export const DraftBoard = () => {
     getDraftedPlayerIds,
     assignManagerToPosition,
     makePick,
+    clearPick,
     finalizeDraft,
     resetDraft,
   } = useDraft();
@@ -248,6 +258,7 @@ export const DraftBoard = () => {
                   pickNumber={pickNumber}
                   isFinalized={draftState?.isFinalized || false}
                   onCellClick={() => handleCellClick(round, position)}
+                  onClearPick={() => clearPick(round, position)}
                   colorClass={getCellColor(player)}
                 />
               );
