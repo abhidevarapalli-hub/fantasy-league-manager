@@ -24,6 +24,7 @@ interface DraftPickDialogProps {
 
 const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
 const PLAYER_ROLES = ['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'];
+const NATIONALITY_FILTERS = ['All', 'Domestic', 'International'];
 
 const teamFilterColors: Record<string, string> = {
   All: 'bg-primary/20 text-primary border-primary/30',
@@ -45,6 +46,12 @@ const roleFilterColors: Record<string, string> = {
   Bowler: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
   'All Rounder': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
   'Wicket Keeper': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+};
+
+const nationalityFilterColors: Record<string, string> = {
+  All: 'bg-primary/20 text-primary border-primary/30',
+  Domestic: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+  International: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
 };
 
 const roleAbbreviations: Record<string, string> = {
@@ -69,6 +76,7 @@ export const DraftPickDialog = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
   const [selectedRole, setSelectedRole] = useState('All');
+  const [selectedNationality, setSelectedNationality] = useState('All');
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -77,6 +85,7 @@ export const DraftPickDialog = ({
       setSearchQuery('');
       setSelectedTeam('All');
       setSelectedRole('All');
+      setSelectedNationality('All');
     }
   }, [open, currentPlayerId]);
 
@@ -100,11 +109,16 @@ export const DraftPickDialog = ({
       // Apply role filter
       const matchesRole = selectedRole === 'All' || p.role === selectedRole;
       
-      return matchesSearch && matchesTeam && matchesRole;
+      // Apply nationality filter
+      const matchesNationality = selectedNationality === 'All' || 
+                                 (selectedNationality === 'International' && p.isInternational) ||
+                                 (selectedNationality === 'Domestic' && !p.isInternational);
+      
+      return matchesSearch && matchesTeam && matchesRole && matchesNationality;
     });
     
     return sortPlayersByPriority(filtered);
-  }, [players, draftedPlayerIds, currentPlayerId, searchQuery, selectedTeam, selectedRole]);
+  }, [players, draftedPlayerIds, currentPlayerId, searchQuery, selectedTeam, selectedRole, selectedNationality]);
 
   const selectedPlayer = useMemo(() => {
     return players.find(p => p.id === selectedPlayerId) || null;
@@ -206,6 +220,26 @@ export const DraftPickDialog = ({
             </div>
           </div>
 
+          {/* Nationality Filter Pills */}
+          <div className="flex-shrink-0 overflow-x-auto scrollbar-hide">
+            <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Nationality</p>
+            <div className="flex gap-1.5">
+              {NATIONALITY_FILTERS.map((nationality) => (
+                <button
+                  key={nationality}
+                  onClick={() => setSelectedNationality(nationality)}
+                  className={cn(
+                    "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
+                    selectedNationality === nationality 
+                      ? nationalityFilterColors[nationality] 
+                      : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                  )}
+                >
+                  {nationality}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* Player Selection - Scrollable List with PlayerCards */}
           <div className="space-y-1.5 flex-1 flex flex-col min-h-0 overflow-hidden">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-shrink-0">
