@@ -179,9 +179,6 @@ const Roster = () => {
                 <span className="text-xs font-bold text-primary truncate block">
                   {manager.teamName}
                 </span>
-                <span className="text-[10px] text-muted-foreground">
-                  {manager.wins}W - {manager.losses}L
-                </span>
               </button>
             ))}
           </div>
