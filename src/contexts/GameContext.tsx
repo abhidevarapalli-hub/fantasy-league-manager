@@ -3,6 +3,11 @@ import { useRealtimeGame } from '@/hooks/useRealtimeGame';
 import { useSeedDatabase } from '@/hooks/useSeedDatabase';
 import { Player, Manager, Match, Activity, PlayerTransaction } from '@/lib/supabase-types';
 
+interface RosterMoveResult {
+  success: boolean;
+  error?: string;
+}
+
 interface GameContextType {
   players: Player[];
   managers: Manager[];
@@ -16,8 +21,8 @@ interface GameContextType {
   getManagerRosterCount: (managerId: string) => number;
   addFreeAgent: (managerId: string, playerId: string, dropPlayerId?: string) => Promise<void>;
   dropPlayerOnly: (managerId: string, playerId: string) => Promise<void>;
-  moveToActive: (managerId: string, playerId: string) => Promise<void>;
-  moveToBench: (managerId: string, playerId: string) => Promise<void>;
+  moveToActive: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
+  moveToBench: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
   updateMatchScore: (week: number, matchIndex: number, homeScore: number, awayScore: number) => Promise<void>;
   finalizeWeekScores: (week: number) => Promise<void>;
   addNewPlayer: (name: string, team: string, role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper') => Promise<void>;

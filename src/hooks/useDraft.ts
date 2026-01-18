@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { DraftPick, DraftOrder, DraftState, mapDbDraftPick, mapDbDraftOrder, mapDbDraftState, DbDraftPick, DbDraftOrder, DbDraftState } from '@/lib/draft-types';
 import { useGame } from '@/contexts/GameContext';
 import { toast } from 'sonner';
+import { Player } from '@/lib/supabase-types';
+import { buildOptimalActive11 } from '@/lib/roster-validation';
 
 export const useDraft = () => {
   const { managers, players } = useGame();
@@ -204,7 +206,7 @@ export const useDraft = () => {
     }
   }, [getPick]);
 
-  // Finalize draft - clear all rosters first, then update with drafted players
+  // Finalize draft - clear all rosters first, then update with drafted players using optimal Active 11
   const finalizeDraft = useCallback(async () => {
     try {
       // Group picks by manager
@@ -235,14 +237,22 @@ export const useDraft = () => {
         return false;
       }
 
-      // Update each manager's roster with drafted players (first 11 active, rest on bench)
+      // Update each manager's roster with drafted players using optimal Active 11 building
       for (const [managerId, playerIds] of picksByManager) {
-        const activeRoster = playerIds.slice(0, 11);
-        const bench = playerIds.slice(11);
+        // Get the actual player objects
+        const draftedPlayers: Player[] = playerIds
+          .map(id => players.find(p => p.id === id))
+          .filter((p): p is Player => p !== undefined);
+        
+        // Build optimal Active 11 based on positional requirements
+        const { active, bench } = buildOptimalActive11(draftedPlayers);
+        
+        const activeRoster = active.map(p => p.id);
+        const benchRoster = bench.map(p => p.id);
 
         const { error } = await supabase
           .from('managers')
-          .update({ roster: activeRoster, bench: bench })
+          .update({ roster: activeRoster, bench: benchRoster })
           .eq('id', managerId);
 
         if (error) {
@@ -255,7 +265,7 @@ export const useDraft = () => {
       // Log draft finalization transaction
       await supabase.from('transactions').insert({
         type: 'trade',
-        description: `Draft finalized - All rosters cleared, ${picksByManager.size} team rosters updated`,
+        description: `Draft finalized - All rosters cleared, ${picksByManager.size} team rosters updated with optimized Active 11`,
         manager_id: null,
         manager_team_name: null,
         week: null,
@@ -269,14 +279,14 @@ export const useDraft = () => {
           .eq('id', draftState.id);
       }
 
-      toast.success(`Draft finalized! All rosters cleared and ${picksByManager.size} teams updated.`);
+      toast.success(`Draft finalized! All rosters cleared and ${picksByManager.size} teams updated with optimized Active 11.`);
       return true;
     } catch (error) {
       console.error('Failed to finalize draft:', error);
       toast.error('Failed to finalize draft');
       return false;
     }
-  }, [draftPicks, draftState]);
+  }, [draftPicks, draftState, players]);
 
   // Reset draft
   const resetDraft = useCallback(async () => {

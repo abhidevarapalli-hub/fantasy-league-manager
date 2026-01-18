@@ -2,8 +2,28 @@ import { useState } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
-import { Users, UserMinus, ChevronRight } from 'lucide-react';
+import { Users, UserMinus, ChevronRight, AlertCircle, Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { 
+  getActiveRosterSlots, 
+  validateActiveRoster, 
+  ACTIVE_ROSTER_SIZE,
+  BENCH_SIZE,
+  MAX_INTERNATIONAL_PLAYERS,
+  sortPlayersByRole,
+} from '@/lib/roster-validation';
+import { Player } from '@/lib/supabase-types';
+import { Badge } from '@/components/ui/badge';
+
+const roleIcons: Record<string, string> = {
+  'Wicket Keeper': '🧤',
+  'Batsman': '🏏',
+  'All Rounder': '⚡',
+  'Bowler': '🎯',
+  'WK/BAT': '🏏',
+  'AR/BWL': '⚡',
+};
 
 const Roster = () => {
   const { managers, players, getManagerRosterCount, moveToActive, moveToBench, dropPlayerOnly } = useGame();
@@ -41,7 +61,7 @@ const Roster = () => {
                     <div className="text-left">
                       <h3 className="font-semibold text-foreground">{manager.teamName}</h3>
                       <p className="text-xs text-muted-foreground">
-                        {rosterCount}/14 Players
+                        {rosterCount}/{ACTIVE_ROSTER_SIZE + BENCH_SIZE} Players
                       </p>
                     </div>
                   </div>
@@ -50,11 +70,11 @@ const Roster = () => {
                       "px-2 py-1 rounded-full text-xs font-medium",
                       rosterCount === 0 
                         ? "bg-muted text-muted-foreground"
-                        : rosterCount < 14 
+                        : rosterCount < ACTIVE_ROSTER_SIZE + BENCH_SIZE 
                           ? "bg-primary/20 text-primary"
                           : "bg-success/20 text-success"
                     )}>
-                      {rosterCount === 0 ? 'Empty' : rosterCount === 14 ? 'Full' : `${rosterCount} players`}
+                      {rosterCount === 0 ? 'Empty' : rosterCount === ACTIVE_ROSTER_SIZE + BENCH_SIZE ? 'Full' : `${rosterCount} players`}
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   </div>
@@ -71,8 +91,31 @@ const Roster = () => {
 
   if (!selectedManager) return null;
 
-  const activePlayers = selectedManager.activeRoster.map(id => players.find(p => p.id === id)!).filter(Boolean);
-  const benchPlayers = selectedManager.bench.map(id => players.find(p => p.id === id)!).filter(Boolean);
+  const activePlayers = selectedManager.activeRoster
+    .map(id => players.find(p => p.id === id))
+    .filter((p): p is Player => p !== undefined);
+  const benchPlayers = selectedManager.bench
+    .map(id => players.find(p => p.id === id))
+    .filter((p): p is Player => p !== undefined);
+
+  const validation = validateActiveRoster(activePlayers);
+  const slots = getActiveRosterSlots(activePlayers);
+  const internationalCount = activePlayers.filter(p => p.isInternational).length;
+  const sortedBench = sortPlayersByRole(benchPlayers);
+
+  const handleMoveToActive = async (playerId: string) => {
+    const result = await moveToActive(selectedManagerId, playerId);
+    if (!result.success && result.error) {
+      toast.error(result.error);
+    }
+  };
+
+  const handleMoveToBench = async (playerId: string) => {
+    const result = await moveToBench(selectedManagerId, playerId);
+    if (!result.success && result.error) {
+      toast.error(result.error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -85,13 +128,40 @@ const Roster = () => {
             ← Back to Teams
           </button>
           <h1 className="text-lg font-bold text-foreground">{selectedManager.teamName}</h1>
-          <p className="text-xs text-muted-foreground">
-            {activePlayers.length}/11 Active • {benchPlayers.length}/3 Bench
-          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{activePlayers.length}/{ACTIVE_ROSTER_SIZE} Active</span>
+            <span>•</span>
+            <span>{benchPlayers.length}/{BENCH_SIZE} Bench</span>
+            <span>•</span>
+            <span className={cn(
+              "flex items-center gap-1",
+              internationalCount > MAX_INTERNATIONAL_PLAYERS && "text-destructive"
+            )}>
+              <Plane className="w-3 h-3" />
+              {internationalCount}/{MAX_INTERNATIONAL_PLAYERS} Intl
+            </span>
+          </div>
         </div>
       </header>
 
       <main className="px-4 py-4 space-y-6">
+        {/* Validation Errors */}
+        {!validation.isValid && validation.errors.length > 0 && (
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-destructive mb-1">Roster Requirements Not Met</p>
+                <ul className="text-xs text-destructive/80 space-y-0.5">
+                  {validation.errors.map((error, i) => (
+                    <li key={i}>• {error}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Active 11 */}
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -100,26 +170,38 @@ const Roster = () => {
             </div>
             <div>
               <h2 className="font-semibold text-foreground">Active 11</h2>
-              <p className="text-xs text-muted-foreground">Starting lineup</p>
+              <p className="text-xs text-muted-foreground">Starting lineup with positional requirements</p>
             </div>
           </div>
           
           <div className="space-y-2">
-            {activePlayers.length === 0 ? (
-              <div className="p-8 text-center bg-card rounded-xl border border-dashed border-border">
-                <p className="text-muted-foreground">No active players</p>
-              </div>
-            ) : (
-              activePlayers.map(player => (
+            {slots.map((slot, index) => (
+              slot.filled && slot.player ? (
                 <PlayerCard
-                  key={player.id}
-                  player={player}
+                  key={slot.player.id}
+                  player={slot.player}
                   isOwned
-                  onMoveDown={benchPlayers.length < 3 ? () => moveToBench(selectedManagerId, player.id) : undefined}
-                  onDrop={() => dropPlayerOnly(selectedManagerId, player.id)}
+                  onMoveDown={benchPlayers.length < BENCH_SIZE ? () => handleMoveToBench(slot.player!.id) : undefined}
+                  onDrop={() => dropPlayerOnly(selectedManagerId, slot.player!.id)}
                 />
-              ))
-            )}
+              ) : (
+                <div 
+                  key={`empty-${index}`}
+                  className="p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3"
+                >
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
+                    {roleIcons[slot.role] || '👤'}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Empty Slot</p>
+                    <p className="text-xs text-muted-foreground/70">{slot.label} required</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {slot.label}
+                  </Badge>
+                </div>
+              )
+            ))}
           </div>
         </section>
 
@@ -131,7 +213,7 @@ const Roster = () => {
             </div>
             <div>
               <h2 className="font-semibold text-foreground">Bench</h2>
-              <p className="text-xs text-muted-foreground">Reserve players</p>
+              <p className="text-xs text-muted-foreground">Reserve players ({benchPlayers.length}/{BENCH_SIZE})</p>
             </div>
           </div>
           
@@ -141,12 +223,12 @@ const Roster = () => {
                 <p className="text-sm text-muted-foreground">No bench players</p>
               </div>
             ) : (
-              benchPlayers.map(player => (
+              sortedBench.map(player => (
                 <PlayerCard
                   key={player.id}
                   player={player}
                   isOwned
-                  onMoveUp={activePlayers.length < 11 ? () => moveToActive(selectedManagerId, player.id) : undefined}
+                  onMoveUp={activePlayers.length < ACTIVE_ROSTER_SIZE ? () => handleMoveToActive(player.id) : undefined}
                   onDrop={() => dropPlayerOnly(selectedManagerId, player.id)}
                 />
               ))

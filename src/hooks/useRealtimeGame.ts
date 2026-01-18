@@ -2,8 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { Player, Manager, Match, Activity, PlayerTransaction } from "@/lib/supabase-types";
+import { 
+  ACTIVE_ROSTER_SIZE, 
+  BENCH_SIZE, 
+  validateActiveRoster,
+  canAddToActive,
+} from "@/lib/roster-validation";
 
-const ROSTER_CAP = 14;
+const ROSTER_CAP = ACTIVE_ROSTER_SIZE + BENCH_SIZE; // 25 total
 
 // Helper to map DB rows to frontend types
 const mapDbPlayer = (db: Tables<"players">): Player => ({
@@ -177,6 +183,9 @@ export const useRealtimeGame = () => {
     const rosterCount = manager.activeRoster.length + manager.bench.length;
     if (rosterCount >= ROSTER_CAP && !dropPlayerId) return;
 
+    // Determine if dropped player was in active roster
+    const droppedFromActive = dropPlayerId && manager.activeRoster.includes(dropPlayerId);
+    
     // Update manager roster
     let newRoster = [...manager.activeRoster];
     let newBench = [...manager.bench];
@@ -185,7 +194,23 @@ export const useRealtimeGame = () => {
       newRoster = newRoster.filter((id) => id !== dropPlayerId);
       newBench = newBench.filter((id) => id !== dropPlayerId);
     }
-    newBench = [...newBench, playerId];
+    
+    // Try to place new player in same location as dropped player
+    if (droppedFromActive) {
+      // Check if adding to active would be valid
+      const currentActivePlayers = newRoster.map(id => players.find(p => p.id === id)).filter(Boolean) as Player[];
+      const validation = canAddToActive(currentActivePlayers, player);
+      
+      if (validation.isValid) {
+        newRoster = [...newRoster, playerId];
+      } else {
+        // Cannot add to active, put on bench
+        newBench = [...newBench, playerId];
+      }
+    } else {
+      // Dropped from bench or no drop - add to bench
+      newBench = [...newBench, playerId];
+    }
 
     // Update manager in database
     const { error: updateError } = await supabase
@@ -264,24 +289,45 @@ export const useRealtimeGame = () => {
     });
   };
 
-  const moveToActive = async (managerId: string, playerId: string) => {
+  const moveToActive = async (managerId: string, playerId: string): Promise<{ success: boolean; error?: string }> => {
     const manager = managers.find((m) => m.id === managerId);
-    if (!manager || manager.activeRoster.length >= 11) return;
+    const player = players.find((p) => p.id === playerId);
+    
+    if (!manager || !player) return { success: false, error: "Manager or player not found" };
+    if (manager.activeRoster.length >= ACTIVE_ROSTER_SIZE) {
+      return { success: false, error: `Active roster is full (${ACTIVE_ROSTER_SIZE} players max)` };
+    }
+
+    // Validate the move
+    const currentActivePlayers = manager.activeRoster
+      .map(id => players.find(p => p.id === id))
+      .filter(Boolean) as Player[];
+    
+    const validation = canAddToActive(currentActivePlayers, player);
+    
+    if (!validation.isValid) {
+      return { success: false, error: validation.errors[0] };
+    }
 
     const newRoster = [...manager.activeRoster, playerId];
     const newBench = manager.bench.filter((id) => id !== playerId);
 
     await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
+    return { success: true };
   };
 
-  const moveToBench = async (managerId: string, playerId: string) => {
+  const moveToBench = async (managerId: string, playerId: string): Promise<{ success: boolean; error?: string }> => {
     const manager = managers.find((m) => m.id === managerId);
-    if (!manager || manager.bench.length >= 3) return;
+    if (!manager) return { success: false, error: "Manager not found" };
+    if (manager.bench.length >= BENCH_SIZE) {
+      return { success: false, error: `Bench is full (${BENCH_SIZE} players max)` };
+    }
 
     const newBench = [...manager.bench, playerId];
     const newRoster = manager.activeRoster.filter((id) => id !== playerId);
 
     await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
+    return { success: true };
   };
 
   const updateMatchScore = async (week: number, matchIndex: number, homeScore: number, awayScore: number) => {
