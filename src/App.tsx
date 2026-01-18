@@ -17,11 +17,11 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <GameProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <GameProvider>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/roster" element={<Roster />} />
@@ -32,9 +32,9 @@ const App = () => (
             <Route path="/team/:teamId" element={<TeamView />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </GameProvider>
+        </GameProvider>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 
