@@ -103,16 +103,105 @@ export function validateActiveRoster(players: Player[]): RosterValidationResult 
   };
 }
 
-// Check if adding a player to active roster would be valid
+/**
+ * Forward-looking validation: Only block moves that make requirements IMPOSSIBLE to meet.
+ * This checks if adding a player would violate maximums or leave insufficient slots
+ * for required minimums to be filled.
+ */
 export function canAddToActive(currentActive: Player[], playerToAdd: Player): RosterValidationResult {
   const newActive = [...currentActive, playerToAdd];
-  return validateActiveRoster(newActive);
+  const counts = countRosterPlayers(newActive);
+  const errors: string[] = [];
+  
+  // Immediate violations - these are always errors
+  
+  // Max 11 players
+  if (counts.total > ACTIVE_ROSTER_SIZE) {
+    errors.push(`Active roster cannot exceed ${ACTIVE_ROSTER_SIZE} players (currently ${counts.total})`);
+    return { isValid: false, errors, counts };
+  }
+  
+  // Max 4 international players
+  if (counts.international > MAX_INTERNATIONAL_PLAYERS) {
+    errors.push(`Cannot exceed ${MAX_INTERNATIONAL_PLAYERS} international players (currently ${counts.international})`);
+    return { isValid: false, errors, counts };
+  }
+  
+  // Max 6 WK + Batsmen combined
+  const batsmenWkTotal = counts.wicketKeepers + counts.batsmen;
+  if (batsmenWkTotal > MAX_BATSMEN_WK_COMBINED) {
+    errors.push(`Cannot exceed ${MAX_BATSMEN_WK_COMBINED} Wicket Keepers + Batsmen combined (currently ${batsmenWkTotal})`);
+    return { isValid: false, errors, counts };
+  }
+  
+  // Forward-looking validation: Check if requirements CAN still be met
+  const remainingSlots = ACTIVE_ROSTER_SIZE - counts.total;
+  
+  // Calculate deficits - how many more of each type we need
+  const wkDeficit = Math.max(0, MIN_WICKET_KEEPERS - counts.wicketKeepers);
+  const arDeficit = Math.max(0, MIN_ALL_ROUNDERS - counts.allRounders);
+  const bowlerDeficit = Math.max(0, MIN_BOWLERS - counts.bowlers);
+  
+  // WK+BAT combined deficit (WK can satisfy both WK requirement AND WK+BAT requirement)
+  const currentWkBat = counts.wicketKeepers + counts.batsmen;
+  const wkBatDeficit = Math.max(0, MIN_BATSMEN_WK_COMBINED - currentWkBat);
+  // But if we still need WK, those WK will also count toward WK+BAT
+  const additionalWkBatNeeded = Math.max(0, wkBatDeficit - wkDeficit);
+  
+  // BWL+AR combined deficit
+  const currentBwlAr = counts.bowlers + counts.allRounders;
+  const bwlArDeficit = Math.max(0, MIN_BOWLERS_ALLROUNDERS_COMBINED - currentBwlAr);
+  // Bowlers and ARs we still need will also count toward BWL+AR
+  const additionalBwlArNeeded = Math.max(0, bwlArDeficit - bowlerDeficit - arDeficit);
+  
+  // Total minimum slots we need to fill with specific roles
+  // WK requirement can be filled by WK (who also count toward WK+BAT)
+  // Additional WK+BAT can be filled by WK or BAT
+  // AR requirement must be filled by AR (who also count toward BWL+AR)
+  // Bowler requirement must be filled by BWL (who also count toward BWL+AR)
+  // Additional BWL+AR can be filled by BWL or AR
+  
+  // The key insight: some positions are "flexible" and some are "strict"
+  // We need to check if the remaining slots can accommodate all strict requirements
+  
+  // Minimum slots needed for strict requirements (can't be substituted)
+  const strictWkNeeded = wkDeficit; // Must have at least 1 WK
+  const strictArNeeded = arDeficit; // Must have at least 1 AR  
+  const strictBowlerNeeded = bowlerDeficit; // Must have at least 3 BWL
+  
+  // These can be filled flexibly
+  const flexWkBatNeeded = additionalWkBatNeeded; // Can be WK or BAT
+  const flexBwlArNeeded = additionalBwlArNeeded; // Can be BWL or AR
+  
+  // Total minimum role-specific slots needed
+  const totalMinSlotsNeeded = strictWkNeeded + strictArNeeded + strictBowlerNeeded + flexWkBatNeeded + flexBwlArNeeded;
+  
+  if (totalMinSlotsNeeded > remainingSlots) {
+    // Determine which requirement is impossible to meet
+    if (strictWkNeeded > remainingSlots) {
+      errors.push(`Cannot add this player: not enough slots remaining to add required Wicket Keeper(s)`);
+    } else if (strictWkNeeded + strictBowlerNeeded > remainingSlots) {
+      errors.push(`Cannot add this player: not enough slots remaining to add required Bowlers`);
+    } else if (strictWkNeeded + strictBowlerNeeded + strictArNeeded > remainingSlots) {
+      errors.push(`Cannot add this player: not enough slots remaining to add required All Rounder(s)`);
+    } else if (strictWkNeeded + strictBowlerNeeded + strictArNeeded + flexWkBatNeeded > remainingSlots) {
+      errors.push(`Cannot add this player: not enough slots remaining for minimum 4 WK+Batsmen`);
+    } else {
+      errors.push(`Cannot add this player: not enough slots remaining for minimum 5 Bowlers+All Rounders`);
+    }
+    return { isValid: false, errors, counts };
+  }
+  
+  return { isValid: true, errors: [], counts };
 }
 
 // Check if removing a player from active roster would still be valid
+// (Note: Removal is always allowed since the roster is incomplete)
 export function canRemoveFromActive(currentActive: Player[], playerToRemove: Player): RosterValidationResult {
   const newActive = currentActive.filter(p => p.id !== playerToRemove.id);
-  return validateActiveRoster(newActive);
+  const counts = countRosterPlayers(newActive);
+  // Removal is always valid - we're just making the roster smaller
+  return { isValid: true, errors: [], counts };
 }
 
 // Check if swapping a player (for roster transactions) would be valid
@@ -122,8 +211,8 @@ export function canSwapInActive(
   playerToRemove: Player
 ): RosterValidationResult {
   const newActive = currentActive.filter(p => p.id !== playerToRemove.id);
-  newActive.push(playerToAdd);
-  return validateActiveRoster(newActive);
+  // Use canAddToActive for forward-looking validation
+  return canAddToActive(newActive, playerToAdd);
 }
 
 // Sort players by role priority for Active 11 display
