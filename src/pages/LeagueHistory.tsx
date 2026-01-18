@@ -34,7 +34,7 @@ interface CombinedRecord {
   isActive: boolean;
 }
 
-const ALL_MANAGER_NAMES = ['Abhi', 'Akash', 'Jasti', 'Krishna', 'Krithik', 'Kush', 'Sahith', 'Santosh', 'Vamsi'];
+const ALL_MANAGER_NAMES = ['Abhi', 'Akash', 'Jasthi', 'Krishna', 'Krithik', 'Kush', 'Sahith', 'Santosh', 'Vamsi'];
 
 const LeagueHistory = () => {
   const { managers, schedule } = useGame();
@@ -141,9 +141,10 @@ const LeagueHistory = () => {
         isActive
       };
     }).sort((a, b) => {
-      // Sort by win % desc, then by total wins desc
-      if (b.winPct !== a.winPct) return b.winPct - a.winPct;
-      return b.totalWins - a.totalWins;
+      // Sort by championships desc, then top 3 desc, then win % desc
+      if (b.championships !== a.championships) return b.championships - a.championships;
+      if (b.top3Finishes !== a.top3Finishes) return b.top3Finishes - a.top3Finishes;
+      return b.winPct - a.winPct;
     });
   };
 
