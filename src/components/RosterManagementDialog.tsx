@@ -132,26 +132,41 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Select Manager
             </label>
-            <Select value={selectedManagerId} onValueChange={setSelectedManagerId}>
-              <SelectTrigger className="bg-muted border-border">
-                <SelectValue placeholder="Choose a manager..." />
-              </SelectTrigger>
-              <SelectContent>
-                {managers.map(manager => {
-                  const count = getManagerRosterCount(manager.id);
-                  return (
-                    <SelectItem key={manager.id} value={manager.id}>
-                      <span className="flex items-center gap-2">
-                        {manager.teamName}
-                        <span className="text-muted-foreground text-xs">
-                          ({count}/14)
+            {preselectedManagerId ? (
+              // Locked manager display for non-league managers
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
+                <div className="flex-1">
+                  <p className="font-medium text-foreground">
+                    {managers.find(m => m.id === preselectedManagerId)?.teamName}
+                  </p>
+                  <span className="text-xs text-muted-foreground">
+                    ({rosterCount}/14 players)
+                  </span>
+                </div>
+              </div>
+            ) : (
+              // Dropdown for league managers
+              <Select value={selectedManagerId} onValueChange={setSelectedManagerId}>
+                <SelectTrigger className="bg-muted border-border">
+                  <SelectValue placeholder="Choose a manager..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {managers.map(manager => {
+                    const count = getManagerRosterCount(manager.id);
+                    return (
+                      <SelectItem key={manager.id} value={manager.id}>
+                        <span className="flex items-center gap-2">
+                          {manager.teamName}
+                          <span className="text-muted-foreground text-xs">
+                            ({count}/14)
+                          </span>
                         </span>
-                      </span>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Drop Player Section - Only shows after manager is selected */}

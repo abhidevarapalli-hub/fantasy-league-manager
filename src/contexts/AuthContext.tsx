@@ -8,6 +8,7 @@ const MANAGER_CREDENTIALS: Record<string, { password: string; isLeagueManager: b
   'Krishna': { password: 'RaviBopara', isLeagueManager: false },
   'Jasthi': { password: 'BradHaddin', isLeagueManager: false },
   'Santosh': { password: 'RossTaylor', isLeagueManager: false },
+  'Sahith': { password: 'RaviRampaul', isLeagueManager: false },
   'Abhi': { password: 'Dilshan', isLeagueManager: true },
 };
 

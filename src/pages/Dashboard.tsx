@@ -1,15 +1,25 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { RefreshCw, Calendar, Trophy } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { StandingsTable } from '@/components/StandingsTable';
 import { ScheduleList } from '@/components/ScheduleList';
 import { BottomNav } from '@/components/BottomNav';
+import { UserMenu } from '@/components/UserMenu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
   const { managers, schedule, currentWeek, currentManagerId, loading } = useGame();
+  const { user } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Find the logged-in user's manager ID
+  const loggedInManagerId = useMemo(() => {
+    if (!user) return undefined;
+    const manager = managers.find(m => m.name === user.name);
+    return manager?.id;
+  }, [user, managers]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -32,15 +42,18 @@ const Dashboard = () => {
             <h1 className="text-lg font-bold text-foreground">Premier League Manager</h1>
             <p className="text-xs text-muted-foreground">Week {currentWeek} of 7</p>
           </div>
-          <button 
-            onClick={handleRefresh}
-            className="p-2 rounded-full hover:bg-muted transition-colors"
-          >
-            <RefreshCw className={cn(
-              "w-5 h-5 text-muted-foreground transition-transform",
-              isRefreshing && "animate-spin text-primary"
-            )} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleRefresh}
+              className="p-2 rounded-full hover:bg-muted transition-colors"
+            >
+              <RefreshCw className={cn(
+                "w-5 h-5 text-muted-foreground transition-transform",
+                isRefreshing && "animate-spin text-primary"
+              )} />
+            </button>
+            <UserMenu />
+          </div>
         </div>
       </header>
 
@@ -64,7 +77,7 @@ const Dashboard = () => {
           </TabsList>
           
           <TabsContent value="standings" className="mt-0">
-            <StandingsTable managers={managers} currentManagerId={currentManagerId} />
+            <StandingsTable managers={managers} currentManagerId={currentManagerId} loggedInManagerId={loggedInManagerId} />
           </TabsContent>
           
           <TabsContent value="schedule" className="mt-0">
