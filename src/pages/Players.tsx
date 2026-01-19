@@ -139,9 +139,9 @@ const Players = () => {
 
   return (
     <AppLayout title="Player Pool" subtitle={`${filteredPlayers.length} players`}>
-      <div className="sticky top-14 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
+      <div className="sticky top-0 z-30 bg-background border-b border-border">
         {/* Search */}
-        <div className="px-4 py-3">
+        <div className="px-4 pt-3 pb-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
