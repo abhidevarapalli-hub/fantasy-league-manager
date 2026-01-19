@@ -2,13 +2,15 @@ import { useState, useMemo } from 'react';
 import { Search, X, Filter } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTrades } from '@/hooks/useTrades';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
 import { UserMenu } from '@/components/UserMenu';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { RosterManagementDialog } from '@/components/RosterManagementDialog';
-import { Player } from '@/lib/supabase-types';
+import { TradeDialog } from '@/components/TradeDialog';
+import { Player, Manager } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
 import { sortPlayersByPriority } from '@/lib/player-order';
 
@@ -47,6 +49,7 @@ const nationalityFilterColors: Record<string, string> = {
 const Players = () => {
   const { players, managers } = useGame();
   const { user, isLeagueManager } = useAuth();
+  const { proposeTrade } = useTrades();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
   const [selectedRole, setSelectedRole] = useState('All');
@@ -54,6 +57,9 @@ const Players = () => {
   const [showOnlyFreeAgents, setShowOnlyFreeAgents] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [tradeDialogOpen, setTradeDialogOpen] = useState(false);
+  const [tradeTargetPlayer, setTradeTargetPlayer] = useState<Player | null>(null);
+  const [tradeTargetManager, setTradeTargetManager] = useState<Manager | null>(null);
 
   // Find the current user's manager ID
   const currentUserManagerId = useMemo(() => {
@@ -61,6 +67,23 @@ const Players = () => {
     const manager = managers.find(m => m.name === user.name);
     return manager?.id;
   }, [user, managers]);
+
+  // Get the current user's manager object
+  const currentManager = useMemo(() => {
+    if (!user) return null;
+    return managers.find(m => m.name === user.name) || null;
+  }, [user, managers]);
+
+  // Build a map of player ID -> manager ID
+  const playerToManagerIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    managers.forEach(manager => {
+      [...manager.activeRoster, ...manager.bench].forEach(playerId => {
+        map[playerId] = manager.id;
+      });
+    });
+    return map;
+  }, [managers]);
 
   // Build a map of player ID -> manager team name
   const playerToManagerMap = useMemo(() => {
@@ -96,6 +119,23 @@ const Players = () => {
       setSelectedPlayer(player);
       setDialogOpen(true);
     }
+  };
+
+  const handleTradePlayer = (playerId: string) => {
+    const player = players.find(p => p.id === playerId);
+    const targetManagerId = playerToManagerIdMap[playerId];
+    const targetMgr = managers.find(m => m.id === targetManagerId);
+    
+    if (player && targetMgr && currentManager) {
+      setTradeTargetPlayer(player);
+      setTradeTargetManager(targetMgr);
+      setTradeDialogOpen(true);
+    }
+  };
+
+  const handleTradeSubmit = async (proposerPlayers: string[], targetPlayers: string[]) => {
+    if (!currentManager || !tradeTargetManager) return;
+    await proposeTrade(currentManager.id, tradeTargetManager.id, proposerPlayers, targetPlayers);
   };
 
   return (
@@ -219,14 +259,18 @@ const Players = () => {
         <div className="space-y-2">
           {filteredPlayers.map(player => {
             const rosteredBy = playerToManagerMap[player.id];
+            const rosteredByManagerId = playerToManagerIdMap[player.id];
+            const isOwnPlayer = rosteredByManagerId === currentUserManagerId;
+            const canTrade = rosteredBy && !isOwnPlayer && !!currentUserManagerId;
             
             return (
               <div key={player.id} className="relative">
                 <PlayerCard
                   player={player}
                   isOwned={false}
-                  showActions={!rosteredBy && (isLeagueManager || !!currentUserManagerId)}
+                  showActions={(!rosteredBy && (isLeagueManager || !!currentUserManagerId)) || canTrade}
                   onAdd={!rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
+                  onTrade={canTrade ? () => handleTradePlayer(player.id) : undefined}
                 />
                 {rosteredBy && (
                   <div className="absolute top-2 right-2">
@@ -257,6 +301,16 @@ const Players = () => {
         onOpenChange={setDialogOpen}
         player={selectedPlayer}
         preselectedManagerId={isLeagueManager ? undefined : currentUserManagerId}
+      />
+
+      <TradeDialog
+        open={tradeDialogOpen}
+        onOpenChange={setTradeDialogOpen}
+        proposerManager={currentManager}
+        targetManager={tradeTargetManager}
+        initialTargetPlayer={tradeTargetPlayer || undefined}
+        onSubmit={handleTradeSubmit}
+        mode="propose"
       />
     </div>
   );

@@ -13,6 +13,7 @@ import Admin from "./pages/Admin";
 import TeamView from "./pages/TeamView";
 import Draft from "./pages/Draft";
 import LeagueHistory from "./pages/LeagueHistory";
+import Trades from "./pages/Trades";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -37,6 +38,9 @@ const AppRoutes = () => {
       } />
       <Route path="/activity" element={
         user ? <Activity /> : <Navigate to="/login" replace />
+      } />
+      <Route path="/trades" element={
+        user ? <Trades /> : <Navigate to="/login" replace />
       } />
       <Route path="/admin" element={
         !user ? <Navigate to="/login" replace /> :

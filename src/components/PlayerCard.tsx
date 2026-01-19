@@ -1,4 +1,4 @@
-import { Plus, Minus, ArrowUp, ArrowDown, Swords, Target, User, Shield, Plane, ArrowLeftRight } from 'lucide-react';
+import { Plus, Minus, ArrowUp, ArrowDown, Swords, Target, User, Shield, Plane, ArrowLeftRight, Repeat } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ interface PlayerCardProps {
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onSwap?: () => void;
+  onTrade?: () => void;
   isOwned?: boolean;
   showActions?: boolean;
   variant?: 'compact' | 'full';
@@ -70,6 +71,7 @@ export const PlayerCard = ({
   onMoveUp,
   onMoveDown,
   onSwap,
+  onTrade,
   isOwned = false,
   showActions = true,
   variant = 'full'
@@ -121,6 +123,17 @@ export const PlayerCard = ({
       
       {showActions && (
         <div className="flex items-center gap-1">
+          {onTrade && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-secondary hover:text-secondary hover:bg-secondary/10"
+              onClick={onTrade}
+              title="Propose trade"
+            >
+              <Repeat className="w-4 h-4" />
+            </Button>
+          )}
           {onSwap && (
             <Button
               variant="ghost"

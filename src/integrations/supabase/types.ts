@@ -283,6 +283,64 @@ export type Database = {
           },
         ]
       }
+      trades: {
+        Row: {
+          created_at: string
+          id: string
+          parent_trade_id: string | null
+          proposer_id: string
+          proposer_players: string[]
+          status: string
+          target_id: string
+          target_players: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parent_trade_id?: string | null
+          proposer_id: string
+          proposer_players?: string[]
+          status?: string
+          target_id: string
+          target_players?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parent_trade_id?: string | null
+          proposer_id?: string
+          proposer_players?: string[]
+          status?: string
+          target_id?: string
+          target_players?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trades_parent_trade_id_fkey"
+            columns: ["parent_trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_proposer_id_fkey"
+            columns: ["proposer_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           created_at: string
