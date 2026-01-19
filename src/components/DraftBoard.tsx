@@ -66,24 +66,28 @@ interface DraftCellProps {
   onCellClick: () => void;
   onClearPick: () => void;
   colorClass: string;
+  readOnly?: boolean;
 }
 
-const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, onCellClick, onClearPick, colorClass }: DraftCellProps) => {
+const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, onCellClick, onClearPick, colorClass, readOnly }: DraftCellProps) => {
   const isEmpty = !player;
 
   const handleClearClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onClearPick();
+    if (!readOnly) {
+      onClearPick();
+    }
   };
   
   return (
     <div
-      onClick={manager ? onCellClick : undefined}
+      onClick={manager && !readOnly ? onCellClick : undefined}
       className={cn(
         "relative min-h-[80px] p-2 border rounded-lg transition-all",
         colorClass,
-        manager ? "cursor-pointer hover:opacity-80" : "cursor-not-allowed opacity-50",
-        isEmpty && manager && "border-dashed"
+        manager && !readOnly ? "cursor-pointer hover:opacity-80" : "cursor-default",
+        !manager && "opacity-50",
+        isEmpty && manager && !readOnly && "border-dashed"
       )}
     >
       {/* Pick number badge */}
@@ -98,8 +102,8 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
         </div>
       )}
 
-      {/* X icon to clear pick */}
-      {player && (
+      {/* X icon to clear pick - only show if not read-only */}
+      {player && !readOnly && (
         <button
           onClick={handleClearClick}
           className="absolute top-1 left-1 p-0.5 rounded hover:bg-black/20 transition-colors"
@@ -136,7 +140,11 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
   );
 };
 
-export const DraftBoard = () => {
+interface DraftBoardProps {
+  readOnly?: boolean;
+}
+
+export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
   const { managers, players } = useGame();
   const {
     draftState,
@@ -157,22 +165,25 @@ export const DraftBoard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCellClick = (round: number, position: number) => {
+    if (readOnly) return;
     setSelectedCell({ round, position });
     setDialogOpen(true);
   };
 
   const handlePickConfirm = async (playerId: string) => {
-    if (!selectedCell) return;
+    if (!selectedCell || readOnly) return;
     await makePick(selectedCell.round, selectedCell.position, playerId);
   };
 
   const handleFinalize = async () => {
+    if (readOnly) return;
     setIsSubmitting(true);
     await finalizeDraft();
     setIsSubmitting(false);
   };
 
   const handleReset = async () => {
+    if (readOnly) return;
     if (window.confirm('Are you sure you want to reset the draft? All picks will be cleared.')) {
       await resetDraft();
     }
@@ -210,21 +221,27 @@ export const DraftBoard = () => {
           return (
             <div key={position} className="flex flex-col items-center gap-1">
               <div className="text-xs text-muted-foreground font-medium">#{position}</div>
-              <Select
-                value={manager?.id || ''}
-                onValueChange={(value) => assignManagerToPosition(position, value)}
-              >
-                <SelectTrigger className="h-8 text-xs bg-muted border-border w-full">
-                  <SelectValue placeholder="Select..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableManagers.map(m => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.teamName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {readOnly ? (
+                <div className="h-8 text-xs bg-muted border border-border rounded-md w-full flex items-center justify-center px-2">
+                  <span className="truncate">{manager?.teamName || 'Empty'}</span>
+                </div>
+              ) : (
+                <Select
+                  value={manager?.id || ''}
+                  onValueChange={(value) => assignManagerToPosition(position, value)}
+                >
+                  <SelectTrigger className="h-8 text-xs bg-muted border-border w-full">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableManagers.map(m => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.teamName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           );
         })}
@@ -258,8 +275,9 @@ export const DraftBoard = () => {
                   pickNumber={pickNumber}
                   isFinalized={draftState?.isFinalized || false}
                   onCellClick={() => handleCellClick(round, position)}
-                  onClearPick={() => clearPick(round, position)}
+                  onClearPick={() => !readOnly && clearPick(round, position)}
                   colorClass={getCellColor(player)}
+                  readOnly={readOnly}
                 />
               );
             });
@@ -267,7 +285,7 @@ export const DraftBoard = () => {
         </div>
       </div>
 
-      {/* Actions */}
+      {/* Actions - only show if not read-only */}
       <div className="flex items-center justify-between pt-4 border-t border-border">
         <div className="text-sm text-muted-foreground">
           {draftState?.isFinalized ? (
@@ -280,30 +298,34 @@ export const DraftBoard = () => {
             </span>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleReset}>
-            Reset Draft
-          </Button>
-          <Button 
-            onClick={handleFinalize} 
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Finalizing...' : draftState?.isFinalized ? 'Re-finalize Draft' : 'Finalize Draft'}
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleReset}>
+              Reset Draft
+            </Button>
+            <Button 
+              onClick={handleFinalize} 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Finalizing...' : draftState?.isFinalized ? 'Re-finalize Draft' : 'Finalize Draft'}
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Draft Pick Dialog */}
-      <DraftPickDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        round={selectedCell?.round || 0}
-        position={selectedCell?.position || 0}
-        manager={selectedManager}
-        draftedPlayerIds={getDraftedPlayerIds().filter(id => id !== selectedPick?.playerId)}
-        currentPlayerId={selectedPick?.playerId || null}
-        onConfirm={handlePickConfirm}
-      />
+      {/* Draft Pick Dialog - only if not read-only */}
+      {!readOnly && (
+        <DraftPickDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          round={selectedCell?.round || 0}
+          position={selectedCell?.position || 0}
+          manager={selectedManager}
+          draftedPlayerIds={getDraftedPlayerIds().filter(id => id !== selectedPick?.playerId)}
+          currentPlayerId={selectedPick?.playerId || null}
+          onConfirm={handlePickConfirm}
+        />
+      )}
     </div>
   );
 };

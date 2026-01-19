@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { Search, X, Filter } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
+import { UserMenu } from '@/components/UserMenu';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { RosterManagementDialog } from '@/components/RosterManagementDialog';
@@ -44,6 +46,7 @@ const nationalityFilterColors: Record<string, string> = {
 
 const Players = () => {
   const { players, managers } = useGame();
+  const { user, isLeagueManager } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
   const [selectedRole, setSelectedRole] = useState('All');
@@ -51,6 +54,13 @@ const Players = () => {
   const [showOnlyFreeAgents, setShowOnlyFreeAgents] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+
+  // Find the current user's manager ID
+  const currentUserManagerId = useMemo(() => {
+    if (!user) return undefined;
+    const manager = managers.find(m => m.name === user.name);
+    return manager?.id;
+  }, [user, managers]);
 
   // Build a map of player ID -> manager team name
   const playerToManagerMap = useMemo(() => {
@@ -91,9 +101,12 @@ const Players = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="px-4 py-3">
-          <h1 className="text-lg font-bold text-foreground">Player Pool</h1>
-          <p className="text-xs text-muted-foreground">{filteredPlayers.length} players</p>
+        <div className="flex items-center justify-between px-4 py-3">
+          <div>
+            <h1 className="text-lg font-bold text-foreground">Player Pool</h1>
+            <p className="text-xs text-muted-foreground">{filteredPlayers.length} players</p>
+          </div>
+          <UserMenu />
         </div>
         
         {/* Search */}
@@ -212,8 +225,8 @@ const Players = () => {
                 <PlayerCard
                   player={player}
                   isOwned={false}
-                  showActions={!rosteredBy}
-                  onAdd={!rosteredBy ? () => handleAddPlayer(player.id) : undefined}
+                  showActions={!rosteredBy && (isLeagueManager || !!currentUserManagerId)}
+                  onAdd={!rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
                 />
                 {rosteredBy && (
                   <div className="absolute top-2 right-2">
@@ -243,6 +256,7 @@ const Players = () => {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         player={selectedPlayer}
+        preselectedManagerId={isLeagueManager ? undefined : currentUserManagerId}
       />
     </div>
   );
