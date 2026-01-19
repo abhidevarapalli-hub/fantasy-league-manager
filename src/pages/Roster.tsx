@@ -191,20 +191,17 @@ const Roster = () => {
             ))}
           </div>
 
-          {/* Roster Grid */}
+          {/* Active 11 Grid */}
           <div className="mt-2 space-y-1">
-            {Array.from({ length: totalRosterSize }, (_, rowIdx) => (
+            {Array.from({ length: ACTIVE_ROSTER_SIZE }, (_, rowIdx) => (
               <div 
                 key={rowIdx}
                 className="grid gap-2 min-w-[640px]"
                 style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}
               >
                 {managers.map(manager => {
-                  const { activeSlots, benchSlots } = getRosterSlots(manager);
-                  const isActiveSLot = rowIdx < ACTIVE_ROSTER_SIZE;
-                  const slot = isActiveSLot 
-                    ? activeSlots[rowIdx] 
-                    : benchSlots[rowIdx - ACTIVE_ROSTER_SIZE];
+                  const { activeSlots } = getRosterSlots(manager);
+                  const slot = activeSlots[rowIdx];
                   
                   if (!slot) return null;
                   
@@ -212,12 +209,43 @@ const Roster = () => {
                     <RosterCell
                       key={`${manager.id}-${rowIdx}`}
                       slot={slot}
-                      isBench={!isActiveSLot}
+                      isBench={false}
                     />
                   );
                 })}
               </div>
             ))}
+          </div>
+
+          {/* Bench Section with spacing */}
+          <div className="mt-6 pt-4 border-t border-border/50">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
+              Bench
+            </p>
+            <div className="space-y-1">
+            {Array.from({ length: BENCH_SIZE }, (_, benchIdx) => (
+              <div 
+                key={benchIdx}
+                className="grid gap-2 min-w-[640px]"
+                style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}
+              >
+                {managers.map(manager => {
+                  const { benchSlots } = getRosterSlots(manager);
+                  const slot = benchSlots[benchIdx];
+                  
+                  if (!slot) return null;
+                  
+                  return (
+                    <RosterCell
+                      key={`${manager.id}-bench-${benchIdx}`}
+                      slot={slot}
+                      isBench={true}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+            </div>
           </div>
 
           {/* Legend */}

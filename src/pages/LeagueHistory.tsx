@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trophy, Medal, TrendingUp, Calendar, User } from 'lucide-react';
@@ -38,6 +39,7 @@ const ALL_MANAGER_NAMES = ['Abhi', 'Akash', 'Jasthi', 'Krishna', 'Krithik', 'Kus
 
 const LeagueHistory = () => {
   const { managers, schedule } = useGame();
+  const { user } = useAuth();
   const [historicalRecords, setHistoricalRecords] = useState<HistoricalRecord[]>([]);
   const [headToHead, setHeadToHead] = useState<HeadToHead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -248,7 +250,10 @@ const LeagueHistory = () => {
                   {combinedRecords.map((record, index) => (
                     <TableRow 
                       key={record.name}
-                      className={cn(!record.isActive && "opacity-60")}
+                      className={cn(
+                        !record.isActive && "opacity-60",
+                        record.name === user?.name && "bg-secondary/10 border-l-2 border-l-secondary"
+                      )}
                     >
                       <TableCell className="font-medium">
                         {index + 1}
@@ -306,8 +311,14 @@ const LeagueHistory = () => {
                 </TableHeader>
                 <TableBody>
                   {ALL_MANAGER_NAMES.map(rowManager => (
-                    <TableRow key={rowManager}>
-                      <TableCell className="sticky left-0 bg-card z-10 font-semibold text-xs">
+                    <TableRow 
+                      key={rowManager}
+                      className={cn(rowManager === user?.name && "bg-secondary/10")}
+                    >
+                      <TableCell className={cn(
+                        "sticky left-0 z-10 font-semibold text-xs",
+                        rowManager === user?.name ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
+                      )}>
                         {rowManager}
                       </TableCell>
                       {ALL_MANAGER_NAMES.map(colManager => {

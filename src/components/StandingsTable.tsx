@@ -6,9 +6,10 @@ import { ChevronRight } from 'lucide-react';
 interface StandingsTableProps {
   managers: Manager[];
   currentManagerId: string;
+  loggedInManagerId?: string;
 }
 
-export const StandingsTable = ({ managers, currentManagerId }: StandingsTableProps) => {
+export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }: StandingsTableProps) => {
   const navigate = useNavigate();
   
   // Sort by wins first, then by points as tiebreaker
@@ -33,7 +34,8 @@ export const StandingsTable = ({ managers, currentManagerId }: StandingsTablePro
           className={cn(
             "w-full grid grid-cols-[1fr_40px_40px_50px] gap-2 px-4 py-3 transition-colors hover:bg-muted/30 items-center",
             index !== sortedManagers.length - 1 && "border-b border-border",
-            manager.id === currentManagerId && "bg-primary/5 hover:bg-primary/10"
+            manager.id === currentManagerId && "bg-primary/5 hover:bg-primary/10",
+            manager.id === loggedInManagerId && "bg-secondary/10 hover:bg-secondary/15 border-l-2 border-l-secondary"
           )}
         >
           <div className="flex items-center gap-3 min-w-0">
