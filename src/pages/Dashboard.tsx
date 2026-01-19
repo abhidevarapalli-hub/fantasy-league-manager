@@ -4,8 +4,7 @@ import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { StandingsTable } from '@/components/StandingsTable';
 import { ScheduleList } from '@/components/ScheduleList';
-import { BottomNav } from '@/components/BottomNav';
-import { UserMenu } from '@/components/UserMenu';
+import { AppLayout } from '@/components/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
@@ -35,29 +34,22 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between px-4 h-14">
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Premier League Manager</h1>
-            <p className="text-xs text-muted-foreground">Week {currentWeek} of 7</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleRefresh}
-              className="p-2 rounded-full hover:bg-muted transition-colors"
-            >
-              <RefreshCw className={cn(
-                "w-5 h-5 text-muted-foreground transition-transform",
-                isRefreshing && "animate-spin text-primary"
-              )} />
-            </button>
-            <UserMenu />
-          </div>
-        </div>
-      </header>
-
-      <main className="px-4 py-4">
+    <AppLayout 
+      title="Premier League Manager" 
+      subtitle={`Week ${currentWeek} of 7`}
+      headerActions={
+        <button 
+          onClick={handleRefresh}
+          className="p-2 rounded-full hover:bg-muted transition-colors"
+        >
+          <RefreshCw className={cn(
+            "w-5 h-5 text-muted-foreground transition-transform",
+            isRefreshing && "animate-spin text-primary"
+          )} />
+        </button>
+      }
+    >
+      <div className="px-4 py-4">
         <Tabs defaultValue="standings" className="w-full">
           <TabsList className="w-full bg-muted/50 p-1 rounded-xl mb-4">
             <TabsTrigger 
@@ -84,10 +76,8 @@ const Dashboard = () => {
             <ScheduleList schedule={schedule} managers={managers} currentWeek={currentWeek} />
           </TabsContent>
         </Tabs>
-      </main>
-
-      <BottomNav />
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

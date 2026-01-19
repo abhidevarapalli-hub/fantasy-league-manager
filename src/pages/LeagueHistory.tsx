@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BottomNav } from '@/components/BottomNav';
+import { AppLayout } from '@/components/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -188,23 +188,15 @@ const LeagueHistory = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>
-        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="px-4 py-3">
-          <h1 className="text-lg font-bold text-foreground">League History</h1>
-          <p className="text-xs text-muted-foreground">All-time records across seasons</p>
-        </div>
-      </header>
-
-      <main className="px-4 py-4">
+    <AppLayout title="League History" subtitle="All-time records across seasons">
+      <div className="px-4 py-4">
         <Tabs defaultValue="overall" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="overall">Overall Rankings</TabsTrigger>
@@ -353,10 +345,8 @@ const LeagueHistory = () => {
             </p>
           </TabsContent>
         </Tabs>
-      </main>
-
-      <BottomNav />
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

@@ -4,8 +4,7 @@ import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrades } from '@/hooks/useTrades';
 import { PlayerCard } from '@/components/PlayerCard';
-import { BottomNav } from '@/components/BottomNav';
-import { UserMenu } from '@/components/UserMenu';
+import { AppLayout } from '@/components/AppLayout';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { RosterManagementDialog } from '@/components/RosterManagementDialog';
@@ -139,18 +138,10 @@ const Players = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Player Pool</h1>
-            <p className="text-xs text-muted-foreground">{filteredPlayers.length} players</p>
-          </div>
-          <UserMenu />
-        </div>
-        
+    <AppLayout title="Player Pool" subtitle={`${filteredPlayers.length} players`}>
+      <div className="sticky top-14 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
         {/* Search */}
-        <div className="px-4 pb-3">
+        <div className="px-4 py-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -253,9 +244,9 @@ const Players = () => {
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="px-4 py-4">
+      <div className="px-4 py-4">
         <div className="space-y-2">
           {filteredPlayers.map(player => {
             const rosteredBy = playerToManagerMap[player.id];
@@ -264,24 +255,26 @@ const Players = () => {
             const canTrade = rosteredBy && !isOwnPlayer && !!currentUserManagerId;
             
             return (
-              <div key={player.id} className="relative">
-                <PlayerCard
-                  player={player}
-                  isOwned={false}
-                  showActions={(!rosteredBy && (isLeagueManager || !!currentUserManagerId)) || canTrade}
-                  onAdd={!rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
-                  onTrade={canTrade ? () => handleTradePlayer(player.id) : undefined}
-                />
-                {rosteredBy && (
-                  <div className="absolute top-2 right-2">
+              <div key={player.id}>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <PlayerCard
+                      player={player}
+                      isOwned={false}
+                      showActions={(!rosteredBy && (isLeagueManager || !!currentUserManagerId)) || canTrade}
+                      onAdd={!rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
+                      onTrade={canTrade ? () => handleTradePlayer(player.id) : undefined}
+                    />
+                  </div>
+                  {rosteredBy && (
                     <Badge 
                       variant="outline" 
-                      className="bg-muted/80 text-muted-foreground border-border text-[10px]"
+                      className="bg-muted/80 text-muted-foreground border-border text-[10px] flex-shrink-0"
                     >
                       {rosteredBy}
                     </Badge>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })}
@@ -292,9 +285,7 @@ const Players = () => {
             </div>
           )}
         </div>
-      </main>
-
-      <BottomNav />
+      </div>
       
       <RosterManagementDialog
         open={dialogOpen}
@@ -312,7 +303,7 @@ const Players = () => {
         onSubmit={handleTradeSubmit}
         mode="propose"
       />
-    </div>
+    </AppLayout>
   );
 };
 

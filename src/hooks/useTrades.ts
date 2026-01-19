@@ -67,19 +67,7 @@ export const useTrades = () => {
         return false;
       }
 
-      // Log the trade proposal as a transaction
-      const proposer = managers.find((m) => m.id === proposerId);
-      const target = managers.find((m) => m.id === targetId);
-      const proposerPlayerNames = proposerPlayers.map((id) => players.find((p) => p.id === id)?.name).filter(Boolean).join(', ');
-      const targetPlayerNames = targetPlayers.map((id) => players.find((p) => p.id === id)?.name).filter(Boolean).join(', ');
-
-      await supabase.from('transactions').insert({
-        type: 'trade',
-        manager_id: proposerId,
-        manager_team_name: proposer?.teamName,
-        description: `${proposer?.teamName} proposed a trade to ${target?.teamName}: ${proposerPlayerNames} for ${targetPlayerNames}`,
-      });
-
+      // Don't log proposed trades - only log accepted trades in Activity
       return true;
     },
     [managers, players]

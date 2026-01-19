@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check, RefreshCw } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
-import { BottomNav } from '@/components/BottomNav';
+import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -232,20 +232,8 @@ const Admin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="flex items-center gap-3 px-4 h-14">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <Settings className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Admin Suite</h1>
-            <p className="text-xs text-muted-foreground">League management tools</p>
-          </div>
-        </div>
-      </header>
-
-      <main className="px-4 py-4 space-y-6">
+    <AppLayout title="Admin Suite" subtitle="League management tools">
+      <div className="px-4 py-4 space-y-6">
         {/* Score Input */}
         <section className="bg-card rounded-xl border border-border p-4">
           <div className="flex items-center justify-between mb-4">
