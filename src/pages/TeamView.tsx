@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowLeftRight, Trophy } from 'lucide-react';
+import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowLeftRight, Trophy, Lock } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { PlayerCard } from '@/components/PlayerCard';
 import { BottomNav } from '@/components/BottomNav';
+import { UserMenu } from '@/components/UserMenu';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -38,12 +40,16 @@ const TeamView = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
   const { managers, players, moveToActive, moveToBench, dropPlayerOnly, swapPlayers } = useGame();
+  const { canEditTeam } = useAuth();
   
   // Swap states
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [playerToSwap, setPlayerToSwap] = useState<{ player: Player; from: 'active' | 'bench' } | null>(null);
   
   const manager = managers.find(m => m.id === teamId);
+  
+  // Check if current user can edit this team
+  const canEdit = canEditTeam(teamId || '', managers.map(m => ({ id: m.id, name: m.name })));
   
   // Calculate standings position
   const standingsPosition = useMemo(() => {
@@ -145,7 +151,12 @@ const TeamView = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-foreground">{manager.teamName}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-foreground">{manager.teamName}</h1>
+              {!canEdit && (
+                <Lock className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               {manager.name} • {totalPlayers}/{TOTAL_ROSTER_SIZE} players
             </p>
@@ -159,10 +170,21 @@ const TeamView = () => {
             <Plane className="w-3 h-3" />
             {internationalCount}/{MAX_INTERNATIONAL_PLAYERS}
           </div>
+          <UserMenu />
         </div>
       </header>
 
       <main className="px-4 py-4 space-y-6">
+        {/* Read-only notice */}
+        {!canEdit && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+            <Lock className="w-4 h-4 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              You can view this team but cannot make changes
+            </p>
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-4 gap-3">
           <div className="bg-card rounded-xl border border-border p-3 text-center">
@@ -225,9 +247,9 @@ const TeamView = () => {
                   key={slot.player.id}
                   player={slot.player}
                   isOwned
-                  onSwap={benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
-                  onMoveDown={benchPlayers.length < maxBenchSize ? () => handleMoveToBench(slot.player!.id) : undefined}
-                  onDrop={() => dropPlayerOnly(teamId!, slot.player!.id)}
+                  onSwap={canEdit && benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
+                  onMoveDown={canEdit && benchPlayers.length < maxBenchSize ? () => handleMoveToBench(slot.player!.id) : undefined}
+                  onDrop={canEdit ? () => dropPlayerOnly(teamId!, slot.player!.id) : undefined}
                 />
               ) : (
                 <div 
@@ -268,9 +290,9 @@ const TeamView = () => {
                 key={player.id}
                 player={player}
                 isOwned
-                onSwap={activePlayers.length > 0 ? () => handleStartSwap(player, 'bench') : undefined}
-                onMoveUp={activePlayers.length < ACTIVE_ROSTER_SIZE ? () => handleMoveToActive(player.id) : undefined}
-                onDrop={() => dropPlayerOnly(teamId!, player.id)}
+                onSwap={canEdit && activePlayers.length > 0 ? () => handleStartSwap(player, 'bench') : undefined}
+                onMoveUp={canEdit && activePlayers.length < ACTIVE_ROSTER_SIZE ? () => handleMoveToActive(player.id) : undefined}
+                onDrop={canEdit ? () => dropPlayerOnly(teamId!, player.id) : undefined}
               />
             ))}
             

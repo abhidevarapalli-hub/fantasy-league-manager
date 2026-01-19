@@ -1,20 +1,23 @@
 import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, History } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-
-const navItems = [
-  { icon: LayoutDashboard, label: 'Home', path: '/' },
-  { icon: Users, label: 'Rosters', path: '/roster' },
-  { icon: UsersRound, label: 'Players', path: '/players' },
-  { icon: Activity, label: 'Activity', path: '/activity' },
-  { icon: History, label: 'History', path: '/history' },
-  { icon: ClipboardList, label: 'Draft', path: '/draft' },
-  { icon: Settings, label: 'Admin', path: '/admin' },
-];
+import { useAuth } from '@/contexts/AuthContext';
 
 export const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isLeagueManager } = useAuth();
+
+  const navItems = [
+    { icon: LayoutDashboard, label: 'Home', path: '/' },
+    { icon: Users, label: 'Rosters', path: '/roster' },
+    { icon: UsersRound, label: 'Players', path: '/players' },
+    { icon: Activity, label: 'Activity', path: '/activity' },
+    { icon: History, label: 'History', path: '/history' },
+    { icon: ClipboardList, label: 'Draft', path: '/draft' },
+    // Only show Admin tab for league managers
+    ...(isLeagueManager ? [{ icon: Settings, label: 'Admin', path: '/admin' }] : []),
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border">
