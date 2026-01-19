@@ -668,10 +668,8 @@ const Admin = () => {
             )}
           </div>
         </section>
-      </main>
-
-      <BottomNav />
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 
