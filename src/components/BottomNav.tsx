@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, History } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, History, ArrowLeftRight } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,8 +12,8 @@ export const BottomNav = () => {
     { icon: LayoutDashboard, label: 'Home', path: '/' },
     { icon: Users, label: 'Rosters', path: '/roster' },
     { icon: UsersRound, label: 'Players', path: '/players' },
+    { icon: ArrowLeftRight, label: 'Trades', path: '/trades' },
     { icon: Activity, label: 'Activity', path: '/activity' },
-    { icon: History, label: 'History', path: '/history' },
     { icon: ClipboardList, label: 'Draft', path: '/draft' },
     // Only show Admin tab for league managers
     ...(isLeagueManager ? [{ icon: Settings, label: 'Admin', path: '/admin' }] : []),
