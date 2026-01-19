@@ -209,79 +209,82 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
 
   return (
     <div className="space-y-4">
-      {/* Header Row - Manager Selection */}
-      <div className="grid grid-cols-8 gap-2">
-        {Array.from({ length: POSITIONS }, (_, i) => {
-          const position = i + 1;
-          const manager = getManagerAtPosition(position);
-          const availableManagers = managers.filter(
-            m => !assignedManagerIds.includes(m.id) || m.id === manager?.id
-          );
-
-          return (
-            <div key={position} className="flex flex-col items-center gap-1">
-              <div className="text-xs text-muted-foreground font-medium">#{position}</div>
-              {readOnly ? (
-                <div className="h-8 text-xs bg-muted border border-border rounded-md w-full flex items-center justify-center px-2">
-                  <span className="truncate">{manager?.teamName || 'Empty'}</span>
-                </div>
-              ) : (
-                <Select
-                  value={manager?.id || ''}
-                  onValueChange={(value) => assignManagerToPosition(position, value)}
-                >
-                  <SelectTrigger className="h-8 text-xs bg-muted border-border w-full">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableManagers.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.teamName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Draft Grid */}
-      <div className="overflow-x-auto">
-        <div className="grid grid-cols-8 gap-2 min-w-[640px]">
-          {Array.from({ length: ROUNDS }, (_, roundIdx) => {
-            const round = roundIdx + 1;
-
-            // Each column represents a fixed manager position (1-8)
-            // Snake draft affects the ORDER picks are made, not the display layout
-            return Array.from({ length: POSITIONS }, (_, colIdx) => {
-              const position = colIdx + 1; // Column 1 = position 1, Column 4 = position 4, etc.
-              
+      {/* Scrollable Draft Container */}
+      <div className="overflow-x-auto -mx-4 px-4">
+        <div className="min-w-[700px]">
+          {/* Header Row - Manager Selection */}
+          <div className="grid grid-cols-8 gap-2 mb-2 sticky top-0 bg-background z-10 pb-2">
+            {Array.from({ length: POSITIONS }, (_, i) => {
+              const position = i + 1;
               const manager = getManagerAtPosition(position);
-              const pick = getPick(round, position);
-              const player = getPlayerForPick(pick);
-              
-              // Pick number shows round.position (matches the column/manager position)
-              const pickNumber = `${round}.${position}`;
+              const availableManagers = managers.filter(
+                m => !assignedManagerIds.includes(m.id) || m.id === manager?.id
+              );
 
               return (
-                <DraftCell
-                  key={`${round}-${position}`}
-                  round={round}
-                  position={position}
-                  manager={manager}
-                  player={player}
-                  pickNumber={pickNumber}
-                  isFinalized={draftState?.isFinalized || false}
-                  onCellClick={() => handleCellClick(round, position)}
-                  onClearPick={() => !readOnly && clearPick(round, position)}
-                  colorClass={getCellColor(player)}
-                  readOnly={readOnly}
-                />
+                <div key={position} className="flex flex-col items-center gap-1">
+                  <div className="text-xs text-muted-foreground font-medium">#{position}</div>
+                  {readOnly ? (
+                    <div className="h-8 text-xs bg-muted border border-border rounded-md w-full flex items-center justify-center px-1">
+                      <span className="truncate text-[10px]">{manager?.teamName || 'Empty'}</span>
+                    </div>
+                  ) : (
+                    <Select
+                      value={manager?.id || ''}
+                      onValueChange={(value) => assignManagerToPosition(position, value)}
+                    >
+                      <SelectTrigger className="h-8 text-xs bg-muted border-border w-full">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableManagers.map(m => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.teamName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
               );
-            });
-          })}
+            })}
+          </div>
+
+          {/* Draft Grid */}
+          <div className="grid grid-cols-8 gap-2">
+            {Array.from({ length: ROUNDS }, (_, roundIdx) => {
+              const round = roundIdx + 1;
+
+              // Each column represents a fixed manager position (1-8)
+              // Snake draft affects the ORDER picks are made, not the display layout
+              return Array.from({ length: POSITIONS }, (_, colIdx) => {
+                const position = colIdx + 1; // Column 1 = position 1, Column 4 = position 4, etc.
+                
+                const manager = getManagerAtPosition(position);
+                const pick = getPick(round, position);
+                const player = getPlayerForPick(pick);
+                
+                // Pick number shows round.position (matches the column/manager position)
+                const pickNumber = `${round}.${position}`;
+
+                return (
+                  <DraftCell
+                    key={`${round}-${position}`}
+                    round={round}
+                    position={position}
+                    manager={manager}
+                    player={player}
+                    pickNumber={pickNumber}
+                    isFinalized={draftState?.isFinalized || false}
+                    onCellClick={() => handleCellClick(round, position)}
+                    onClearPick={() => !readOnly && clearPick(round, position)}
+                    colorClass={getCellColor(player)}
+                    readOnly={readOnly}
+                  />
+                );
+              });
+            })}
+          </div>
         </div>
       </div>
 
