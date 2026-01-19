@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Match, Manager } from '@/lib/supabase-types';
 import { Calendar, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface HeadToHead {
   id: string;
@@ -20,6 +21,10 @@ interface ScheduleListProps {
 
 export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListProps) => {
   const [headToHead, setHeadToHead] = useState<HeadToHead[]>([]);
+  const { user } = useAuth();
+  
+  // Find the logged-in user's manager
+  const loggedInManager = managers.find(m => m.name === user?.name);
   
   useEffect(() => {
     const fetchH2H = async () => {
@@ -30,6 +35,12 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
   }, []);
 
   const getManager = (id: string) => managers.find(m => m.id === id);
+  
+  // Check if this match involves the logged-in user's team
+  const isUserMatch = (match: Match): boolean => {
+    if (!loggedInManager) return false;
+    return match.home === loggedInManager.id || match.away === loggedInManager.id;
+  };
   
   // Get historical H2H record between two managers
   const getHistoricalH2H = (manager1Name: string, manager2Name: string): { wins: number; losses: number } => {
@@ -118,9 +129,13 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
               const h2h = homeManager && awayManager 
                 ? getCombinedH2H(homeManager.name, awayManager.name) 
                 : { wins: 0, losses: 0 };
+              const userPlaying = isUserMatch(match);
               
               return (
-                <div key={idx} className="px-4 py-3">
+                <div key={idx} className={cn(
+                  "px-4 py-3",
+                  userPlaying && "bg-secondary/10 border-l-2 border-l-secondary"
+                )}>
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className={cn(
@@ -163,16 +178,18 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
                     </div>
                   </div>
                   
-                  {/* H2H Record */}
+                  {/* H2H Record - shows home team's record vs away team */}
                   {homeManager && awayManager && (h2h.wins > 0 || h2h.losses > 0) && (
                     <div className="mt-1 text-center">
                       <span className="text-[10px] text-muted-foreground">
-                        H2H: <span className={cn(
+                        All-time: <span className="font-medium text-foreground">{homeManager.name}</span>
+                        {' '}
+                        <span className={cn(
                           "font-medium",
-                          h2h.wins > h2h.losses && "text-green-600",
-                          h2h.wins < h2h.losses && "text-red-500"
-                        )}>{h2h.wins}-{h2h.losses}</span>
-                        <span className="ml-1">({homeManager.name})</span>
+                          h2h.wins > h2h.losses && "text-success",
+                          h2h.wins < h2h.losses && "text-destructive"
+                        )}>{h2h.wins}W-{h2h.losses}L</span>
+                        {' '}vs {awayManager.name}
                       </span>
                     </div>
                   )}
