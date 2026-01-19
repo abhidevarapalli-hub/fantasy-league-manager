@@ -18,90 +18,39 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Protected route wrapper
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
-// Admin-only route wrapper
-const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLeagueManager } = useAuth();
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  if (!isLeagueManager) {
-    return <Navigate to="/" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
-// Public route that redirects to home if already logged in
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
-  
-  if (user) {
-    return <Navigate to="/" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
 const AppRoutes = () => {
+  const { user, isLeagueManager } = useAuth();
+
   return (
     <Routes>
       <Route path="/login" element={
-        <PublicRoute>
-          <Login />
-        </PublicRoute>
+        user ? <Navigate to="/" replace /> : <Login />
       } />
       <Route path="/" element={
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
+        user ? <Dashboard /> : <Navigate to="/login" replace />
       } />
       <Route path="/roster" element={
-        <ProtectedRoute>
-          <Roster />
-        </ProtectedRoute>
+        user ? <Roster /> : <Navigate to="/login" replace />
       } />
       <Route path="/players" element={
-        <ProtectedRoute>
-          <Players />
-        </ProtectedRoute>
+        user ? <Players /> : <Navigate to="/login" replace />
       } />
       <Route path="/activity" element={
-        <ProtectedRoute>
-          <Activity />
-        </ProtectedRoute>
+        user ? <Activity /> : <Navigate to="/login" replace />
       } />
       <Route path="/admin" element={
-        <AdminRoute>
-          <Admin />
-        </AdminRoute>
+        !user ? <Navigate to="/login" replace /> :
+        !isLeagueManager ? <Navigate to="/" replace /> :
+        <Admin />
       } />
       <Route path="/draft" element={
-        <ProtectedRoute>
-          <Draft />
-        </ProtectedRoute>
+        user ? <Draft /> : <Navigate to="/login" replace />
       } />
       <Route path="/history" element={
-        <ProtectedRoute>
-          <LeagueHistory />
-        </ProtectedRoute>
+        user ? <LeagueHistory /> : <Navigate to="/login" replace />
       } />
       <Route path="/team/:teamId" element={
-        <ProtectedRoute>
-          <TeamView />
-        </ProtectedRoute>
+        user ? <TeamView /> : <Navigate to="/login" replace />
       } />
       <Route path="*" element={<NotFound />} />
     </Routes>
