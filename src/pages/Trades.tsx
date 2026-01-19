@@ -3,8 +3,7 @@ import { ArrowLeftRight, Inbox, Send, Check, X, RotateCcw, Loader2 } from 'lucid
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrades } from '@/hooks/useTrades';
-import { BottomNav } from '@/components/BottomNav';
-import { UserMenu } from '@/components/UserMenu';
+import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -106,18 +105,8 @@ const Trades = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-2">
-            <ArrowLeftRight className="w-5 h-5 text-secondary" />
-            <h1 className="text-lg font-bold">Trades</h1>
-          </div>
-          <UserMenu />
-        </div>
-      </header>
-
-      <main className="px-4 py-4">
+    <AppLayout title="Trades">
+      <div className="px-4 py-4">
         {!currentManager ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">Please log in to view trades</p>
@@ -219,9 +208,7 @@ const Trades = () => {
             </TabsContent>
           </Tabs>
         )}
-      </main>
-
-      <BottomNav />
+      </div>
 
       {selectedTrade && currentManager && (
         <TradeDialog
@@ -233,7 +220,7 @@ const Trades = () => {
           mode="counter"
         />
       )}
-    </div>
+    </AppLayout>
   );
 };
 
@@ -278,11 +265,11 @@ const TradeCard = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="font-semibold text-sm">
-              {isIncoming ? getManagerName(trade.proposerId) : getManagerName(trade.targetId)}
+              {isIncoming ? getManagerName(trade.proposerId) : 'You'}
             </span>
             <ArrowLeftRight className="w-4 h-4 text-muted-foreground" />
             <span className="font-semibold text-sm">
-              {isIncoming ? 'You' : isOutgoing ? getManagerName(trade.targetId) : getManagerName(trade.targetId)}
+              {isIncoming ? 'You' : getManagerName(trade.targetId)}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">

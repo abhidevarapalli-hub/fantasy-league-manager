@@ -4,8 +4,7 @@ import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowLeftRight, Trophy
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { PlayerCard } from '@/components/PlayerCard';
-import { BottomNav } from '@/components/BottomNav';
-import { UserMenu } from '@/components/UserMenu';
+import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -138,29 +137,11 @@ const TeamView = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header with Team Name */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="flex items-center gap-3 px-4 h-14">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-foreground">{manager.teamName}</h1>
-              {!canEdit && (
-                <Lock className="w-4 h-4 text-muted-foreground" />
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {manager.name} • {totalPlayers}/{TOTAL_ROSTER_SIZE} players
-            </p>
-          </div>
+    <AppLayout 
+      title={manager.teamName} 
+      subtitle={`${manager.name} • ${totalPlayers}/${TOTAL_ROSTER_SIZE} players`}
+      headerActions={
+        <>
           <div className={cn(
             "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
             internationalCount > MAX_INTERNATIONAL_PLAYERS 
@@ -170,11 +151,22 @@ const TeamView = () => {
             <Plane className="w-3 h-3" />
             {internationalCount}/{MAX_INTERNATIONAL_PLAYERS}
           </div>
-          <UserMenu />
-        </div>
-      </header>
+          {!canEdit && <Lock className="w-4 h-4 text-muted-foreground" />}
+        </>
+      }
+    >
+      <div className="px-4 py-4 space-y-6">
+        {/* Back button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(-1)}
+          className="text-muted-foreground hover:text-foreground -ml-2"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Back
+        </Button>
 
-      <main className="px-4 py-4 space-y-6">
         {/* Read-only notice */}
         {!canEdit && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
@@ -316,7 +308,7 @@ const TeamView = () => {
             ))}
           </div>
         </section>
-      </main>
+      </div>
 
       {/* Swap Dialog */}
       <Dialog open={swapDialogOpen} onOpenChange={(open) => {
@@ -373,9 +365,7 @@ const TeamView = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      <BottomNav />
-    </div>
+    </AppLayout>
   );
 };
 

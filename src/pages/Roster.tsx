@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
-import { BottomNav } from '@/components/BottomNav';
-import { User, Plane } from 'lucide-react';
+import { AppLayout } from '@/components/AppLayout';
+import { Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ACTIVE_ROSTER_SIZE, BENCH_SIZE, getActiveRosterSlots, sortPlayersByRole } from '@/lib/roster-validation';
 import { Badge } from '@/components/ui/badge';
@@ -53,11 +53,6 @@ const roleIcons: Record<string, string> = {
   'Bowler': '🎯',
   'WK/BAT': '🏏',
   'AR/BWL': '⚡',
-};
-
-const getCellColor = (player: Player | null): string => {
-  if (!player) return defaultCellColor;
-  return teamColors[player.team] || defaultCellColor;
 };
 
 interface RosterCellProps {
@@ -163,18 +158,9 @@ const Roster = () => {
     return { activeSlots, benchSlots };
   };
 
-  const totalRosterSize = ACTIVE_ROSTER_SIZE + BENCH_SIZE;
-
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="px-4 py-3">
-          <h1 className="text-lg font-bold text-foreground">Team Rosters</h1>
-          <p className="text-xs text-muted-foreground">Click on a team name to manage roster</p>
-        </div>
-      </header>
-
-      <main className="px-4 py-4">
+    <AppLayout title="Team Rosters" subtitle="Click on a team name to manage roster">
+      <div className="px-4 py-4">
         <div className="overflow-x-auto">
           {/* Header Row - Manager Names */}
           <div className="grid gap-2 min-w-[640px]" style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}>
@@ -260,10 +246,8 @@ const Roster = () => {
             </div>
           </div>
         </div>
-      </main>
-
-      <BottomNav />
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 
