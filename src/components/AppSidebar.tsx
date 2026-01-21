@@ -16,10 +16,13 @@ import {
 import { cn } from '@/lib/utils';
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const { isLeagueManager } = useAuth();
+
+  // On mobile, always show labels (no collapse mode)
+  const showLabels = isMobile || !collapsed;
 
   const navItems = [
     { title: 'Home', url: '/', icon: LayoutDashboard },
@@ -39,13 +42,13 @@ export function AppSidebar() {
     <Sidebar
       className={cn(
         "border-r border-border bg-card transition-all duration-300",
-        collapsed ? "w-14" : "w-56"
+        collapsed && !isMobile ? "w-14" : "w-56"
       )}
       collapsible="icon"
     >
       <div className="flex items-center h-14 px-3 border-b border-border">
         <SidebarTrigger className="h-8 w-8" />
-        {!collapsed && (
+        {showLabels && (
           <span className="ml-2 font-semibold text-sm text-foreground truncate">Menu</span>
         )}
       </div>
@@ -59,7 +62,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={isActive(item.url)}
-                    tooltip={collapsed ? item.title : undefined}
+                    tooltip={!showLabels ? item.title : undefined}
                   >
                     <NavLink
                       to={item.url}
@@ -71,7 +74,7 @@ export function AppSidebar() {
                       activeClassName="bg-primary/10 text-primary font-medium"
                     >
                       <item.icon className="h-5 w-5 flex-shrink-0" />
-                      {!collapsed && <span className="truncate">{item.title}</span>}
+                      {showLabels && <span className="truncate">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
