@@ -1,7 +1,46 @@
-import { Plus, Minus, ArrowUp, ArrowDown, Swords, Target, User, Shield, Plane, ArrowLeftRight, Repeat } from 'lucide-react';
+import { Plus, Minus, ArrowUp, ArrowDown, Plane, ArrowLeftRight, Repeat } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
+
+// Cricket Bat Icon
+const CricketBatIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 20L8 16" />
+    <rect x="7" y="4" width="5" height="14" rx="1" transform="rotate(45 9.5 11)" />
+  </svg>
+);
+
+// Cricket Ball Icon
+const CricketBallIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 3C9 6 9 18 12 21" />
+    <path d="M12 3C15 6 15 18 12 21" />
+  </svg>
+);
+
+// Wicket Keeper Gloves Icon
+const GlovesIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 10V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1" />
+    <path d="M10 6V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
+    <path d="M14 6V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v6" />
+    <path d="M6 10a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V8" />
+    <path d="M6 10V8a2 2 0 0 1 2-2" />
+    <path d="M10 14v4a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2v-4" />
+  </svg>
+);
+
+// All Rounder Icon (bat + ball combined)
+const AllRounderIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="16" cy="8" r="5" />
+    <path d="M16 5v6" />
+    <path d="M4 20l4-4" />
+    <rect x="6" y="10" width="3" height="8" rx="0.5" transform="rotate(45 7.5 14)" />
+  </svg>
+);
 
 interface PlayerCardProps {
   player: Player;
@@ -52,15 +91,15 @@ const roleStyles: Record<string, string> = {
 const getRoleIcon = (role: string) => {
   switch (role) {
     case 'Batsman':
-      return <Swords className="w-5 h-5" />;
+      return <CricketBatIcon className="w-5 h-5" />;
     case 'Bowler':
-      return <Target className="w-5 h-5" />;
+      return <CricketBallIcon className="w-5 h-5" />;
     case 'All Rounder':
-      return <User className="w-5 h-5" />;
+      return <AllRounderIcon className="w-5 h-5" />;
     case 'Wicket Keeper':
-      return <Shield className="w-5 h-5" />;
+      return <GlovesIcon className="w-5 h-5" />;
     default:
-      return <User className="w-5 h-5" />;
+      return <CricketBatIcon className="w-5 h-5" />;
   }
 };
 
