@@ -365,10 +365,10 @@ export const MockDraftBoard = () => {
         onOpenChange={setDialogOpen}
         round={selectedCell?.round || 0}
         position={selectedCell?.position || 0}
-        manager={null}
         draftedPlayerIds={getDraftedPlayerIds()}
         currentPlayerId={null}
         onConfirm={handlePickConfirm}
+        isMockDraft={true}
       />
 
       {/* Available Players Drawer */}
