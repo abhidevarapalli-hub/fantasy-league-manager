@@ -1,8 +1,10 @@
 import { AppLayout } from '@/components/AppLayout';
 import { DraftBoard } from '@/components/DraftBoard';
+import { MockDraftBoard } from '@/components/MockDraftBoard';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Lock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Draft = () => {
   const { loading } = useGame();
@@ -24,19 +26,30 @@ const Draft = () => {
         !isLeagueManager ? <Lock className="w-4 h-4 text-muted-foreground" /> : null
       }
     >
-      {/* Read-only notice for non-league managers */}
-      {!isLeagueManager && (
-        <div className="mx-4 mt-4 flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
-          <Lock className="w-4 h-4 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            View only - Only the league manager can modify the draft
-          </p>
-        </div>
-      )}
-
-      {/* Draft Content */}
       <div className="px-4 py-4">
-        <DraftBoard readOnly={!isLeagueManager} />
+        <Tabs defaultValue="official" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="official">Official Draft</TabsTrigger>
+            <TabsTrigger value="mock">Mock Draft</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="official" className="mt-0">
+            {/* Read-only notice for non-league managers */}
+            {!isLeagueManager && (
+              <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+                <Lock className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  View only - Only the league manager can modify the draft
+                </p>
+              </div>
+            )}
+            <DraftBoard readOnly={!isLeagueManager} />
+          </TabsContent>
+
+          <TabsContent value="mock" className="mt-0">
+            <MockDraftBoard />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
