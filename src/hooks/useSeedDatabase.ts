@@ -75,7 +75,7 @@ const PLAYERS_DATA = [
   { name: "Sarfaraz Khan", team: "CSK", role: "Batsman" },
   { name: "Akeal Hosein", team: "CSK", role: "Bowler" },
   { name: "Jamie Overton", team: "CSK", role: "All Rounder" },
-  { name: "Mathew Short", team: "CSK", role: "All Rounder" },
+  { name: "Mathew Short", team: "CSK", role: "Batsman" },
   { name: "Ramakrishna Ghosh", team: "CSK", role: "Bowler" },
   { name: "Gurjapneet Singh", team: "CSK", role: "Bowler" },
   { name: "Mukesh Choudhary", team: "CSK", role: "Bowler" },
@@ -294,7 +294,7 @@ export const useSeedDatabase = () => {
       // Seed players
       if (!existingPlayers || existingPlayers.length === 0) {
         // Add is_international flag to players data
-        const playersWithInternational = PLAYERS_DATA.map(player => ({
+        const playersWithInternational = PLAYERS_DATA.map((player) => ({
           ...player,
           is_international: isInternationalPlayer(player.name),
         }));
