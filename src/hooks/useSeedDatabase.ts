@@ -405,8 +405,12 @@ export const useSeedDatabase = () => {
         throw deleteError;
       }
 
-      // Insert new players
-      const { error: insertError } = await supabase.from("players").insert(PLAYERS_DATA);
+      // Insert new players with international flag
+      const playersWithInternational = PLAYERS_DATA.map((player) => ({
+        ...player,
+        is_international: isInternationalPlayer(player.name),
+      }));
+      const { error: insertError } = await supabase.from("players").insert(playersWithInternational);
       if (insertError) {
         console.error("Error inserting players:", insertError);
         throw insertError;
