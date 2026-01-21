@@ -148,13 +148,14 @@ export const MockDraftBoard = () => {
     runAutoPickLoop,
     getPlayerById,
     getDraftedPlayerIds,
-    getPick,
+    getPickByTeam,
+    getPickDisplayNumber,
     getTeamForPick,
   } = useMockDraft(players);
 
   const [selectedPosition, setSelectedPosition] = useState<string>('1');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedCell, setSelectedCell] = useState<{ round: number; position: number } | null>(null);
+  const [selectedCell, setSelectedCell] = useState<{ round: number; teamIndex: number } | null>(null);
 
   // Start auto-picking loop when mock draft starts
   useEffect(() => {
@@ -172,7 +173,7 @@ export const MockDraftBoard = () => {
     startMockDraft(position);
   };
 
-  const handleCellClick = (round: number, position: number) => {
+  const handleCellClick = (round: number, teamIndex: number) => {
     if (!isUserTurn) return;
     
     // Check if this is the current pick position for the user
@@ -181,8 +182,9 @@ export const MockDraftBoard = () => {
     
     if (currentTeamIndex !== userTeamIndex) return;
     if (round !== state.currentRound) return;
+    if (teamIndex !== userTeamIndex) return;
     
-    setSelectedCell({ round, position });
+    setSelectedCell({ round, teamIndex });
     setDialogOpen(true);
   };
 
@@ -308,14 +310,14 @@ export const MockDraftBoard = () => {
               const round = roundIdx + 1;
 
               return Array.from({ length: POSITIONS }, (_, colIdx) => {
-                const position = colIdx + 1;
                 const teamIndex = colIdx; // Column index = team index (0-7)
                 
-                // Find the pick for this cell
-                const pick = getPick(round, position);
+                // Find the pick for this cell by team index
+                const pick = getPickByTeam(round, teamIndex);
                 const player = pick ? getPlayerById(pick.playerId) : null;
                 
-                const pickNumber = `${round}.${position}`;
+                // Get proper snake draft pick number
+                const pickNumber = getPickDisplayNumber(round, teamIndex);
                 
                 // Check if this is the current pick
                 const currentTeamIndex = getTeamForPick(state.currentRound, state.currentPickIndex);
@@ -328,14 +330,14 @@ export const MockDraftBoard = () => {
 
                 return (
                   <MockDraftCell
-                    key={`${round}-${position}`}
+                    key={`${round}-${teamIndex}`}
                     round={round}
-                    position={position}
+                    position={teamIndex + 1}
                     player={player}
                     pickNumber={pickNumber}
                     isCurrentPick={isCurrentPick}
                     isUserTeam={isUserTeam}
-                    onCellClick={canClick ? () => handleCellClick(round, position) : undefined}
+                    onCellClick={canClick ? () => handleCellClick(round, teamIndex) : undefined}
                     colorClass={getCellColor(player)}
                   />
                 );
@@ -364,7 +366,7 @@ export const MockDraftBoard = () => {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         round={selectedCell?.round || 0}
-        position={selectedCell?.position || 0}
+        position={(selectedCell?.teamIndex || 0) + 1}
         draftedPlayerIds={getDraftedPlayerIds()}
         currentPlayerId={null}
         onConfirm={handlePickConfirm}
