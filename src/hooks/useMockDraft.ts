@@ -354,10 +354,26 @@ export const useMockDraft = (allPlayers: Player[]) => {
     return sortedPlayers.filter(p => !draftedIds.has(p.id));
   }, [sortedPlayers, getDraftedPlayerIds]);
 
-  // Get pick for a specific round and position
-  const getPick = useCallback((round: number, position: number): MockDraftPick | null => {
-    return state.picks.find(p => p.round === round && p.position === position) || null;
+  // Get pick for a specific round and team index (column)
+  const getPickByTeam = useCallback((round: number, teamIndex: number): MockDraftPick | null => {
+    return state.picks.find(p => p.round === round && p.teamIndex === teamIndex) || null;
   }, [state.picks]);
+
+  // Calculate the display pick number for a cell (e.g., "2.1" for first pick of round 2)
+  const getPickDisplayNumber = useCallback((round: number, teamIndex: number): string => {
+    // In snake draft:
+    // Odd rounds: team 0 picks 1st, team 7 picks 8th
+    // Even rounds: team 7 picks 1st, team 0 picks 8th
+    let pickOrderInRound: number;
+    if (round % 2 === 1) {
+      // Odd round: team 0 = pick 1, team 7 = pick 8
+      pickOrderInRound = teamIndex + 1;
+    } else {
+      // Even round (snake): team 7 = pick 1, team 0 = pick 8
+      pickOrderInRound = TEAMS - teamIndex;
+    }
+    return `${round}.${pickOrderInRound}`;
+  }, []);
 
   // Get user's roster
   const getUserRoster = useCallback((): Player[] => {
@@ -378,7 +394,8 @@ export const useMockDraft = (allPlayers: Player[]) => {
     getPlayerById,
     getDraftedPlayerIds,
     getAvailablePlayers,
-    getPick,
+    getPickByTeam,
+    getPickDisplayNumber,
     getTeamForPick,
     getUserRoster,
   };
