@@ -16,10 +16,11 @@ interface DraftPickDialogProps {
   onOpenChange: (open: boolean) => void;
   round: number;
   position: number;
-  manager: Manager | null;
+  manager?: Manager | null;
   draftedPlayerIds: string[];
   currentPlayerId: string | null;
   onConfirm: (playerId: string) => void;
+  isMockDraft?: boolean;
 }
 
 const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
@@ -70,6 +71,7 @@ export const DraftPickDialog = ({
   draftedPlayerIds,
   currentPlayerId,
   onConfirm,
+  isMockDraft = false,
 }: DraftPickDialogProps) => {
   const { players } = useGame();
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
@@ -131,7 +133,8 @@ export const DraftPickDialog = ({
     }
   };
 
-  if (!manager) return null;
+  // For official draft, require manager. For mock draft, allow without manager
+  if (!manager && !isMockDraft) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -144,18 +147,20 @@ export const DraftPickDialog = ({
         </DialogHeader>
 
         <div className="space-y-3 pt-2 flex-1 overflow-hidden flex flex-col">
-          {/* Manager (read-only) */}
-          <div className="space-y-1.5 flex-shrink-0">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Manager
-            </label>
-            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/50 border border-border">
-              <div className="flex-1">
-                <p className="font-medium text-foreground text-sm">{manager.teamName}</p>
-                <p className="text-xs text-muted-foreground">{manager.name}</p>
+          {/* Manager (read-only) - only show for official draft */}
+          {manager && !isMockDraft && (
+            <div className="space-y-1.5 flex-shrink-0">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Manager
+              </label>
+              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/50 border border-border">
+                <div className="flex-1">
+                  <p className="font-medium text-foreground text-sm">{manager.teamName}</p>
+                  <p className="text-xs text-muted-foreground">{manager.name}</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Search */}
           <div className="flex-shrink-0">
