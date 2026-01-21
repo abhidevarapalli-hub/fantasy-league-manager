@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DraftPickDialog } from '@/components/DraftPickDialog';
+import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
 import { cn } from '@/lib/utils';
 
 const ROUNDS = 14;
@@ -208,7 +209,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-16">
       {/* Scrollable Draft Container */}
       <div className="overflow-x-auto -mx-4 px-4">
         <div className="min-w-[700px]">
@@ -329,6 +330,9 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
           onConfirm={handlePickConfirm}
         />
       )}
+
+      {/* Available Players Drawer - always visible */}
+      <AvailablePlayersDrawer draftedPlayerIds={getDraftedPlayerIds()} />
     </div>
   );
 };
