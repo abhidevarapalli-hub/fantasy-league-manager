@@ -180,6 +180,7 @@ export const PLAYER_PRIORITY_ORDER: string[] = [
   "Shahrukh Khan",
   "Arjun Tendulkar",
   "Cooper Connolly",
+  "Mukesh Kumar",
   "Shivang Kumar",
   "Allah Ghazanfar",
   "Kartik Tyagi",
