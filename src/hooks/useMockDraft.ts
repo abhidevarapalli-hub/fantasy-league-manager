@@ -117,6 +117,45 @@ export const useMockDraft = (allPlayers: Player[]) => {
     return [...new Set(neededRoles)]; // Remove duplicates
   }, []);
 
+  // Get the tier (1-25) of a player based on their index in the sorted list
+  // Players are sorted by priority, so index 0-9 = tier 1, 10-19 = tier 2, etc.
+  const getPlayerTier = useCallback((playerIndex: number): number => {
+    return Math.floor(playerIndex / 10) + 1;
+  }, []);
+
+  // Weighted selection: tier X is twice as likely as tier X+1
+  // Weight = 2^(25 - tier) for tiers 1-25
+  const selectPlayerWeighted = useCallback((eligiblePlayers: Player[]): Player => {
+    // Create index map for eligible players to get their position in sortedPlayers
+    const playerIndexMap = new Map<string, number>();
+    sortedPlayers.forEach((p, idx) => playerIndexMap.set(p.id, idx));
+
+    // Calculate weights for each eligible player
+    const weights = eligiblePlayers.map(player => {
+      const index = playerIndexMap.get(player.id) ?? sortedPlayers.length;
+      const tier = getPlayerTier(index);
+      // Weight = 2^(25 - tier), so tier 1 = 2^24, tier 2 = 2^23, etc.
+      // To avoid huge numbers, use relative weights: tier 1 = 2^24 relative factor
+      // We can normalize by using 2^(25 - tier) directly
+      return Math.pow(2, 25 - tier);
+    });
+
+    // Calculate total weight
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+
+    // Random selection based on weights
+    let random = Math.random() * totalWeight;
+    for (let i = 0; i < eligiblePlayers.length; i++) {
+      random -= weights[i];
+      if (random <= 0) {
+        return eligiblePlayers[i];
+      }
+    }
+
+    // Fallback (shouldn't happen)
+    return eligiblePlayers[eligiblePlayers.length - 1];
+  }, [sortedPlayers, getPlayerTier]);
+
   const selectPlayerForTeam = useCallback((
     teamIndex: number,
     availablePlayers: Player[],
@@ -152,11 +191,9 @@ export const useMockDraft = (allPlayers: Player[]) => {
 
     if (eligiblePlayers.length === 0) return null;
 
-    // Take top 15 (sorted by priority) and randomly select one
-    const top15 = eligiblePlayers.slice(0, 15);
-    const randomIndex = Math.floor(Math.random() * top15.length);
-    return top15[randomIndex];
-  }, [getTeamRosterCounts, getNeededRoles]);
+    // Use weighted tier-based selection
+    return selectPlayerWeighted(eligiblePlayers);
+  }, [getTeamRosterCounts, getNeededRoles, selectPlayerWeighted]);
 
   // Get the team index that picks at a given round and pick position
   const getTeamForPick = useCallback((round: number, pickIndex: number): number => {
