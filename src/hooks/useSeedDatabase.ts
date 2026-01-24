@@ -287,13 +287,16 @@ export const useSeedDatabase = () => {
       const { data: existingPlayers } = await supabase.from("players").select("id").limit(1);
       const { data: existingManagers } = await supabase.from("managers").select("id").limit(1);
 
-      if (existingPlayers && existingPlayers.length > 0 && existingManagers && existingManagers.length > 0) {
+      const hasPlayers = (existingPlayers?.length ?? 0) > 0;
+      const hasManagers = (existingManagers?.length ?? 0) > 0;
+
+      if (hasPlayers && hasManagers) {
         console.log("Database already seeded");
         return true;
       }
 
       // Seed players
-      if (!existingPlayers || existingPlayers.length === 0) {
+      if (!hasPlayers) {
         // Add is_international flag to players data
         const playersWithInternational = PLAYERS_DATA.map((player) => ({
           ...player,
@@ -302,13 +305,14 @@ export const useSeedDatabase = () => {
         const { error: playersError } = await supabase.from("players").insert(playersWithInternational);
         if (playersError) {
           console.error("Error seeding players:", playersError);
-          throw playersError;
+          // Don't throw here, try to continue with managers
+        } else {
+          console.log("Players seeded successfully");
         }
-        console.log("Players seeded successfully");
       }
 
       // Seed managers and get their IDs
-      if (!existingManagers || existingManagers.length === 0) {
+      if (!hasManagers) {
         const { data: insertedManagers, error: managersError } = await supabase
           .from("managers")
           .insert(MANAGERS_DATA)
@@ -407,7 +411,11 @@ export const useSeedDatabase = () => {
       }
 
       // Insert new players
-      const { error: insertError } = await supabase.from("players").insert(PLAYERS_DATA);
+      const playersWithInternational = PLAYERS_DATA.map((player) => ({
+        ...player,
+        is_international: isInternationalPlayer(player.name),
+      }));
+      const { error: insertError } = await supabase.from("players").insert(playersWithInternational);
       if (insertError) {
         console.error("Error inserting players:", insertError);
         throw insertError;

@@ -12,9 +12,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export const UserMenu = () => {
-  const { user, logout } = useAuth();
+  const { managerProfile, signOut } = useAuth();
 
-  if (!user) return null;
+  if (!managerProfile) return null;
 
   return (
     <DropdownMenu>
@@ -22,11 +22,11 @@ export const UserMenu = () => {
         <Button variant="ghost" size="sm" className="gap-2">
           <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
             <span className="text-xs font-bold text-primary">
-              {user.name.charAt(0).toUpperCase()}
+              {managerProfile.name.charAt(0).toUpperCase()}
             </span>
           </div>
-          <span className="text-sm font-medium">{user.name}</span>
-          {user.isLeagueManager && (
+          <span className="text-sm font-medium">{managerProfile.name}</span>
+          {managerProfile.is_league_manager && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-primary/30">
               <Shield className="w-2.5 h-2.5 mr-0.5" />
               LM
@@ -37,18 +37,14 @@ export const UserMenu = () => {
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-sm font-medium leading-none">{managerProfile.name}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.isLeagueManager ? 'League Manager' : 'Team Manager'}
+              {managerProfile.is_league_manager ? 'League Manager' : 'Team Manager'}
             </p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Switch Account
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+        <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
           <LogOut className="w-4 h-4 mr-2" />
           Sign Out
         </DropdownMenuItem>

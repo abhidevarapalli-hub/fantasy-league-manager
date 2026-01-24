@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check, RefreshCw } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,28 +17,36 @@ const IPL_TEAMS = ['MI', 'KKR', 'CSK', 'RR', 'RCB', 'DC', 'GT', 'LSG', 'PBKS', '
 const Admin = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { 
-    managers, 
-    players, 
-    schedule, 
-    updateMatchScore, 
+  const {
+    managers,
+    players,
+    schedule,
+    updateMatchScore,
     finalizeWeekScores,
-    resetLeague, 
-    executeTrade, 
-    addFreeAgent, 
-    getFreeAgents, 
+    resetLeague,
+    executeTrade,
+    addFreeAgent,
+    getFreeAgents,
     getManagerRosterCount,
     addNewPlayer,
     dropPlayerOnly,
     reseedPlayers,
     reseeding,
   } = useGame();
-  
+  const { isLeagueManager } = useAuth();
+
+  // If not league manager, redirect home
+  useEffect(() => {
+    if (!isLeagueManager) {
+      navigate('/');
+    }
+  }, [isLeagueManager, navigate]);
+
   const [tradeManager1, setTradeManager1] = useState('');
   const [tradeManager2, setTradeManager2] = useState('');
   const [selectedPlayers1, setSelectedPlayers1] = useState<string[]>([]);
   const [selectedPlayers2, setSelectedPlayers2] = useState<string[]>([]);
-  
+
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showReseedConfirm, setShowReseedConfirm] = useState(false);
 
@@ -101,11 +110,11 @@ const Admin = () => {
 
   const manager1 = managers.find(m => m.id === tradeManager1);
   const manager2 = managers.find(m => m.id === tradeManager2);
-  
-  const manager1Players = manager1 
+
+  const manager1Players = manager1
     ? [...manager1.activeRoster, ...manager1.bench].map(id => players.find(p => p.id === id)!).filter(Boolean)
     : [];
-  const manager2Players = manager2 
+  const manager2Players = manager2
     ? [...manager2.activeRoster, ...manager2.bench].map(id => players.find(p => p.id === id)!).filter(Boolean)
     : [];
 
@@ -116,7 +125,7 @@ const Admin = () => {
   const isAtCap = rmRosterCount >= ROSTER_CAP;
   const hasPlayers = rmRosterCount > 0;
 
-  const rmManagerPlayers = rmManagerData 
+  const rmManagerPlayers = rmManagerData
     ? [...rmManagerData.activeRoster, ...rmManagerData.bench].map(id => players.find(p => p.id === id)!).filter(Boolean)
     : [];
 
@@ -189,7 +198,7 @@ const Admin = () => {
   // Score Input Logic
   const weekNum = parseInt(selectedWeek);
   const weekMatches = schedule.filter(m => m.week === weekNum);
-  const allScoresEntered = weekMatches.every((_, idx) => 
+  const allScoresEntered = weekMatches.every((_, idx) =>
     matchScores[idx]?.home && matchScores[idx]?.away
   );
 
@@ -208,7 +217,7 @@ const Admin = () => {
     if (scores?.home && scores?.away) {
       const homeScore = parseInt(scores.home);
       const awayScore = parseInt(scores.away);
-      
+
       if (!isNaN(homeScore) && !isNaN(awayScore)) {
         updateMatchScore(weekNum, matchIndex, homeScore, awayScore);
       }
@@ -262,11 +271,11 @@ const Admin = () => {
             <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
               Week {selectedWeek} Matchups
             </h3>
-            
+
             {weekMatches.map((match, idx) => {
               const homeManager = managers.find(m => m.id === match.home);
               const awayManager = managers.find(m => m.id === match.away);
-              
+
               return (
                 <div key={idx} className="bg-card rounded-xl p-4 border border-border">
                   <div className="flex items-center justify-between gap-2">
@@ -300,7 +309,7 @@ const Admin = () => {
               );
             })}
 
-            <Button 
+            <Button
               onClick={handleFinalizeWeek}
               disabled={!allScoresEntered}
               className="w-full"
@@ -317,7 +326,7 @@ const Admin = () => {
             <Plus className="w-5 h-5 text-primary" />
             <h2 className="font-semibold text-foreground">Add New Player</h2>
           </div>
-          
+
           <div className="space-y-4">
             <div>
               <Label className="text-muted-foreground mb-2 block">Player Name</Label>
@@ -371,7 +380,7 @@ const Admin = () => {
               </Label>
             </div>
 
-            <Button 
+            <Button
               onClick={handleAddNewPlayer}
               disabled={!newPlayerName || !newPlayerTeam || !newPlayerRole}
               className="w-full"
@@ -388,7 +397,7 @@ const Admin = () => {
             <ArrowLeftRight className="w-5 h-5 text-primary" />
             <h2 className="font-semibold text-foreground italic">Roster Management</h2>
           </div>
-          
+
           <div className="space-y-4">
             {/* Three dropdowns in a row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -484,7 +493,7 @@ const Admin = () => {
             )}
 
             {/* Execute Button */}
-            <Button 
+            <Button
               onClick={handleExecuteRosterMove}
               disabled={!isButtonEnabled}
               className="w-full bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30"
@@ -501,7 +510,7 @@ const Admin = () => {
             <ArrowLeftRight className="w-5 h-5 text-secondary" />
             <h2 className="font-semibold text-foreground">Trade Hub</h2>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <Label className="text-muted-foreground mb-2 block text-xs">Team 1</Label>
@@ -516,7 +525,7 @@ const Admin = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div>
               <Label className="text-muted-foreground mb-2 block text-xs">Team 2</Label>
               <Select value={tradeManager2} onValueChange={(v) => { setTradeManager2(v); setSelectedPlayers2([]); }}>
@@ -542,7 +551,7 @@ const Admin = () => {
                       <Checkbox
                         checked={selectedPlayers1.includes(player.id)}
                         onCheckedChange={(checked) => {
-                          setSelectedPlayers1(prev => 
+                          setSelectedPlayers1(prev =>
                             checked ? [...prev, player.id] : prev.filter(id => id !== player.id)
                           );
                         }}
@@ -552,7 +561,7 @@ const Admin = () => {
                   ))}
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground">{manager2?.teamName} gives:</p>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -561,7 +570,7 @@ const Admin = () => {
                       <Checkbox
                         checked={selectedPlayers2.includes(player.id)}
                         onCheckedChange={(checked) => {
-                          setSelectedPlayers2(prev => 
+                          setSelectedPlayers2(prev =>
                             checked ? [...prev, player.id] : prev.filter(id => id !== player.id)
                           );
                         }}
@@ -573,8 +582,8 @@ const Admin = () => {
               </div>
             </div>
           )}
-          
-          <Button 
+
+          <Button
             onClick={handleTrade}
             disabled={selectedPlayers1.length === 0 || selectedPlayers2.length === 0}
             variant="secondary"
@@ -590,11 +599,11 @@ const Admin = () => {
             <AlertTriangle className="w-5 h-5 text-destructive" />
             <h2 className="font-semibold text-destructive">Danger Zone</h2>
           </div>
-          
+
           <div className="space-y-3">
             {/* Reseed Players */}
             {!showReseedConfirm ? (
-              <Button 
+              <Button
                 onClick={() => setShowReseedConfirm(true)}
                 variant="outline"
                 disabled={reseeding}
@@ -632,7 +641,7 @@ const Admin = () => {
 
             {/* Reset League */}
             {!showResetConfirm ? (
-              <Button 
+              <Button
                 onClick={() => setShowResetConfirm(true)}
                 variant="outline"
                 className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"

@@ -7,8 +7,8 @@ import { PlayerCard } from '@/components/PlayerCard';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ACTIVE_ROSTER_SIZE, 
+import {
+  ACTIVE_ROSTER_SIZE,
   TOTAL_ROSTER_SIZE,
   MAX_INTERNATIONAL_PLAYERS,
   getActiveRosterSlots,
@@ -40,16 +40,17 @@ const TeamView = () => {
   const navigate = useNavigate();
   const { managers, players, moveToActive, moveToBench, dropPlayerOnly, swapPlayers } = useGame();
   const { canEditTeam } = useAuth();
-  
+
   // Swap states
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [playerToSwap, setPlayerToSwap] = useState<{ player: Player; from: 'active' | 'bench' } | null>(null);
-  
+
   const manager = managers.find(m => m.id === teamId);
-  
+
   // Check if current user can edit this team
-  const canEdit = canEditTeam(teamId || '', managers.map(m => ({ id: m.id, name: m.name })));
-  
+  // Check if current user can edit this team
+  const canEdit = canEditTeam(teamId || '');
+
   // Calculate standings position
   const standingsPosition = useMemo(() => {
     if (!manager) return 0;
@@ -59,7 +60,7 @@ const TeamView = () => {
     });
     return sortedManagers.findIndex(m => m.id === manager.id) + 1;
   }, [managers, manager]);
-  
+
   if (!manager) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -75,7 +76,7 @@ const TeamView = () => {
     .map(id => players.find(p => p.id === id))
     .filter((p): p is Player => p !== undefined);
   const totalPlayers = activePlayers.length + benchPlayers.length;
-  
+
   // Calculate max bench size based on active roster
   const maxBenchSize = TOTAL_ROSTER_SIZE - ACTIVE_ROSTER_SIZE;
 
@@ -109,7 +110,7 @@ const TeamView = () => {
 
   const handleSwap = async (targetPlayer: Player) => {
     if (!playerToSwap || !teamId) return;
-    
+
     // Validate the swap - determine which player is going TO active
     let swapValidation;
     if (playerToSwap.from === 'bench') {
@@ -119,33 +120,33 @@ const TeamView = () => {
       // Active player going to bench, target (bench) player coming to active
       swapValidation = canSwapInActive(activePlayers, targetPlayer, playerToSwap.player);
     }
-    
+
     if (!swapValidation.isValid) {
       toast.error(swapValidation.errors[0] || 'Invalid swap');
       return;
     }
-    
+
     const result = await swapPlayers(teamId, playerToSwap.player.id, targetPlayer.id);
     if (!result.success && result.error) {
       toast.error(result.error);
     } else {
       toast.success('Players swapped successfully');
     }
-    
+
     setSwapDialogOpen(false);
     setPlayerToSwap(null);
   };
 
   return (
-    <AppLayout 
-      title={manager.teamName} 
+    <AppLayout
+      title={manager.teamName}
       subtitle={`${manager.name} • ${totalPlayers}/${TOTAL_ROSTER_SIZE} players`}
       headerActions={
         <>
           <div className={cn(
             "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
-            internationalCount > MAX_INTERNATIONAL_PLAYERS 
-              ? "bg-destructive/20 text-destructive" 
+            internationalCount > MAX_INTERNATIONAL_PLAYERS
+              ? "bg-destructive/20 text-destructive"
               : "bg-primary/20 text-primary"
           )}>
             <Plane className="w-3 h-3" />
@@ -231,7 +232,7 @@ const TeamView = () => {
               <p className="text-xs text-muted-foreground">Starting lineup ({activePlayers.length}/{ACTIVE_ROSTER_SIZE})</p>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             {slots.map((slot, index) => (
               slot.filled && slot.player ? (
@@ -244,7 +245,7 @@ const TeamView = () => {
                   onDrop={canEdit ? () => dropPlayerOnly(teamId!, slot.player!.id) : undefined}
                 />
               ) : (
-                <div 
+                <div
                   key={`empty-${index}`}
                   className="p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3"
                 >
@@ -275,7 +276,7 @@ const TeamView = () => {
               <p className="text-xs text-muted-foreground">Reserve players ({benchPlayers.length}/{maxBenchSize})</p>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             {sortedBench.map(player => (
               <PlayerCard
@@ -287,10 +288,10 @@ const TeamView = () => {
                 onDrop={canEdit ? () => dropPlayerOnly(teamId!, player.id) : undefined}
               />
             ))}
-            
+
             {/* Empty bench slots */}
             {Array.from({ length: maxBenchSize - benchPlayers.length }).map((_, index) => (
-              <div 
+              <div
                 key={`empty-bench-${index}`}
                 className="p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3"
               >
@@ -330,10 +331,10 @@ const TeamView = () => {
               (playerToSwap.from === 'active' ? sortedBench : sortPlayersByRole(activePlayers)).map(player => {
                 // When swapping from active to bench: check if bringing bench player TO active is valid
                 // When swapping from bench to active: check if bringing bench player TO active is valid
-                const isValidSwap = playerToSwap.from === 'bench' 
+                const isValidSwap = playerToSwap.from === 'bench'
                   ? canSwapInActive(activePlayers, playerToSwap.player, player).isValid
                   : canSwapInActive(activePlayers, player, playerToSwap.player).isValid;
-                
+
                 return (
                   <button
                     key={player.id}
@@ -341,8 +342,8 @@ const TeamView = () => {
                     disabled={!isValidSwap}
                     className={cn(
                       "w-full text-left p-3 rounded-lg border transition-colors",
-                      isValidSwap 
-                        ? "border-border hover:border-primary bg-card" 
+                      isValidSwap
+                        ? "border-border hover:border-primary bg-card"
                         : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
                     )}
                   >

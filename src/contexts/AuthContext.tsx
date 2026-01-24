@@ -1,93 +1,134 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Session, User } from '@supabase/supabase-js';
 
-// Manager credentials mapping
-const MANAGER_CREDENTIALS: Record<string, { password: string; isLeagueManager: boolean }> = {
-  'Akash': { password: 'MorneMorkel', isLeagueManager: false },
-  'Krithik': { password: 'SaeedAjmal', isLeagueManager: false },
-  'Vamsi': { password: 'TamimIqbal', isLeagueManager: false },
-  'Krishna': { password: 'RaviBopara', isLeagueManager: false },
-  'Jasthi': { password: 'BradHaddin', isLeagueManager: false },
-  'Santosh': { password: 'RossTaylor', isLeagueManager: false },
-  'Sahith': { password: 'RaviRampaul', isLeagueManager: false },
-  'Abhi': { password: 'Dilshan', isLeagueManager: true },
+// Legacy password verification for manager claiming
+// This is used only once to verify identity when linking a user to a manager
+const LEGACY_MANAGER_CREDENTIALS: Record<string, string> = {
+  'Akash': 'MorneMorkel',
+  'Krithik': 'SaeedAjmal',
+  'Vamsi': 'TamimIqbal',
+  'Krishna': 'RaviBopara',
+  'Jasthi': 'BradHaddin',
+  'Santosh': 'RossTaylor',
+  'Sahith': 'MarlonSamuels',
+  'Abhi': 'Dilshan',
 };
 
-interface User {
+interface ManagerProfile {
+  id: string;
   name: string;
-  isLeagueManager: boolean;
+  is_league_manager: boolean;
+  user_id: string | null;
 }
 
 interface AuthContextType {
+  session: Session | null;
   user: User | null;
-  login: (managerName: string, password: string) => { success: boolean; error?: string };
-  logout: () => void;
-  canEditTeam: (managerId: string, managers: { id: string; name: string }[]) => boolean;
+  managerProfile: ManagerProfile | null;
+  isLoading: boolean;
+  signOut: () => Promise<{ error: any }>;
+  verifyLegacyPassword: (managerName: string, password: string) => boolean;
+  selectManager: (managerName: string) => Promise<void>;
   isLeagueManager: boolean;
+  canEditTeam: (teamId: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const AUTH_STORAGE_KEY = 'ipl_fantasy_auth';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    // Try to restore session from localStorage
+  const [session, setSession] = useState<Session | null>(null);
+  const [managerProfile, setManagerProfile] = useState<ManagerProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchManagerProfileByName = async (name: string) => {
     try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
+      const { data, error } = await supabase
+        .from('managers')
+        .select('*')
+        .eq('name', name)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching manager profile:', error);
       }
+
+      setManagerProfile(data);
     } catch (e) {
-      console.error('Failed to restore auth session:', e);
+      console.error('Unexpected error fetching profile:', e);
     }
-    return null;
-  });
+  };
 
-  // Persist user state to localStorage
   useEffect(() => {
-    if (user) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    }
-  }, [user]);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
 
-  const login = (managerName: string, password: string): { success: boolean; error?: string } => {
-    const credentials = MANAGER_CREDENTIALS[managerName];
-    
-    if (!credentials) {
-      return { success: false, error: 'Invalid manager selected' };
-    }
-
-    if (credentials.password !== password) {
-      return { success: false, error: 'Incorrect password. Please try again.' };
-    }
-
-    setUser({
-      name: managerName,
-      isLeagueManager: credentials.isLeagueManager,
+      const savedManager = localStorage.getItem('selected_manager');
+      if (session?.user && savedManager) {
+        fetchManagerProfileByName(savedManager);
+      }
+      setIsLoading(false);
     });
 
-    return { success: true };
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        const savedManager = localStorage.getItem('selected_manager');
+        if (savedManager) {
+          fetchManagerProfileByName(savedManager);
+        }
+      } else {
+        setManagerProfile(null);
+        localStorage.removeItem('selected_manager');
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signOut = async () => {
+    localStorage.removeItem('selected_manager');
+    setManagerProfile(null);
+    return await supabase.auth.signOut();
   };
 
-  const logout = () => {
-    setUser(null);
+  const verifyLegacyPassword = (managerName: string, password: string): boolean => {
+    const correctPassword = LEGACY_MANAGER_CREDENTIALS[managerName];
+    return correctPassword === password;
   };
 
-  const canEditTeam = (managerId: string, managers: { id: string; name: string }[]): boolean => {
-    if (!user) return false;
-    if (user.isLeagueManager) return true;
-    
-    // Find the manager by ID and check if it matches the logged-in user
-    const manager = managers.find(m => m.id === managerId);
-    return manager?.name === user.name;
+  const selectManager = async (managerName: string) => {
+    localStorage.setItem('selected_manager', managerName);
+    await fetchManagerProfileByName(managerName);
   };
 
-  const isLeagueManager = user?.isLeagueManager ?? false;
+  const canEditTeam = (teamId: string) => {
+    if (!managerProfile) return false;
+    if (managerProfile.is_league_manager || managerProfile.name === 'Abhi') return true;
+    return managerProfile.id === teamId;
+  };
+
+  const isLeagueManager = (managerProfile?.is_league_manager ?? false) || managerProfile?.name === 'Abhi';
+
+  const value = {
+    session,
+    user: session?.user ?? null,
+    managerProfile,
+    isLoading,
+    signOut,
+    verifyLegacyPassword,
+    selectManager,
+    isLeagueManager,
+    canEditTeam,
+  };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, canEditTeam, isLeagueManager }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -101,5 +142,5 @@ export const useAuth = () => {
   return context;
 };
 
-// Export manager names for the login dropdown
-export const MANAGER_NAMES = Object.keys(MANAGER_CREDENTIALS);
+// Export manager names for the claiming dropdown
+export const MANAGER_NAMES = Object.keys(LEGACY_MANAGER_CREDENTIALS);

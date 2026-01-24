@@ -10,15 +10,11 @@ import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
   const { managers, schedule, currentWeek, currentManagerId, loading } = useGame();
-  const { user } = useAuth();
+  const { managerProfile } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Find the logged-in user's manager ID
-  const loggedInManagerId = useMemo(() => {
-    if (!user) return undefined;
-    const manager = managers.find(m => m.name === user.name);
-    return manager?.id;
-  }, [user, managers]);
+  const loggedInManagerId = managerProfile?.id;
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -34,11 +30,11 @@ const Dashboard = () => {
   }
 
   return (
-    <AppLayout 
-      title="Premier League Manager" 
+    <AppLayout
+      title="Premier League Manager"
       subtitle={`Week ${currentWeek} of 7`}
       headerActions={
-        <button 
+        <button
           onClick={handleRefresh}
           className="p-2 rounded-full hover:bg-muted transition-colors"
         >
@@ -52,14 +48,14 @@ const Dashboard = () => {
       <div className="px-4 py-4">
         <Tabs defaultValue="standings" className="w-full">
           <TabsList className="w-full bg-muted/50 p-1 rounded-xl mb-4">
-            <TabsTrigger 
-              value="standings" 
+            <TabsTrigger
+              value="standings"
               className="flex-1 gap-2 data-[state=active]:bg-card data-[state=active]:text-foreground rounded-lg"
             >
               <Trophy className="w-4 h-4" />
               Standings
             </TabsTrigger>
-            <TabsTrigger 
+            <TabsTrigger
               value="schedule"
               className="flex-1 gap-2 data-[state=active]:bg-card data-[state=active]:text-foreground rounded-lg"
             >
@@ -67,11 +63,11 @@ const Dashboard = () => {
               Schedule
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="standings" className="mt-0">
             <StandingsTable managers={managers} currentManagerId={currentManagerId} loggedInManagerId={loggedInManagerId} />
           </TabsContent>
-          
+
           <TabsContent value="schedule" className="mt-0">
             <ScheduleList schedule={schedule} managers={managers} currentWeek={currentWeek} />
           </TabsContent>

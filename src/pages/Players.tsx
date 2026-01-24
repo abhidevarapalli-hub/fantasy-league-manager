@@ -47,7 +47,7 @@ const nationalityFilterColors: Record<string, string> = {
 
 const Players = () => {
   const { players, managers } = useGame();
-  const { user, isLeagueManager } = useAuth();
+  const { managerProfile, isLeagueManager } = useAuth();
   const { proposeTrade } = useTrades();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
@@ -61,17 +61,13 @@ const Players = () => {
   const [tradeTargetManager, setTradeTargetManager] = useState<Manager | null>(null);
 
   // Find the current user's manager ID
-  const currentUserManagerId = useMemo(() => {
-    if (!user) return undefined;
-    const manager = managers.find(m => m.name === user.name);
-    return manager?.id;
-  }, [user, managers]);
+  const currentUserManagerId = managerProfile?.id;
 
   // Get the current user's manager object
   const currentManager = useMemo(() => {
-    if (!user) return null;
-    return managers.find(m => m.name === user.name) || null;
-  }, [user, managers]);
+    if (!currentUserManagerId) return null;
+    return managers.find(m => m.id === currentUserManagerId) || null;
+  }, [currentUserManagerId, managers]);
 
   // Build a map of player ID -> manager ID
   const playerToManagerIdMap = useMemo(() => {
@@ -98,17 +94,17 @@ const Players = () => {
   const filteredPlayers = useMemo(() => {
     const filtered = players.filter(player => {
       const matchesSearch = player.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           player.team.toLowerCase().includes(searchQuery.toLowerCase());
+        player.team.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTeam = selectedTeam === 'All' || player.team === selectedTeam;
       const matchesRole = selectedRole === 'All' || player.role === selectedRole;
-      const matchesNationality = selectedNationality === 'All' || 
-                                 (selectedNationality === 'International' && player.isInternational) ||
-                                 (selectedNationality === 'Domestic' && !player.isInternational);
+      const matchesNationality = selectedNationality === 'All' ||
+        (selectedNationality === 'International' && player.isInternational) ||
+        (selectedNationality === 'Domestic' && !player.isInternational);
       const isRostered = playerToManagerMap[player.id];
       const matchesFreeAgentFilter = !showOnlyFreeAgents || !isRostered;
       return matchesSearch && matchesTeam && matchesRole && matchesNationality && matchesFreeAgentFilter;
     });
-    
+
     return sortPlayersByPriority(filtered);
   }, [players, searchQuery, selectedTeam, selectedRole, selectedNationality, playerToManagerMap, showOnlyFreeAgents]);
 
@@ -124,7 +120,7 @@ const Players = () => {
     const player = players.find(p => p.id === playerId);
     const targetManagerId = playerToManagerIdMap[playerId];
     const targetMgr = managers.find(m => m.id === targetManagerId);
-    
+
     if (player && targetMgr && currentManager) {
       setTradeTargetPlayer(player);
       setTradeTargetManager(targetMgr);
@@ -176,7 +172,7 @@ const Players = () => {
             {showOnlyFreeAgents ? 'Showing Free Agents Only' : 'Show Free Agents Only'}
           </button>
         </div>
-        
+
         {/* Team Filter Pills */}
         <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
           <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Team</p>
@@ -187,8 +183,8 @@ const Players = () => {
                 onClick={() => setSelectedTeam(team)}
                 className={cn(
                   "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                  selectedTeam === team 
-                    ? teamFilterColors[team] 
+                  selectedTeam === team
+                    ? teamFilterColors[team]
                     : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                 )}
               >
@@ -211,8 +207,8 @@ const Players = () => {
                     onClick={() => setSelectedRole(role)}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                      selectedRole === role 
-                        ? roleFilterColors[role] 
+                      selectedRole === role
+                        ? roleFilterColors[role]
                         : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                     )}
                   >
@@ -232,8 +228,8 @@ const Players = () => {
                     onClick={() => setSelectedNationality(nationality)}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                      selectedNationality === nationality 
-                        ? nationalityFilterColors[nationality] 
+                      selectedNationality === nationality
+                        ? nationalityFilterColors[nationality]
                         : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                     )}
                   >
@@ -253,7 +249,7 @@ const Players = () => {
             const rosteredByManagerId = playerToManagerIdMap[player.id];
             const isOwnPlayer = rosteredByManagerId === currentUserManagerId;
             const canTrade = rosteredBy && !isOwnPlayer && !!currentUserManagerId;
-            
+
             return (
               <div key={player.id}>
                 <div className="flex items-center gap-2">
@@ -267,8 +263,8 @@ const Players = () => {
                     />
                   </div>
                   {rosteredBy && (
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className="bg-muted/80 text-muted-foreground border-border text-[10px] flex-shrink-0"
                     >
                       {rosteredBy}
@@ -278,7 +274,7 @@ const Players = () => {
               </div>
             );
           })}
-          
+
           {filteredPlayers.length === 0 && (
             <div className="py-12 text-center">
               <p className="text-muted-foreground">No players found</p>
@@ -286,7 +282,7 @@ const Players = () => {
           )}
         </div>
       </div>
-      
+
       <RosterManagementDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
