@@ -1,12 +1,11 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { AppLayout } from '@/components/AppLayout';
 import { Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ACTIVE_ROSTER_SIZE, BENCH_SIZE, getActiveRosterSlots, sortPlayersByRole } from '@/lib/roster-validation';
+import { getActiveRosterSlots, sortPlayersByRole, SlotRequirement } from '@/lib/roster-validation';
 import { Badge } from '@/components/ui/badge';
 import { Player, Manager } from '@/lib/supabase-types';
-import { SlotRequirement } from '@/lib/roster-validation';
 
 // Team colors based on IPL teams (same as draft page)
 const teamColors: Record<string, string> = {
@@ -63,7 +62,7 @@ interface RosterCellProps {
 const RosterCell = ({ slot, isBench }: RosterCellProps) => {
   const player = slot.player || null;
   const colorClass = player ? (teamColors[player.team] || defaultCellColor) : defaultCellColor;
-  
+
   return (
     <div
       className={cn(
@@ -94,7 +93,7 @@ const RosterCell = ({ slot, isBench }: RosterCellProps) => {
           <p className="font-bold text-sm truncate leading-tight w-full">
             {player.name.split(' ').slice(1).join(' ')}
           </p>
-          <Badge 
+          <Badge
             className={cn(
               "text-[8px] px-1 py-0 mt-1 font-semibold",
               teamBadgeColors[player.team] || 'bg-muted text-muted-foreground'
@@ -119,25 +118,24 @@ const RosterCell = ({ slot, isBench }: RosterCellProps) => {
 
 const Roster = () => {
   const navigate = useNavigate();
-  const { managers, players } = useGame();
+  const { leagueId } = useParams<{ leagueId: string }>();
+  const { managers, players, config, currentManagerId } = useGame();
 
-  // Get roster slots for a manager using the same logic as TeamView
+  // Get roster slots for a manager
   const getRosterSlots = (manager: Manager): { activeSlots: SlotRequirement[]; benchSlots: SlotRequirement[] } => {
     const rosterIds = manager.activeRoster || [];
     const benchIds = manager.bench || [];
-    
+
     const activePlayers = rosterIds
       .map(id => players.find(p => p.id === id))
       .filter((p): p is Player => p !== undefined);
-    
+
     const benchPlayers = benchIds
       .map(id => players.find(p => p.id === id))
       .filter((p): p is Player => p !== undefined);
-    
-    // Use getActiveRosterSlots for active roster (shows position requirements)
-    const activeSlots = getActiveRosterSlots(activePlayers);
-    
-    // For bench, show filled players sorted + empty slots
+
+    const activeSlots = getActiveRosterSlots(activePlayers, config);
+
     const sortedBench = sortPlayersByRole(benchPlayers);
     const benchSlots: SlotRequirement[] = sortedBench.map(player => ({
       role: player.role,
@@ -145,16 +143,15 @@ const Roster = () => {
       filled: true,
       player,
     }));
-    
-    // Add empty bench slots
-    for (let i = benchPlayers.length; i < BENCH_SIZE; i++) {
+
+    for (let i = benchPlayers.length; i < config.benchSize; i++) {
       benchSlots.push({
-        role: 'WK/BAT', // Any position for bench
+        role: 'WK/BAT',
         label: 'Reserve',
         filled: false,
       });
     }
-    
+
     return { activeSlots, benchSlots };
   };
 
@@ -162,25 +159,30 @@ const Roster = () => {
     <AppLayout title="Team Rosters" subtitle="Click on a team name to manage roster">
       <div className="px-4 py-4">
         <div className="overflow-x-auto">
-          {/* Header Row - Manager Names */}
+          {/* Header Row */}
           <div className="grid gap-2 min-w-[640px]" style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}>
             {managers.map(manager => (
               <button
                 key={manager.id}
-                onClick={() => navigate(`/team/${manager.id}`)}
-                className="text-center py-2 px-1 bg-primary/10 hover:bg-primary/20 rounded-lg border border-primary/30 transition-colors"
+                onClick={() => navigate(`/${leagueId}/team/${manager.id}`)}
+                className={cn(
+                  "text-center py-2 px-1 rounded-lg border transition-colors",
+                  manager.id === currentManagerId
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
+                )}
               >
-                <span className="text-xs font-bold text-primary truncate block">
+                <span className="text-xs font-bold truncate block">
                   {manager.teamName}
                 </span>
               </button>
             ))}
           </div>
 
-          {/* Active 11 Grid */}
+          {/* Active Grid */}
           <div className="mt-2 space-y-1">
-            {Array.from({ length: ACTIVE_ROSTER_SIZE }, (_, rowIdx) => (
-              <div 
+            {Array.from({ length: config.activeSize }, (_, rowIdx) => (
+              <div
                 key={rowIdx}
                 className="grid gap-2 min-w-[640px]"
                 style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}
@@ -188,9 +190,7 @@ const Roster = () => {
                 {managers.map(manager => {
                   const { activeSlots } = getRosterSlots(manager);
                   const slot = activeSlots[rowIdx];
-                  
                   if (!slot) return null;
-                  
                   return (
                     <RosterCell
                       key={`${manager.id}-${rowIdx}`}
@@ -203,38 +203,35 @@ const Roster = () => {
             ))}
           </div>
 
-          {/* Bench Section with spacing */}
+          {/* Bench Section */}
           <div className="mt-6 pt-4 border-t border-border/50">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
               Bench
             </p>
             <div className="space-y-1">
-            {Array.from({ length: BENCH_SIZE }, (_, benchIdx) => (
-              <div 
-                key={benchIdx}
-                className="grid gap-2 min-w-[640px]"
-                style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}
-              >
-                {managers.map(manager => {
-                  const { benchSlots } = getRosterSlots(manager);
-                  const slot = benchSlots[benchIdx];
-                  
-                  if (!slot) return null;
-                  
-                  return (
-                    <RosterCell
-                      key={`${manager.id}-bench-${benchIdx}`}
-                      slot={slot}
-                      isBench={true}
-                    />
-                  );
-                })}
-              </div>
-            ))}
+              {Array.from({ length: config.benchSize }, (_, benchIdx) => (
+                <div
+                  key={benchIdx}
+                  className="grid gap-2 min-w-[640px]"
+                  style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}
+                >
+                  {managers.map(manager => {
+                    const { benchSlots } = getRosterSlots(manager);
+                    const slot = benchSlots[benchIdx];
+                    if (!slot) return null;
+                    return (
+                      <RosterCell
+                        key={`${manager.id}-bench-${benchIdx}`}
+                        slot={slot}
+                        isBench={true}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Legend */}
           <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
               <Plane className="w-3 h-3" />

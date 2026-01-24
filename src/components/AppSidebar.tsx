@@ -2,6 +2,7 @@ import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, 
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGame } from '@/contexts/GameContext';
 import {
   Sidebar,
   SidebarContent,
@@ -14,29 +15,49 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { useParams } from 'react-router-dom';
 
 export function AppSidebar() {
   const { state, isMobile } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const { isLeagueManager } = useAuth();
+  const { isLeagueManager: authIsLM } = useAuth();
+  const { leagueId } = useParams<{ leagueId: string }>();
+
+  // Attempt to get robust LM status from GameContext if we have a leagueId
+  let gameContext;
+  try {
+    gameContext = useGame();
+  } catch (e) {
+    // Outside GameProvider
+  }
+  const isLeagueManager = gameContext
+    ? (gameContext.loading ? (gameContext.isLeagueManager || authIsLM) : gameContext.isLeagueManager)
+    : authIsLM;
+
+
 
   // On mobile, always show labels (no collapse mode)
   const showLabels = isMobile || !collapsed;
 
-  const navItems = [
-    { title: 'Home', url: '/', icon: LayoutDashboard },
-    { title: 'Rosters', url: '/roster', icon: Users },
-    { title: 'Players', url: '/players', icon: UsersRound },
-    { title: 'Trades', url: '/trades', icon: ArrowLeftRight },
-    { title: 'Activity', url: '/activity', icon: Activity },
-    { title: 'Draft', url: '/draft', icon: ClipboardList },
-    ...(isLeagueManager ? [{ title: 'Admin', url: '/admin', icon: Settings }] : []),
+  const navItems = leagueId ? [
+    { title: 'Home', url: `/${leagueId}`, icon: LayoutDashboard },
+    { title: 'Rosters', url: `/${leagueId}/roster`, icon: Users },
+    { title: 'Players', url: `/${leagueId}/players`, icon: UsersRound },
+    { title: 'Trades', url: `/${leagueId}/trades`, icon: ArrowLeftRight },
+    { title: 'Activity', url: `/${leagueId}/activity`, icon: Activity },
+    { title: 'Draft', url: `/${leagueId}/draft`, icon: ClipboardList },
+    ...(isLeagueManager ? [{ title: 'Admin', url: `/${leagueId}/admin`, icon: Settings }] : []),
+  ] : [
+
+    { title: 'Leagues', url: '/leagues', icon: LayoutDashboard },
   ];
 
+
   const isActive = (path: string) => {
-    return location.pathname === path || (path === '/' && location.pathname.startsWith('/team/'));
+    return location.pathname === path || (leagueId && path === `/${leagueId}` && location.pathname.startsWith(`/${leagueId}/team/`));
   };
+
 
   return (
     <Sidebar

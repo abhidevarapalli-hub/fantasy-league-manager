@@ -1,19 +1,38 @@
 import { Player } from './supabase-types';
 
 // Roster constraints
-export const ACTIVE_ROSTER_SIZE = 11;
-export const TOTAL_ROSTER_SIZE = 14; // Maximum total players per team
-export const BENCH_SIZE = TOTAL_ROSTER_SIZE - ACTIVE_ROSTER_SIZE; // 3 bench spots
-export const TOTAL_ROSTER_CAP = TOTAL_ROSTER_SIZE; // Alias for backwards compatibility
+// Roster configuration type
+export interface LeagueConfig {
+  managerCount: number;
+  activeSize: number;
+  benchSize: number;
+  minBatsmen: number;
+  maxBatsmen: number;
+  minBowlers: number;
+  minWks: number;
+  minAllRounders: number;
+  maxInternational: number;
+}
 
-// Active 11 constraints
-export const MIN_WICKET_KEEPERS = 1;
-export const MIN_BATSMEN_WK_COMBINED = 4;
-export const MAX_BATSMEN_WK_COMBINED = 6;
-export const MIN_ALL_ROUNDERS = 1;
-export const MIN_BOWLERS = 3;
-export const MIN_BOWLERS_ALLROUNDERS_COMBINED = 5;
-export const MAX_INTERNATIONAL_PLAYERS = 4;
+// Default configuration for backwards compatibility and fallback
+export const DEFAULT_LEAGUE_CONFIG: LeagueConfig = {
+  managerCount: 8,
+  activeSize: 11,
+  benchSize: 3,
+  minBatsmen: 1,
+  maxBatsmen: 6,
+  minBowlers: 3,
+  minWks: 1,
+  minAllRounders: 1,
+  maxInternational: 4
+};
+
+// Internal helpers for combined rules based on current standard fantasy logic
+// These may need to be made configurable too, but for now we derive them from the base rules
+const getMinWkBat = (config: LeagueConfig) => 4; // Standard for 11 players
+const getMaxWkBat = (config: LeagueConfig) => 6; // Standard for 11 players
+const getMinBwlAr = (config: LeagueConfig) => 5; // Standard for 11 players
+
 
 export type PlayerRole = 'Wicket Keeper' | 'Batsman' | 'All Rounder' | 'Bowler';
 
@@ -52,49 +71,50 @@ export function countRosterPlayers(players: Player[]): RosterCounts {
 }
 
 // Validate if a roster meets Active 11 requirements
-export function validateActiveRoster(players: Player[]): RosterValidationResult {
+export function validateActiveRoster(players: Player[], config: LeagueConfig = DEFAULT_LEAGUE_CONFIG): RosterValidationResult {
   const counts = countRosterPlayers(players);
   const errors: string[] = [];
 
-  // Max 11 players
-  if (counts.total > ACTIVE_ROSTER_SIZE) {
-    errors.push(`Active roster cannot exceed ${ACTIVE_ROSTER_SIZE} players (currently ${counts.total})`);
+  // Max players
+  if (counts.total > config.activeSize) {
+    errors.push(`Active roster cannot exceed ${config.activeSize} players (currently ${counts.total})`);
   }
 
-  // At least 1 WK
-  if (counts.wicketKeepers < MIN_WICKET_KEEPERS) {
-    errors.push(`Need at least ${MIN_WICKET_KEEPERS} Wicket Keeper (currently ${counts.wicketKeepers})`);
+  // At least MIN WKs
+  if (counts.wicketKeepers < config.minWks) {
+    errors.push(`Need at least ${config.minWks} Wicket Keeper (currently ${counts.wicketKeepers})`);
   }
 
-  // 4-6 WK + Batsmen combined
+  // WK + Batsmen combined
   const batsmenWkTotal = counts.wicketKeepers + counts.batsmen;
-  if (batsmenWkTotal < MIN_BATSMEN_WK_COMBINED) {
-    errors.push(`Need at least ${MIN_BATSMEN_WK_COMBINED} Wicket Keepers + Batsmen combined (currently ${batsmenWkTotal})`);
+  if (batsmenWkTotal < getMinWkBat(config)) {
+    errors.push(`Need at least ${getMinWkBat(config)} Wicket Keepers + Batsmen combined (currently ${batsmenWkTotal})`);
   }
-  if (batsmenWkTotal > MAX_BATSMEN_WK_COMBINED) {
-    errors.push(`Cannot exceed ${MAX_BATSMEN_WK_COMBINED} Wicket Keepers + Batsmen combined (currently ${batsmenWkTotal})`);
-  }
-
-  // At least 1 All Rounder
-  if (counts.allRounders < MIN_ALL_ROUNDERS) {
-    errors.push(`Need at least ${MIN_ALL_ROUNDERS} All Rounder (currently ${counts.allRounders})`);
+  if (batsmenWkTotal > getMaxWkBat(config)) {
+    errors.push(`Cannot exceed ${getMaxWkBat(config)} Wicket Keepers + Batsmen combined (currently ${batsmenWkTotal})`);
   }
 
-  // At least 3 Bowlers
-  if (counts.bowlers < MIN_BOWLERS) {
-    errors.push(`Need at least ${MIN_BOWLERS} Bowlers (currently ${counts.bowlers})`);
+  // At least MIN All Rounder
+  if (counts.allRounders < config.minAllRounders) {
+    errors.push(`Need at least ${config.minAllRounders} All Rounder (currently ${counts.allRounders})`);
   }
 
-  // At least 5 Bowlers + All Rounders combined
+  // At least MIN Bowlers
+  if (counts.bowlers < config.minBowlers) {
+    errors.push(`Need at least ${config.minBowlers} Bowlers (currently ${counts.bowlers})`);
+  }
+
+  // Bowlers + All Rounders combined
   const bowlersArTotal = counts.bowlers + counts.allRounders;
-  if (bowlersArTotal < MIN_BOWLERS_ALLROUNDERS_COMBINED) {
-    errors.push(`Need at least ${MIN_BOWLERS_ALLROUNDERS_COMBINED} Bowlers + All Rounders combined (currently ${bowlersArTotal})`);
+  if (bowlersArTotal < getMinBwlAr(config)) {
+    errors.push(`Need at least ${getMinBwlAr(config)} Bowlers + All Rounders combined (currently ${bowlersArTotal})`);
   }
 
-  // Max 4 international players
-  if (counts.international > MAX_INTERNATIONAL_PLAYERS) {
-    errors.push(`Cannot exceed ${MAX_INTERNATIONAL_PLAYERS} international players (currently ${counts.international})`);
+  // Max international players
+  if (counts.international > config.maxInternational) {
+    errors.push(`Cannot exceed ${config.maxInternational} international players (currently ${counts.international})`);
   }
+
 
   return {
     isValid: errors.length === 0,
@@ -108,74 +128,74 @@ export function validateActiveRoster(players: Player[]): RosterValidationResult 
  * This checks if adding a player would violate maximums or leave insufficient slots
  * for required minimums to be filled.
  */
-export function canAddToActive(currentActive: Player[], playerToAdd: Player): RosterValidationResult {
+export function canAddToActive(currentActive: Player[], playerToAdd: Player, config: LeagueConfig = DEFAULT_LEAGUE_CONFIG): RosterValidationResult {
   const newActive = [...currentActive, playerToAdd];
   const counts = countRosterPlayers(newActive);
   const errors: string[] = [];
-  
+
   // Immediate violations - these are always errors
-  
-  // Max 11 players
-  if (counts.total > ACTIVE_ROSTER_SIZE) {
-    errors.push(`Active roster cannot exceed ${ACTIVE_ROSTER_SIZE} players (currently ${counts.total})`);
+
+  // Max players
+  if (counts.total > config.activeSize) {
+    errors.push(`Active roster cannot exceed ${config.activeSize} players (currently ${counts.total})`);
     return { isValid: false, errors, counts };
   }
-  
-  // Max 4 international players
-  if (counts.international > MAX_INTERNATIONAL_PLAYERS) {
-    errors.push(`Cannot exceed ${MAX_INTERNATIONAL_PLAYERS} international players (currently ${counts.international})`);
+
+  // Max international players
+  if (counts.international > config.maxInternational) {
+    errors.push(`Cannot exceed ${config.maxInternational} international players (currently ${counts.international})`);
     return { isValid: false, errors, counts };
   }
-  
-  // Max 6 WK + Batsmen combined
+
+  // Max WK + Batsmen combined
   const batsmenWkTotal = counts.wicketKeepers + counts.batsmen;
-  if (batsmenWkTotal > MAX_BATSMEN_WK_COMBINED) {
-    errors.push(`Cannot exceed ${MAX_BATSMEN_WK_COMBINED} Wicket Keepers + Batsmen combined (currently ${batsmenWkTotal})`);
+  if (batsmenWkTotal > getMaxWkBat(config)) {
+    errors.push(`Cannot exceed ${getMaxWkBat(config)} Wicket Keepers + Batsmen combined (currently ${batsmenWkTotal})`);
     return { isValid: false, errors, counts };
   }
-  
+
   // Forward-looking validation: Check if requirements CAN still be met
-  const remainingSlots = ACTIVE_ROSTER_SIZE - counts.total;
-  
+  const remainingSlots = config.activeSize - counts.total;
+
   // Calculate deficits - how many more of each type we need
-  const wkDeficit = Math.max(0, MIN_WICKET_KEEPERS - counts.wicketKeepers);
-  const arDeficit = Math.max(0, MIN_ALL_ROUNDERS - counts.allRounders);
-  const bowlerDeficit = Math.max(0, MIN_BOWLERS - counts.bowlers);
-  
+  const wkDeficit = Math.max(0, config.minWks - counts.wicketKeepers);
+  const arDeficit = Math.max(0, config.minAllRounders - counts.allRounders);
+  const bowlerDeficit = Math.max(0, config.minBowlers - counts.bowlers);
+
   // WK+BAT combined deficit (WK can satisfy both WK requirement AND WK+BAT requirement)
   const currentWkBat = counts.wicketKeepers + counts.batsmen;
-  const wkBatDeficit = Math.max(0, MIN_BATSMEN_WK_COMBINED - currentWkBat);
+  const wkBatDeficit = Math.max(0, getMinWkBat(config) - currentWkBat);
   // But if we still need WK, those WK will also count toward WK+BAT
   const additionalWkBatNeeded = Math.max(0, wkBatDeficit - wkDeficit);
-  
+
   // BWL+AR combined deficit
   const currentBwlAr = counts.bowlers + counts.allRounders;
-  const bwlArDeficit = Math.max(0, MIN_BOWLERS_ALLROUNDERS_COMBINED - currentBwlAr);
+  const bwlArDeficit = Math.max(0, getMinBwlAr(config) - currentBwlAr);
   // Bowlers and ARs we still need will also count toward BWL+AR
   const additionalBwlArNeeded = Math.max(0, bwlArDeficit - bowlerDeficit - arDeficit);
-  
+
   // Total minimum slots we need to fill with specific roles
   // WK requirement can be filled by WK (who also count toward WK+BAT)
   // Additional WK+BAT can be filled by WK or BAT
   // AR requirement must be filled by AR (who also count toward BWL+AR)
   // Bowler requirement must be filled by BWL (who also count toward BWL+AR)
   // Additional BWL+AR can be filled by BWL or AR
-  
+
   // The key insight: some positions are "flexible" and some are "strict"
   // We need to check if the remaining slots can accommodate all strict requirements
-  
+
   // Minimum slots needed for strict requirements (can't be substituted)
-  const strictWkNeeded = wkDeficit; // Must have at least 1 WK
-  const strictArNeeded = arDeficit; // Must have at least 1 AR  
-  const strictBowlerNeeded = bowlerDeficit; // Must have at least 3 BWL
-  
+  const strictWkNeeded = wkDeficit; // Must have at least X WK
+  const strictArNeeded = arDeficit; // Must have at least X AR  
+  const strictBowlerNeeded = bowlerDeficit; // Must have at least X BWL
+
   // These can be filled flexibly
   const flexWkBatNeeded = additionalWkBatNeeded; // Can be WK or BAT
   const flexBwlArNeeded = additionalBwlArNeeded; // Can be BWL or AR
-  
+
   // Total minimum role-specific slots needed
   const totalMinSlotsNeeded = strictWkNeeded + strictArNeeded + strictBowlerNeeded + flexWkBatNeeded + flexBwlArNeeded;
-  
+
   if (totalMinSlotsNeeded > remainingSlots) {
     // Determine which requirement is impossible to meet
     if (strictWkNeeded > remainingSlots) {
@@ -185,15 +205,16 @@ export function canAddToActive(currentActive: Player[], playerToAdd: Player): Ro
     } else if (strictWkNeeded + strictBowlerNeeded + strictArNeeded > remainingSlots) {
       errors.push(`Cannot add this player: not enough slots remaining to add required All Rounder(s)`);
     } else if (strictWkNeeded + strictBowlerNeeded + strictArNeeded + flexWkBatNeeded > remainingSlots) {
-      errors.push(`Cannot add this player: not enough slots remaining for minimum 4 WK+Batsmen`);
+      errors.push(`Cannot add this player: not enough slots remaining for minimum ${getMinWkBat(config)} WK+Batsmen`);
     } else {
-      errors.push(`Cannot add this player: not enough slots remaining for minimum 5 Bowlers+All Rounders`);
+      errors.push(`Cannot add this player: not enough slots remaining for minimum ${getMinBwlAr(config)} Bowlers+All Rounders`);
     }
     return { isValid: false, errors, counts };
   }
-  
+
   return { isValid: true, errors: [], counts };
 }
+
 
 // Check if removing a player from active roster would still be valid
 // (Note: Removal is always allowed since the roster is incomplete)
@@ -208,12 +229,14 @@ export function canRemoveFromActive(currentActive: Player[], playerToRemove: Pla
 export function canSwapInActive(
   currentActive: Player[],
   playerToAdd: Player,
-  playerToRemove: Player
+  playerToRemove: Player,
+  config: LeagueConfig = DEFAULT_LEAGUE_CONFIG
 ): RosterValidationResult {
   const newActive = currentActive.filter(p => p.id !== playerToRemove.id);
   // Use canAddToActive for forward-looking validation
-  return canAddToActive(newActive, playerToAdd);
+  return canAddToActive(newActive, playerToAdd, config);
 }
+
 
 // Sort players by role priority for Active 11 display
 export function sortPlayersByRole(players: Player[]): Player[] {
@@ -223,7 +246,7 @@ export function sortPlayersByRole(players: Player[]): Player[] {
     'All Rounder': 2,
     'Bowler': 3,
   };
-  
+
   return [...players].sort((a, b) => {
     const aOrder = roleOrder[a.role];
     const bOrder = roleOrder[b.role];
@@ -233,9 +256,9 @@ export function sortPlayersByRole(players: Player[]): Player[] {
 }
 
 // Get the display slots for Active 11 with empty placeholders
-export function getActiveRosterSlots(players: Player[]): SlotRequirement[] {
+export function getActiveRosterSlots(players: Player[], config: LeagueConfig = DEFAULT_LEAGUE_CONFIG): SlotRequirement[] {
   const sorted = sortPlayersByRole(players);
-  const counts = countRosterPlayers(players);
+  // const counts = countRosterPlayers(players);
   const slots: SlotRequirement[] = [];
 
   // Track what we've added
@@ -262,18 +285,19 @@ export function getActiveRosterSlots(players: Player[]): SlotRequirement[] {
   }
 
   // Calculate remaining slots needed
-  const totalSlots = ACTIVE_ROSTER_SIZE;
+  const totalSlots = config.activeSize;
   const filledSlots = sorted.length;
   const emptySlots = totalSlots - filledSlots;
 
   if (emptySlots <= 0) return slots;
 
   // Determine minimum requirements not yet met
-  const wkNeeded = Math.max(0, MIN_WICKET_KEEPERS - wkAdded);
-  const batsmenWkNeeded = Math.max(0, MIN_BATSMEN_WK_COMBINED - wkAdded - batAdded);
-  const arNeeded = Math.max(0, MIN_ALL_ROUNDERS - arAdded);
-  const bowlersNeeded = Math.max(0, MIN_BOWLERS - bowlerAdded);
-  const bowlersArNeeded = Math.max(0, MIN_BOWLERS_ALLROUNDERS_COMBINED - bowlerAdded - arAdded);
+  const wkNeeded = Math.max(0, config.minWks - wkAdded);
+  const batsmenWkNeeded = Math.max(0, getMinWkBat(config) - wkAdded - batAdded);
+  const arNeeded = Math.max(0, config.minAllRounders - arAdded);
+  const bowlersNeeded = Math.max(0, config.minBowlers - bowlerAdded);
+  const bowlersArNeeded = Math.max(0, getMinBwlAr(config) - bowlerAdded - arAdded);
+
 
   let slotsToFill = emptySlots;
 
@@ -368,10 +392,10 @@ export function getActiveRosterSlots(players: Player[]): SlotRequirement[] {
 }
 
 // Build an optimal Active 11 from a list of players
-export function buildOptimalActive11(allPlayers: Player[]): { active: Player[]; bench: Player[] } {
+export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig = DEFAULT_LEAGUE_CONFIG): { active: Player[]; bench: Player[] } {
   const active: Player[] = [];
   const bench: Player[] = [];
-  
+
   // Sort by role priority for selection
   const wks = allPlayers.filter(p => p.role === 'Wicket Keeper');
   const bats = allPlayers.filter(p => p.role === 'Batsman');
@@ -382,93 +406,91 @@ export function buildOptimalActive11(allPlayers: Player[]): { active: Player[]; 
   let internationalCount = 0;
 
   const tryAdd = (player: Player): boolean => {
-    if (active.length >= ACTIVE_ROSTER_SIZE) return false;
-    if (player.isInternational && internationalCount >= MAX_INTERNATIONAL_PLAYERS) return false;
-    
+    if (active.length >= config.activeSize) return false;
+    if (player.isInternational && internationalCount >= config.maxInternational) return false;
+
     active.push(player);
     if (player.isInternational) internationalCount++;
     return true;
   };
 
   // First, ensure minimums are met (prefer domestic players first to save international slots)
-  
-  // 1. Add 1 WK (prefer domestic)
+
+  // 1. Add MIN Wks (prefer domestic)
   const domesticWks = wks.filter(p => !p.isInternational);
   const intlWks = wks.filter(p => p.isInternational);
-  if (domesticWks.length > 0) {
-    tryAdd(domesticWks[0]);
-  } else if (intlWks.length > 0) {
-    tryAdd(intlWks[0]);
+  const addedWks: Player[] = [];
+  for (const wk of [...domesticWks, ...intlWks]) {
+    if (addedWks.length >= config.minWks) break;
+    if (tryAdd(wk)) addedWks.push(wk);
   }
 
-  // 2. Add at least 1 AR (prefer domestic)
+  // 2. Add at least MIN AR (prefer domestic)
   const domesticArs = ars.filter(p => !p.isInternational);
   const intlArs = ars.filter(p => p.isInternational);
   const addedArs: Player[] = [];
-  
-  if (domesticArs.length > 0) {
-    if (tryAdd(domesticArs[0])) addedArs.push(domesticArs[0]);
-  } else if (intlArs.length > 0) {
-    if (tryAdd(intlArs[0])) addedArs.push(intlArs[0]);
+  for (const ar of [...domesticArs, ...intlArs]) {
+    if (addedArs.length >= config.minAllRounders) break;
+    if (tryAdd(ar)) addedArs.push(ar);
   }
 
-  // 3. Add at least 3 Bowlers (prefer domestic)
+  // 3. Add at least MIN Bowlers (prefer domestic)
   const domesticBowlers = bowlers.filter(p => !p.isInternational);
   const intlBowlers = bowlers.filter(p => p.isInternational);
   const addedBowlers: Player[] = [];
-  
+
   for (const bowler of [...domesticBowlers, ...intlBowlers]) {
-    if (addedBowlers.length >= 3) break;
+    if (addedBowlers.length >= config.minBowlers) break;
     if (tryAdd(bowler)) addedBowlers.push(bowler);
   }
 
-  // Now check if we have enough bowlers+ARs (need 5 combined)
+  // Now check if we have enough bowlers+ARs (need getMinBwlArCombined)
   const currentBowlerAr = addedBowlers.length + addedArs.length;
-  const neededBowlerAr = Math.max(0, MIN_BOWLERS_ALLROUNDERS_COMBINED - currentBowlerAr);
-  
+  const neededBowlerAr = Math.max(0, getMinBwlAr(config) - currentBowlerAr);
+
   // Add more ARs or Bowlers as needed
   const remainingArs = [...domesticArs, ...intlArs].filter(p => !addedArs.includes(p));
   const remainingBowlers = [...domesticBowlers, ...intlBowlers].filter(p => !addedBowlers.includes(p));
-  
-  let added = 0;
+
+  let bwlArAdded = 0;
   for (const player of [...remainingArs, ...remainingBowlers]) {
-    if (added >= neededBowlerAr) break;
+    if (bwlArAdded >= neededBowlerAr) break;
     if (tryAdd(player)) {
-      added++;
+      bwlArAdded++;
       if (player.role === 'All Rounder') addedArs.push(player);
       else addedBowlers.push(player);
     }
   }
 
-  // 4. Add remaining WK/Batsmen to reach 4-6 combined
+  // 4. Add remaining WK/Batsmen to reach getMinWkBat combined
   const addedWkBat: Player[] = active.filter(p => p.role === 'Wicket Keeper' || p.role === 'Batsman');
-  const neededWkBat = Math.max(0, MIN_BATSMEN_WK_COMBINED - addedWkBat.length);
-  
+  const neededWkBat = Math.max(0, getMinWkBat(config) - addedWkBat.length);
+
   const remainingWks = [...domesticWks, ...intlWks].filter(p => !active.includes(p));
   const domesticBats = bats.filter(p => !p.isInternational);
   const intlBats = bats.filter(p => p.isInternational);
-  
-  let wkBatAdded = 0;
+
+  let wkBatAddedCount = 0;
   for (const player of [...remainingWks, ...domesticBats, ...intlBats]) {
-    if (wkBatAdded >= neededWkBat) break;
-    if (tryAdd(player)) wkBatAdded++;
+    if (wkBatAddedCount >= neededWkBat) break;
+    if (tryAdd(player)) wkBatAddedCount++;
   }
 
-  // 5. Fill remaining slots (up to 11) with any remaining players, respecting max 6 WK+BAT
+  // 5. Fill remaining slots (up to activeSize) with any remaining players, respecting getMaxWkBat combined
   const allRemaining = allPlayers.filter(p => !active.includes(p));
-  const currentWkBat = active.filter(p => p.role === 'Wicket Keeper' || p.role === 'Batsman').length;
-  
+
   for (const player of allRemaining) {
-    if (active.length >= ACTIVE_ROSTER_SIZE) break;
-    
+    if (active.length >= config.activeSize) break;
+
     // Check if adding would exceed WK+BAT limit
     if ((player.role === 'Wicket Keeper' || player.role === 'Batsman')) {
       const futureWkBat = active.filter(p => p.role === 'Wicket Keeper' || p.role === 'Batsman').length + 1;
-      if (futureWkBat > MAX_BATSMEN_WK_COMBINED) continue;
+      if (futureWkBat > getMaxWkBat(config)) continue;
     }
-    
+
     tryAdd(player);
   }
+
 
   // All remaining players go to bench
   for (const player of allPlayers) {

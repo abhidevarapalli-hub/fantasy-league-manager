@@ -1,7 +1,11 @@
 import { ReactNode } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { UserMenu } from '@/components/UserMenu';
+
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -11,6 +15,9 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, title, subtitle, headerActions }: AppLayoutProps) {
+  const navigate = useNavigate();
+  const { leagueId } = useParams();
+
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="flex min-h-screen w-full">
@@ -21,7 +28,19 @@ export function AppLayout({ children, title, subtitle, headerActions }: AppLayou
             <div className="flex items-center justify-between px-4 h-14">
               <div className="flex items-center gap-3 min-w-0">
                 <SidebarTrigger className="h-8 w-8 flex-shrink-0" />
+                {leagueId && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => navigate('/leagues')}
+                    title="Exit League"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                )}
                 <div className="min-w-0">
+
                   <h1 className="text-lg font-bold text-foreground truncate">{title}</h1>
                   {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
                 </div>

@@ -13,8 +13,9 @@ import { Trade } from '@/lib/trade-types';
 import { cn } from '@/lib/utils';
 
 const Trades = () => {
-  const { managers, players } = useGame();
-  const { user, isLeagueManager } = useAuth();
+  const { managers, players, isLeagueManager, loading: gameLoading } = useGame();
+  const { managerProfile } = useAuth();
+
   const {
     trades,
     loading,
@@ -32,9 +33,9 @@ const Trades = () => {
 
   // Current user's manager
   const currentManager = useMemo(() => {
-    if (!user) return null;
-    return managers.find((m) => m.name === user.name) || null;
-  }, [user, managers]);
+    if (!managerProfile) return null;
+    return managers.find((m) => m.id === managerProfile.id) || null;
+  }, [managerProfile, managers]);
 
   const incomingTrades = useMemo(() => {
     if (!currentManager) return [];

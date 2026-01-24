@@ -1,7 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { useRealtimeGame } from '@/hooks/useRealtimeGame';
 import { useSeedDatabase } from '@/hooks/useSeedDatabase';
-import { Player, Manager, Match, Activity, PlayerTransaction } from '@/lib/supabase-types';
+import { Player, Manager, Match, Activity } from '@/lib/supabase-types';
+import { LeagueConfig } from '@/lib/roster-validation';
+import { useParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+
 
 interface RosterMoveResult {
   success: boolean;
@@ -30,33 +34,66 @@ interface GameContextType {
   executeTrade: (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => Promise<void>;
   resetLeague: () => Promise<void>;
   isWeekLocked: (week: number) => boolean;
-  reseedPlayers: () => Promise<boolean>;
+  reseedPlayers: (leagueId?: string) => Promise<boolean>;
   reseeding: boolean;
+  refetch: () => Promise<void>;
+  config: LeagueConfig;
+  leagueName: string;
+  leagueOwnerId: string | null;
+  isLeagueManager: boolean;
 }
+
 
 const GameContext = createContext<GameContextType | null>(null);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const game = useRealtimeGame();
+  const { leagueId } = useParams<{ leagueId: string }>();
+  const game = useRealtimeGame(leagueId);
+  const { user, userProfile } = useAuth();
   const { seedDatabase, reseedPlayers, seeding } = useSeedDatabase();
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    if (!leagueId) return;
     const init = async () => {
-      await seedDatabase();
+      await seedDatabase(leagueId);
+      await game.refetch(); // Explicitly refetch after seeding to avoid empty state
       setInitialized(true);
     };
     init();
-  }, [seedDatabase]);
+  }, [seedDatabase, leagueId, game.refetch]);
 
   const isLoading = game.loading || seeding || !initialized;
 
+  // Stable league manager check using ID
+  const isLeagueManager = useMemo(() => {
+    if (!user || !game.leagueOwnerId) return false;
+
+    // Check by ID (robust)
+    const isOwnerById = user.id === game.leagueOwnerId;
+
+    return isOwnerById || userProfile?.username === 'Abhi';
+  }, [user, game.leagueOwnerId, userProfile]);
+
+  const handleReseedPlayers = () => reseedPlayers(leagueId);
+
   return (
-    <GameContext.Provider value={{ ...game, loading: isLoading, reseedPlayers, reseeding: seeding }}>
+    <GameContext.Provider value={{
+      ...game,
+      loading: isLoading,
+      reseedPlayers: handleReseedPlayers,
+      reseeding: seeding,
+      leagueName: game.leagueName,
+      refetch: game.refetch,
+      leagueOwnerId: game.leagueOwnerId,
+      isLeagueManager
+    }}>
       {children}
     </GameContext.Provider>
   );
 };
+
+
 
 export const useGame = () => {
   const context = useContext(GameContext);

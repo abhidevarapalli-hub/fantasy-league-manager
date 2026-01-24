@@ -1,99 +1,54 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { LogIn, UserPlus, AlertCircle, Trophy, Crown, Loader2 } from 'lucide-react';
+import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
+
+import { AlertCircle, Trophy, Crown, Loader2 } from 'lucide-react';
 import { useAuth, MANAGER_NAMES } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { user, managerProfile, verifyLegacyPassword, selectManager, isLoading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const leagueId = searchParams.get('leagueId');
+  const { user, userProfile, managerProfile, selectManager, fetchManagerProfile, isLoading: authLoading } = useAuth();
 
-  const [activeTab, setActiveTab] = useState('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Claiming state
   const [selectedManager, setSelectedManager] = useState('');
-  const [claimPassword, setClaimPassword] = useState('');
 
   useEffect(() => {
-    // If fully authenticated and has a profile, go to dashboard
-    if (!authLoading && user && managerProfile) {
-      navigate('/');
+    // If we have a user and leagueId but no managerProfile, try to fetch it automatically by user_id
+    if (user && leagueId && !managerProfile && !authLoading) {
+      fetchManagerProfile(undefined, leagueId);
     }
-  }, [user, managerProfile, authLoading, navigate]);
+  }, [user, leagueId, managerProfile, authLoading]);
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    try {
-      if (activeTab === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        // Navigation handled by useEffect
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              username,
-            },
-          },
-        });
-        if (error) throw error;
-        toast.success('Account created! Please check your email to verify.');
+  useEffect(() => {
+    // If fully authenticated and has a profile for this context, go to dashboard
+    if (!authLoading && user && userProfile?.username) {
+      if (!leagueId) {
+        navigate('/leagues');
+      } else if (managerProfile) {
+        navigate(`/${leagueId}`);
       }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [user, userProfile, managerProfile, authLoading, navigate, leagueId]);
 
   const handleGoogleLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/leagues`
+        }
       });
       if (error) throw error;
     } catch (err: any) {
       setError(err.message);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!email) {
-      toast.error('Please enter your email address first');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/reset-password',
-      });
-      if (error) throw error;
-      toast.success('Password reset email sent!');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -105,16 +60,8 @@ const Login = () => {
     setError('');
 
     try {
-      // 1. Verify legacy password locally
-      if (!verifyLegacyPassword(selectedManager, claimPassword)) {
-        throw new Error('Incorrect manager password');
-      }
-
-      // 2. Simply select the manager (saves to localStorage and fetches profile)
-      await selectManager(selectedManager);
-
+      await selectManager(selectedManager, leagueId || undefined);
       toast.success(`Welcome, ${selectedManager}!`);
-      // Navigation handled by useEffect
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -130,76 +77,69 @@ const Login = () => {
     );
   }
 
-  // State 2: Authenticated but No Manager Linked (Identity Selection)
-  if (user && !managerProfile) {
+  // State: Authenticated but missing username (Handled by App.tsx ProtectedRoute usually, but here for safety)
+  if (user && !userProfile?.username) {
+    return <Navigate to="/leagues/setup" replace />;
+  }
+
+  // State: Authenticated with username, but viewing legacy league without a linked manager
+  if (user && leagueId === 'legacy' && !managerProfile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md border-2 border-primary/10 shadow-2xl glass-morphism">
           <CardHeader className="text-center">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-              <Crown className="w-8 h-8 text-primary" />
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 border-2 border-primary/20">
+              <Crown className="w-10 h-10 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Claim Your Profile</CardTitle>
-            <CardDescription>
-              Link your account to an existing manager profile.
+            <CardTitle className="text-3xl font-black italic uppercase tracking-tighter">Enter Legacy League</CardTitle>
+            <CardDescription className="text-base font-medium">
+              Claim your original identity from the historic 2024 season.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleClaimManager} className="space-y-4">
+            <form onSubmit={handleClaimManager} className="space-y-6">
               {error && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
-                  <p className="text-sm text-destructive">{error}</p>
+                <div className="flex items-center gap-2 p-4 rounded-xl bg-destructive/10 border border-destructive/20">
+                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                  <p className="text-sm font-semibold text-destructive">{error}</p>
                 </div>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="manager">Select Manager</Label>
+                <Label htmlFor="manager" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Select Your Name</Label>
                 <Select value={selectedManager} onValueChange={setSelectedManager}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose profile..." />
+                  <SelectTrigger className="h-14 text-lg font-bold bg-background/50 border-primary/20">
+                    <SelectValue placeholder="Which one are you?" />
                   </SelectTrigger>
                   <SelectContent>
                     {MANAGER_NAMES.map(name => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                      <SelectItem key={name} value={name} className="py-3 text-lg font-medium">{name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="claim-password">Verification Password</Label>
-                <Input
-                  id="claim-password"
-                  type="password"
-                  placeholder="Enter the legacy password"
-                  value={claimPassword}
-                  onChange={(e) => setClaimPassword(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Use the password you previously used for this manager.
-                </p>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Claim Profile
-              </Button>
-
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={() => supabase.auth.signOut()}
-              >
-                Sign Out
+              <Button type="submit" className="w-full h-14 text-lg font-black italic uppercase tracking-tight shadow-lg shadow-primary/20" disabled={isLoading || !selectedManager}>
+                {isLoading ? <Loader2 className="w-5 h-5 mr-3 animate-spin" /> : null}
+                Claim Legacy Profile
               </Button>
             </form>
           </CardContent>
+          <CardFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full text-muted-foreground hover:text-foreground"
+              onClick={() => navigate('/leagues')}
+            >
+              Go Back
+            </Button>
+          </CardFooter>
         </Card>
       </div>
     );
   }
+
 
   // State 1: Authentication (Google Only)
   return (
@@ -209,14 +149,14 @@ const Login = () => {
           <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
             <Trophy className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold">IPL Fantasy League</h1>
+          <h1 className="text-2xl font-bold">IPL Fantasy Manager</h1>
           <p className="text-muted-foreground mt-1">Sign in with your Google account</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-center">Authentication Required</CardTitle>
-            <CardDescription className="text-center">Please sign in to manage your team and follow the league</CardDescription>
+            <CardTitle className="text-center transition-colors">Authentication Required</CardTitle>
+            <CardDescription className="text-center transition-colors">Please sign in to manage your team and follow the league</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
@@ -258,6 +198,12 @@ const Login = () => {
             </p>
           </CardFooter>
         </Card>
+
+        {leagueId && (
+          <p className="text-center text-sm text-muted-foreground">
+            Joining League ID: <span className="font-mono text-primary">{leagueId}</span>
+          </p>
+        )}
       </div>
     </div>
   );

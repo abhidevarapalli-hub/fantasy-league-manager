@@ -280,103 +280,58 @@ const MANAGERS_DATA = [
 export const useSeedDatabase = () => {
   const [seeding, setSeeding] = useState(false);
 
-  const seedDatabase = useCallback(async () => {
+  const seedDatabase = useCallback(async (leagueId?: string) => {
+    if (!leagueId) return false;
     setSeeding(true);
     try {
-      // Check if data already exists
-      const { data: existingPlayers } = await supabase.from("players").select("id").limit(1);
-      const { data: existingManagers } = await supabase.from("managers").select("id").limit(1);
+      // Check if data already exists for this league
+      const { data: existingPlayers } = await (supabase.from("players").select("id").eq("league_id", leagueId).limit(1) as any);
+      const { data: existingManagers } = await (supabase.from("managers").select("id").eq("league_id", leagueId).limit(1) as any);
 
       const hasPlayers = (existingPlayers?.length ?? 0) > 0;
       const hasManagers = (existingManagers?.length ?? 0) > 0;
 
       if (hasPlayers && hasManagers) {
-        console.log("Database already seeded");
+        console.log(`League ${leagueId} already seeded`);
         return true;
       }
 
       // Seed players
       if (!hasPlayers) {
         // Add is_international flag to players data
-        const playersWithInternational = PLAYERS_DATA.map((player) => ({
+        const playersWithData = PLAYERS_DATA.map((player) => ({
           ...player,
           is_international: isInternationalPlayer(player.name),
+          league_id: leagueId,
         }));
-        const { error: playersError } = await supabase.from("players").insert(playersWithInternational);
+        const { error: playersError } = await (supabase.from("players").insert(playersWithData) as any);
         if (playersError) {
           console.error("Error seeding players:", playersError);
-          // Don't throw here, try to continue with managers
         } else {
-          console.log("Players seeded successfully");
+          console.log("Players seeded successfully for league", leagueId);
         }
       }
 
-      // Seed managers and get their IDs
-      if (!hasManagers) {
-        const { data: insertedManagers, error: managersError } = await supabase
+      // ONLY seed default managers for the legacy case or if explicitly null
+      // For new dynamic leagues, we don't automatedly seed 8 managers.
+      const isLegacy = !leagueId || leagueId === 'legacy';
+
+      if (!hasManagers && isLegacy) {
+        const managersWithLeague = MANAGERS_DATA.map(m => ({ ...m, league_id: leagueId === 'legacy' ? null : leagueId }));
+        const { data: insertedManagers, error: managersError } = await (supabase
           .from("managers")
-          .insert(MANAGERS_DATA)
-          .select();
+          .insert(managersWithLeague)
+          .select() as any);
 
         if (managersError) {
           console.error("Error seeding managers:", managersError);
           throw managersError;
         }
-        console.log("Managers seeded successfully");
-
-        // Create schedule using manager IDs
-        if (insertedManagers && insertedManagers.length === 8) {
-          const managerIds = insertedManagers.map((m) => m.id);
-          const [m1, m2, m3, m4, m5, m6, m7, m8] = managerIds;
-
-          const scheduleData = [
-            // Week 1
-            { week: 1, home_manager_id: m1, away_manager_id: m8 },
-            { week: 1, home_manager_id: m4, away_manager_id: m6 },
-            { week: 1, home_manager_id: m7, away_manager_id: m5 },
-            { week: 1, home_manager_id: m3, away_manager_id: m2 },
-            // Week 2
-            { week: 2, home_manager_id: m1, away_manager_id: m3 },
-            { week: 2, home_manager_id: m6, away_manager_id: m2 },
-            { week: 2, home_manager_id: m7, away_manager_id: m4 },
-            { week: 2, home_manager_id: m8, away_manager_id: m5 },
-            // Week 3
-            { week: 3, home_manager_id: m1, away_manager_id: m2 },
-            { week: 3, home_manager_id: m4, away_manager_id: m5 },
-            { week: 3, home_manager_id: m7, away_manager_id: m3 },
-            { week: 3, home_manager_id: m8, away_manager_id: m6 },
-            // Week 4
-            { week: 4, home_manager_id: m1, away_manager_id: m6 },
-            { week: 4, home_manager_id: m4, away_manager_id: m2 },
-            { week: 4, home_manager_id: m7, away_manager_id: m8 },
-            { week: 4, home_manager_id: m5, away_manager_id: m3 },
-            // Week 5
-            { week: 5, home_manager_id: m1, away_manager_id: m7 },
-            { week: 5, home_manager_id: m6, away_manager_id: m3 },
-            { week: 5, home_manager_id: m5, away_manager_id: m2 },
-            { week: 5, home_manager_id: m4, away_manager_id: m8 },
-            // Week 6
-            { week: 6, home_manager_id: m1, away_manager_id: m4 },
-            { week: 6, home_manager_id: m7, away_manager_id: m2 },
-            { week: 6, home_manager_id: m5, away_manager_id: m6 },
-            { week: 6, home_manager_id: m8, away_manager_id: m3 },
-            // Week 7
-            { week: 7, home_manager_id: m1, away_manager_id: m5 },
-            { week: 7, home_manager_id: m4, away_manager_id: m3 },
-            { week: 7, home_manager_id: m7, away_manager_id: m6 },
-            { week: 7, home_manager_id: m8, away_manager_id: m2 },
-          ];
-
-          const { error: scheduleError } = await supabase.from("schedule").insert(scheduleData);
-          if (scheduleError) {
-            console.error("Error seeding schedule:", scheduleError);
-            throw scheduleError;
-          }
-          console.log("Schedule seeded successfully");
-        }
+        console.log("Managers seeded successfully for legacy league");
       }
 
       return true;
+
     } catch (error) {
       console.error("Error seeding database:", error);
       return false;
@@ -385,25 +340,26 @@ export const useSeedDatabase = () => {
     }
   }, []);
 
-  const reseedPlayers = useCallback(async () => {
+  const reseedPlayers = useCallback(async (leagueId?: string) => {
+    if (!leagueId) return false;
     setSeeding(true);
     try {
-      // First, we need to clear all manager rosters since they reference player IDs
-      const { error: clearRostersError } = await supabase
+      // First, we need to clear all manager rosters for this league
+      const { error: clearRostersError } = await (supabase
         .from("managers")
         .update({ roster: [], bench: [] })
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // Update all
+        .eq("league_id", leagueId) as any);
 
       if (clearRostersError) {
         console.error("Error clearing rosters:", clearRostersError);
         throw clearRostersError;
       }
 
-      // Delete all existing players
-      const { error: deleteError } = await supabase
+      // Delete all existing players for this league
+      const { error: deleteError } = await (supabase
         .from("players")
         .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+        .eq("league_id", leagueId) as any);
 
       if (deleteError) {
         console.error("Error deleting players:", deleteError);
@@ -411,17 +367,18 @@ export const useSeedDatabase = () => {
       }
 
       // Insert new players
-      const playersWithInternational = PLAYERS_DATA.map((player) => ({
+      const playersWithData = PLAYERS_DATA.map((player) => ({
         ...player,
         is_international: isInternationalPlayer(player.name),
+        league_id: leagueId,
       }));
-      const { error: insertError } = await supabase.from("players").insert(playersWithInternational);
+      const { error: insertError } = await (supabase.from("players").insert(playersWithData) as any);
       if (insertError) {
         console.error("Error inserting players:", insertError);
         throw insertError;
       }
 
-      console.log("Players reseeded successfully");
+      console.log("Players reseeded successfully for league", leagueId);
       return true;
     } catch (error) {
       console.error("Error reseeding players:", error);

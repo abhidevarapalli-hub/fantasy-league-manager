@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 
-const ROSTER_CAP = 14;
 const IPL_TEAMS = ['MI', 'KKR', 'CSK', 'RR', 'RCB', 'DC', 'GT', 'LSG', 'PBKS', 'SRH'];
 
 const Admin = () => {
@@ -32,15 +31,22 @@ const Admin = () => {
     dropPlayerOnly,
     reseedPlayers,
     reseeding,
+    config,
+    isLeagueManager,
+    loading: gameLoading,
   } = useGame();
-  const { isLeagueManager } = useAuth();
+
+  const ROSTER_CAP = config.activeSize + config.benchSize;
 
   // If not league manager, redirect home
   useEffect(() => {
-    if (!isLeagueManager) {
+    if (!gameLoading && !isLeagueManager) {
+      console.log("Redirecting unauthorized user from Admin suite");
       navigate('/');
     }
-  }, [isLeagueManager, navigate]);
+  }, [isLeagueManager, gameLoading, navigate]);
+
+
 
   const [tradeManager1, setTradeManager1] = useState('');
   const [tradeManager2, setTradeManager2] = useState('');
@@ -240,8 +246,22 @@ const Admin = () => {
     finalizeWeekScores(weekNum);
   };
 
+  if (gameLoading) {
+    return (
+      <AppLayout title="Admin Suite" subtitle="Checking credentials...">
+        <div className="min-h-[400px] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <RefreshCw className="w-8 h-8 animate-spin text-primary opacity-50" />
+            <p className="text-muted-foreground font-medium animate-pulse">Verifying League Ownership...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout title="Admin Suite" subtitle="League management tools">
+
       <div className="px-4 py-4 space-y-6">
         {/* Score Input */}
         <section className="bg-card rounded-xl border border-border p-4">
@@ -257,11 +277,12 @@ const Admin = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7].map(week => (
-                    <SelectItem key={week} value={week.toString()}>
-                      Week {week}
+                  {Array.from({ length: Math.max(7, ...schedule.map(m => m.week)) }).map((_, i) => (
+                    <SelectItem key={i + 1} value={(i + 1).toString()}>
+                      Week {i + 1}
                     </SelectItem>
                   ))}
+
                 </SelectContent>
               </Select>
             </div>

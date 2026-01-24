@@ -1,6 +1,10 @@
-import { LogOut, RefreshCw, Shield } from 'lucide-react';
+import { LogOut, RefreshCw, Shield, LayoutGrid } from 'lucide-react';
+
 import { useAuth } from '@/contexts/AuthContext';
+import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
+
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,43 +16,84 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export const UserMenu = () => {
-  const { managerProfile, signOut } = useAuth();
+  const { managerProfile, userProfile, signOut, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { leagueId } = useParams();
 
-  if (!managerProfile) return null;
+  // Robust LM check from GameContext if possible
+  let gameContext;
+  try {
+    gameContext = useGame();
+  } catch (e) { }
+
+  const isLeagueManager = gameContext ? gameContext.isLeagueManager : false;
+  const gameLoading = gameContext ? gameContext.loading : false;
+
+  // If we're loading either auth or game data, show a subtle loading state
+  if (authLoading || (leagueId && gameLoading && !managerProfile)) {
+    return (
+      <div className="h-9 px-3 flex items-center justify-center rounded-full border border-border/50 opacity-50">
+        <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!managerProfile && !userProfile) return null;
+
+  const displayName = managerProfile?.name || userProfile?.username || 'User';
+  const displayTeam = managerProfile?.teamName || (leagueId ? 'Joining...' : '');
+
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2">
+        <Button variant="ghost" size="sm" className="gap-2 h-9 px-3 hover:bg-muted/50 rounded-full border border-border/50">
           <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="text-xs font-bold text-primary">
-              {managerProfile.name.charAt(0).toUpperCase()}
+            <span className="text-[10px] font-bold text-primary">
+              {displayName.charAt(0).toUpperCase()}
             </span>
           </div>
-          <span className="text-sm font-medium">{managerProfile.name}</span>
-          {managerProfile.is_league_manager && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-primary/30">
-              <Shield className="w-2.5 h-2.5 mr-0.5" />
+          <div className="flex flex-col items-start leading-tight">
+            <span className="text-xs font-bold text-foreground">{displayName}</span>
+            {displayTeam && (
+              <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{displayTeam}</span>
+            )}
+          </div>
+          {isLeagueManager && (
+            <Badge variant="outline" className="text-[9px] h-4 px-1 py-0 bg-primary/10 text-primary border-primary/30">
               LM
             </Badge>
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel className="font-normal">
+      <DropdownMenuContent align="end" className="w-56 mt-2 shadow-xl border-border">
+        <DropdownMenuLabel className="font-normal italic">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{managerProfile.name}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {managerProfile.is_league_manager ? 'League Manager' : 'Team Manager'}
+            <p className="text-sm font-bold leading-none">{displayTeam || displayName}</p>
+            <p className="text-[10px] leading-none text-muted-foreground uppercase tracking-tighter">
+              {isLeagueManager ? 'League Manager' : 'Team Manager'}
             </p>
           </div>
         </DropdownMenuLabel>
+
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
-          <LogOut className="w-4 h-4 mr-2" />
+
+        {leagueId && (
+          <>
+            <DropdownMenuItem onClick={() => navigate('/leagues')} className="gap-2">
+              <LayoutGrid className="w-4 h-4" />
+              Switch League
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+
+        <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive gap-2">
+          <LogOut className="w-4 h-4" />
           Sign Out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 };
+

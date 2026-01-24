@@ -7,8 +7,8 @@ import { Lock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Draft = () => {
-  const { loading } = useGame();
-  const { isLeagueManager } = useAuth();
+  const { loading, isLeagueManager } = useGame();
+
 
   if (loading) {
     return (
@@ -19,8 +19,8 @@ const Draft = () => {
   }
 
   return (
-    <AppLayout 
-      title="Draft Board" 
+    <AppLayout
+      title="Draft Board"
       subtitle="8 teams × 14 rounds snake draft"
       headerActions={
         !isLeagueManager ? <Lock className="w-4 h-4 text-muted-foreground" /> : null

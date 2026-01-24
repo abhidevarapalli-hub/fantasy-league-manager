@@ -8,14 +8,12 @@ import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ACTIVE_ROSTER_SIZE,
-  TOTAL_ROSTER_SIZE,
-  MAX_INTERNATIONAL_PLAYERS,
   getActiveRosterSlots,
   validateActiveRoster,
   sortPlayersByRole,
   canSwapInActive,
 } from '@/lib/roster-validation';
+
 import { Player } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,7 +36,8 @@ const roleIcons: Record<string, string> = {
 const TeamView = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
-  const { managers, players, moveToActive, moveToBench, dropPlayerOnly, swapPlayers } = useGame();
+  const { managers, players, moveToActive, moveToBench, dropPlayerOnly, swapPlayers, config } = useGame();
+
   const { canEditTeam } = useAuth();
 
   // Swap states
@@ -78,12 +77,15 @@ const TeamView = () => {
   const totalPlayers = activePlayers.length + benchPlayers.length;
 
   // Calculate max bench size based on active roster
-  const maxBenchSize = TOTAL_ROSTER_SIZE - ACTIVE_ROSTER_SIZE;
+  // Calculate max bench size based on active roster
+  const maxBenchSize = config.benchSize;
+  const totalRosterCap = config.activeSize + config.benchSize;
 
-  const validation = validateActiveRoster(activePlayers);
-  const slots = getActiveRosterSlots(activePlayers);
+  const validation = validateActiveRoster(activePlayers, config);
+  const slots = getActiveRosterSlots(activePlayers, config);
   const internationalCount = activePlayers.filter(p => p.isInternational).length;
   const sortedBench = sortPlayersByRole(benchPlayers);
+
 
   const handleMoveToActive = async (playerId: string) => {
     const result = await moveToActive(teamId!, playerId);
@@ -115,11 +117,12 @@ const TeamView = () => {
     let swapValidation;
     if (playerToSwap.from === 'bench') {
       // Bench player going to active, target (active) player leaving
-      swapValidation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer);
+      swapValidation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer, config);
     } else {
       // Active player going to bench, target (bench) player coming to active
-      swapValidation = canSwapInActive(activePlayers, targetPlayer, playerToSwap.player);
+      swapValidation = canSwapInActive(activePlayers, targetPlayer, playerToSwap.player, config);
     }
+
 
     if (!swapValidation.isValid) {
       toast.error(swapValidation.errors[0] || 'Invalid swap');
@@ -140,22 +143,23 @@ const TeamView = () => {
   return (
     <AppLayout
       title={manager.teamName}
-      subtitle={`${manager.name} • ${totalPlayers}/${TOTAL_ROSTER_SIZE} players`}
+      subtitle={`${manager.name} • ${totalPlayers}/${totalRosterCap} players`}
       headerActions={
         <>
           <div className={cn(
             "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
-            internationalCount > MAX_INTERNATIONAL_PLAYERS
+            internationalCount > config.maxInternational
               ? "bg-destructive/20 text-destructive"
               : "bg-primary/20 text-primary"
           )}>
             <Plane className="w-3 h-3" />
-            {internationalCount}/{MAX_INTERNATIONAL_PLAYERS}
+            {internationalCount}/{config.maxInternational}
           </div>
           {!canEdit && <Lock className="w-4 h-4 text-muted-foreground" />}
         </>
       }
     >
+
       <div className="px-4 py-4 space-y-6">
         {/* Back button */}
         <Button
@@ -229,8 +233,9 @@ const TeamView = () => {
             </div>
             <div>
               <h2 className="font-semibold text-foreground">Active 11</h2>
-              <p className="text-xs text-muted-foreground">Starting lineup ({activePlayers.length}/{ACTIVE_ROSTER_SIZE})</p>
+              <p className="text-xs text-muted-foreground">Starting lineup ({activePlayers.length}/{config.activeSize})</p>
             </div>
+
           </div>
 
           <div className="space-y-2">
@@ -284,7 +289,8 @@ const TeamView = () => {
                 player={player}
                 isOwned
                 onSwap={canEdit && activePlayers.length > 0 ? () => handleStartSwap(player, 'bench') : undefined}
-                onMoveUp={canEdit && activePlayers.length < ACTIVE_ROSTER_SIZE ? () => handleMoveToActive(player.id) : undefined}
+                onMoveUp={canEdit && activePlayers.length < config.activeSize ? () => handleMoveToActive(player.id) : undefined}
+
                 onDrop={canEdit ? () => dropPlayerOnly(teamId!, player.id) : undefined}
               />
             ))}
@@ -332,8 +338,9 @@ const TeamView = () => {
                 // When swapping from active to bench: check if bringing bench player TO active is valid
                 // When swapping from bench to active: check if bringing bench player TO active is valid
                 const isValidSwap = playerToSwap.from === 'bench'
-                  ? canSwapInActive(activePlayers, playerToSwap.player, player).isValid
-                  : canSwapInActive(activePlayers, player, playerToSwap.player).isValid;
+                  ? canSwapInActive(activePlayers, playerToSwap.player, player, config).isValid
+                  : canSwapInActive(activePlayers, player, playerToSwap.player, config).isValid;
+
 
                 return (
                   <button

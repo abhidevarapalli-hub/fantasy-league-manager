@@ -2,14 +2,27 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { Player, Manager, Match, Activity, PlayerTransaction } from "@/lib/supabase-types";
-import { 
-  ACTIVE_ROSTER_SIZE, 
-  BENCH_SIZE, 
+import {
+  DEFAULT_LEAGUE_CONFIG,
+  LeagueConfig,
   validateActiveRoster,
   canAddToActive,
 } from "@/lib/roster-validation";
 
-const ROSTER_CAP = ACTIVE_ROSTER_SIZE + BENCH_SIZE; // 25 total
+interface DbLeague {
+  id: string;
+  name: string;
+  league_manager_id: string;
+  manager_count: number;
+  active_size: number;
+  bench_size: number;
+  min_batsmen: number;
+  max_batsmen: number;
+  min_bowlers: number;
+  min_wks: number;
+  min_all_rounders: number;
+  max_international: number;
+}
 
 // Helper to map DB rows to frontend types
 const mapDbPlayer = (db: Tables<"players">): Player => ({
@@ -51,7 +64,8 @@ const mapDbTransaction = (db: Tables<"transactions">): Activity => ({
   managerTeamName: db.manager_team_name || undefined,
 });
 
-export const useRealtimeGame = () => {
+export const useRealtimeGame = (leagueId?: string) => {
+  const [config, setConfig] = useState<LeagueConfig>(DEFAULT_LEAGUE_CONFIG);
   const [players, setPlayers] = useState<Player[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
   const [schedule, setSchedule] = useState<Match[]>([]);
@@ -59,51 +73,107 @@ export const useRealtimeGame = () => {
   const [loading, setLoading] = useState(true);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [currentManagerId, setCurrentManagerId] = useState("");
+  const [leagueName, setLeagueName] = useState("IPL Fantasy");
+  const [leagueOwnerId, setLeagueOwnerId] = useState<string | null>(null);
+
+  const ROSTER_CAP = config.activeSize + config.benchSize;
+
+  // Data fetching logic
+  const fetchAllData = useCallback(async () => {
+    if (!leagueId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const isLegacy = leagueId === 'legacy';
+
+      if (!isLegacy) {
+        // Fetch League Config first
+        const { data: leagueData } = await (supabase
+          .from("leagues" as any)
+          .select("*")
+          .eq("id", leagueId)
+          .single() as any);
+
+        if (leagueData) {
+          setLeagueName(leagueData.name);
+          setLeagueOwnerId(leagueData.league_manager_id);
+          setConfig({
+
+
+            managerCount: leagueData.manager_count,
+            activeSize: leagueData.active_size,
+            benchSize: leagueData.bench_size,
+            minBatsmen: leagueData.min_batsmen,
+            maxBatsmen: leagueData.max_batsmen,
+            minBowlers: leagueData.min_bowlers,
+            minWks: leagueData.min_wks,
+            minAllRounders: leagueData.min_all_rounders,
+            maxInternational: leagueData.max_international,
+          });
+        }
+      } else {
+        setLeagueName("Legacy League");
+        setConfig(DEFAULT_LEAGUE_CONFIG);
+      }
+
+      const buildQuery = (table: string) => {
+        let query = supabase.from(table as any).select("*");
+        if (isLegacy) {
+          return query.is("league_id", null);
+        }
+        return query.eq("league_id", leagueId);
+      };
+
+      const [playersRes, managersRes, scheduleRes, transactionsRes] = await Promise.all([
+        (buildQuery("players") as any).order("name"),
+        (buildQuery("managers") as any).order("name"),
+        (buildQuery("schedule") as any).order("week").order("created_at"),
+        (buildQuery("transactions") as any).order("created_at", { ascending: false }).limit(50),
+      ]);
+
+
+      if (playersRes.data) {
+        setPlayers(playersRes.data.map(mapDbPlayer));
+      }
+      if (managersRes.data) {
+        const mappedManagers = managersRes.data.map(mapDbManager);
+        setManagers(mappedManagers);
+        if (mappedManagers.length > 0 && !currentManagerId) {
+          setCurrentManagerId(mappedManagers[0].id);
+        }
+      }
+      if (scheduleRes.data) {
+        setSchedule(scheduleRes.data.map(mapDbSchedule));
+      }
+      if (transactionsRes.data) {
+        setActivities(transactionsRes.data.map(mapDbTransaction));
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [leagueId, currentManagerId]);
 
   // Initial data fetch
   useEffect(() => {
-    const fetchAllData = async () => {
-      setLoading(true);
-      try {
-        const [playersRes, managersRes, scheduleRes, transactionsRes] = await Promise.all([
-          supabase.from("players").select("*").order("name"),
-          supabase.from("managers").select("*").order("name"),
-          supabase.from("schedule").select("*").order("week").order("created_at"),
-          supabase.from("transactions").select("*").order("created_at", { ascending: false }).limit(50),
-        ]);
-
-        if (playersRes.data) {
-          setPlayers(playersRes.data.map(mapDbPlayer));
-        }
-        if (managersRes.data) {
-          const mappedManagers = managersRes.data.map(mapDbManager);
-          setManagers(mappedManagers);
-          if (mappedManagers.length > 0 && !currentManagerId) {
-            setCurrentManagerId(mappedManagers[0].id);
-          }
-        }
-        if (scheduleRes.data) {
-          setSchedule(scheduleRes.data.map(mapDbSchedule));
-        }
-        if (transactionsRes.data) {
-          setActivities(transactionsRes.data.map(mapDbTransaction));
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchAllData();
-  }, []);
+  }, [fetchAllData]);
+
 
   // Real-time subscriptions
   useEffect(() => {
+    if (!leagueId) return;
+
+    const isLegacy = leagueId === 'legacy';
+    const filter = isLegacy ? `league_id=is.null` : `league_id=eq.${leagueId}`;
+
     const channel = supabase
-      .channel("game-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "players" }, (payload) => {
-        // console.log('Players change:', payload);
+      .channel(`game-changes-${leagueId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "players", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
           setPlayers((prev) => [...prev, mapDbPlayer(payload.new as Tables<"players">)]);
         } else if (payload.eventType === "UPDATE") {
@@ -114,8 +184,7 @@ export const useRealtimeGame = () => {
           setPlayers((prev) => prev.filter((p) => p.id !== payload.old.id));
         }
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "managers" }, (payload) => {
-        console.log("Managers change:", payload);
+      .on("postgres_changes", { event: "*", schema: "public", table: "managers", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
           setManagers((prev) => [...prev, mapDbManager(payload.new as Tables<"managers">)]);
         } else if (payload.eventType === "UPDATE") {
@@ -126,8 +195,7 @@ export const useRealtimeGame = () => {
           setManagers((prev) => prev.filter((m) => m.id !== payload.old.id));
         }
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "schedule" }, (payload) => {
-        console.log("Schedule change:", payload);
+      .on("postgres_changes", { event: "*", schema: "public", table: "schedule", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
           setSchedule((prev) => [...prev, mapDbSchedule(payload.new as Tables<"schedule">)]);
         } else if (payload.eventType === "UPDATE") {
@@ -138,8 +206,7 @@ export const useRealtimeGame = () => {
           setSchedule((prev) => prev.filter((s) => s.id !== payload.old.id));
         }
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, (payload) => {
-        console.log("Transactions change:", payload);
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
           setActivities((prev) => [mapDbTransaction(payload.new as Tables<"transactions">), ...prev]);
         } else if (payload.eventType === "UPDATE") {
@@ -152,12 +219,12 @@ export const useRealtimeGame = () => {
       })
       .subscribe();
 
+
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [leagueId]);
 
-  // Helper functions
   const getFreeAgents = useCallback(() => {
     const rosteredIds = new Set(managers.flatMap((m) => [...m.activeRoster, ...m.bench]));
     return players.filter((p) => !rosteredIds.has(p.id));
@@ -172,7 +239,6 @@ export const useRealtimeGame = () => {
     [managers],
   );
 
-  // Actions
   const addFreeAgent = async (managerId: string, playerId: string, dropPlayerId?: string) => {
     const manager = managers.find((m) => m.id === managerId);
     const player = players.find((p) => p.id === playerId);
@@ -183,10 +249,8 @@ export const useRealtimeGame = () => {
     const rosterCount = manager.activeRoster.length + manager.bench.length;
     if (rosterCount >= ROSTER_CAP && !dropPlayerId) return;
 
-    // Determine if dropped player was in active roster
     const droppedFromActive = dropPlayerId && manager.activeRoster.includes(dropPlayerId);
-    
-    // Update manager roster
+
     let newRoster = [...manager.activeRoster];
     let newBench = [...manager.bench];
 
@@ -194,25 +258,20 @@ export const useRealtimeGame = () => {
       newRoster = newRoster.filter((id) => id !== dropPlayerId);
       newBench = newBench.filter((id) => id !== dropPlayerId);
     }
-    
-    // Try to place new player in same location as dropped player
+
     if (droppedFromActive) {
-      // Check if adding to active would be valid
       const currentActivePlayers = newRoster.map(id => players.find(p => p.id === id)).filter(Boolean) as Player[];
-      const validation = canAddToActive(currentActivePlayers, player);
-      
+      const validation = canAddToActive(currentActivePlayers, player, config);
+
       if (validation.isValid) {
         newRoster = [...newRoster, playerId];
       } else {
-        // Cannot add to active, put on bench
         newBench = [...newBench, playerId];
       }
     } else {
-      // Dropped from bench or no drop - add to bench
       newBench = [...newBench, playerId];
     }
 
-    // Update manager in database
     const { error: updateError } = await supabase
       .from("managers")
       .update({ roster: newRoster, bench: newBench })
@@ -223,7 +282,6 @@ export const useRealtimeGame = () => {
       return;
     }
 
-    // Create transaction record
     const playerTransactions: PlayerTransaction[] = [];
     if (dropPlayer) {
       playerTransactions.push({
@@ -245,13 +303,14 @@ export const useRealtimeGame = () => {
       description = `${manager.teamName} dropped ${dropPlayer.name}, added ${player.name}`;
     }
 
-    await supabase.from("transactions").insert({
-      type: "add" as const,
+    await (supabase.from("transactions").insert({
+      type: "add" as any,
       manager_id: managerId,
       manager_team_name: manager.teamName,
       description,
-      players: playerTransactions as unknown as undefined,
-    });
+      players: playerTransactions as any,
+      league_id: leagueId,
+    }) as any);
   };
 
   const dropPlayerOnly = async (managerId: string, playerId: string) => {
@@ -280,31 +339,31 @@ export const useRealtimeGame = () => {
       team: player.team,
     };
 
-    await supabase.from("transactions").insert({
-      type: "drop" as const,
+    await (supabase.from("transactions").insert({
+      type: "drop" as any,
       manager_id: managerId,
       manager_team_name: manager.teamName,
       description: `${manager.teamName} dropped ${player.name}`,
-      players: [playerTx] as unknown as undefined,
-    });
+      players: [playerTx] as any,
+      league_id: leagueId,
+    }) as any);
   };
 
   const moveToActive = async (managerId: string, playerId: string): Promise<{ success: boolean; error?: string }> => {
     const manager = managers.find((m) => m.id === managerId);
     const player = players.find((p) => p.id === playerId);
-    
+
     if (!manager || !player) return { success: false, error: "Manager or player not found" };
-    if (manager.activeRoster.length >= ACTIVE_ROSTER_SIZE) {
-      return { success: false, error: `Active roster is full (${ACTIVE_ROSTER_SIZE} players max)` };
+    if (manager.activeRoster.length >= config.activeSize) {
+      return { success: false, error: `Active roster is full (${config.activeSize} players max)` };
     }
 
-    // Validate the move
     const currentActivePlayers = manager.activeRoster
       .map(id => players.find(p => p.id === id))
       .filter(Boolean) as Player[];
-    
-    const validation = canAddToActive(currentActivePlayers, player);
-    
+
+    const validation = canAddToActive(currentActivePlayers, player, config);
+
     if (!validation.isValid) {
       return { success: false, error: validation.errors[0] };
     }
@@ -319,8 +378,8 @@ export const useRealtimeGame = () => {
   const moveToBench = async (managerId: string, playerId: string): Promise<{ success: boolean; error?: string }> => {
     const manager = managers.find((m) => m.id === managerId);
     if (!manager) return { success: false, error: "Manager not found" };
-    if (manager.bench.length >= BENCH_SIZE) {
-      return { success: false, error: `Bench is full (${BENCH_SIZE} players max)` };
+    if (manager.bench.length >= config.benchSize) {
+      return { success: false, error: `Bench is full (${config.benchSize} players max)` };
     }
 
     const newBench = [...manager.bench, playerId];
@@ -331,8 +390,8 @@ export const useRealtimeGame = () => {
   };
 
   const swapPlayers = async (
-    managerId: string, 
-    player1Id: string, 
+    managerId: string,
+    player1Id: string,
     player2Id: string
   ): Promise<{ success: boolean; error?: string }> => {
     const manager = managers.find((m) => m.id === managerId);
@@ -341,18 +400,15 @@ export const useRealtimeGame = () => {
     const player1InActive = manager.activeRoster.includes(player1Id);
     const player2InActive = manager.activeRoster.includes(player2Id);
 
-    // Swap the players
     let newRoster = [...manager.activeRoster];
     let newBench = [...manager.bench];
 
     if (player1InActive && !player2InActive) {
-      // Player 1 is in active, player 2 is in bench -> swap them
       newRoster = newRoster.filter(id => id !== player1Id);
       newRoster.push(player2Id);
       newBench = newBench.filter(id => id !== player2Id);
       newBench.push(player1Id);
     } else if (!player1InActive && player2InActive) {
-      // Player 1 is in bench, player 2 is in active -> swap them
       newRoster = newRoster.filter(id => id !== player2Id);
       newRoster.push(player1Id);
       newBench = newBench.filter(id => id !== player1Id);
@@ -368,17 +424,16 @@ export const useRealtimeGame = () => {
   const updateMatchScore = async (week: number, matchIndex: number, homeScore: number, awayScore: number) => {
     const weekMatches = schedule.filter((m) => m.week === week);
     if (matchIndex >= weekMatches.length) return;
-
     const match = weekMatches[matchIndex];
-
     await supabase.from("schedule").update({ home_score: homeScore, away_score: awayScore }).eq("id", match.id);
   };
 
   const finalizeWeekScores = async (week: number) => {
-    // Fetch fresh schedule data from database to avoid stale state issues
+    if (!leagueId) return;
     const { data: freshSchedule, error: scheduleError } = await supabase
       .from("schedule")
       .select("*")
+      .eq("league_id", leagueId)
       .eq("week", week);
 
     if (scheduleError || !freshSchedule) {
@@ -389,59 +444,47 @@ export const useRealtimeGame = () => {
     const weekMatches = freshSchedule.map(mapDbSchedule);
     const allHaveScores = weekMatches.every((m) => m.homeScore !== undefined && m.awayScore !== undefined);
 
-    if (!allHaveScores) {
-      console.log("Not all matches have scores yet");
-      return;
-    }
+    if (!allHaveScores) return;
 
     const wasFinalized = weekMatches.some((m) => m.completed);
     const scoreSummary: string[] = [];
 
-    // Mark all matches as finalized
     for (const match of weekMatches) {
       await supabase.from("schedule").update({ is_finalized: true }).eq("id", match.id);
-
       const homeManager = managers.find((m) => m.id === match.home);
       const awayManager = managers.find((m) => m.id === match.away);
-
       if (homeManager && awayManager) {
         scoreSummary.push(`${homeManager.teamName} ${match.homeScore} - ${match.awayScore} ${awayManager.teamName}`);
       }
     }
 
-    // Always recalculate all standings from all finalized matches
     await recalculateAllStandings();
 
-    await supabase.from("transactions").insert({
-      type: "score" as const,
+    await (supabase.from("transactions").insert({
+      type: "score" as any,
       manager_id: null,
       manager_team_name: null,
       description: `Week ${week} scores ${wasFinalized ? "updated" : "finalized"}:\n${scoreSummary.join("\n")}`,
       week,
-    });
+      league_id: leagueId,
+    }) as any);
   };
 
   const recalculateAllStandings = async () => {
-    // Fetch all finalized matches
+    if (!leagueId) return;
     const { data: allMatches, error } = await supabase
       .from("schedule")
       .select("*")
+      .eq("league_id", leagueId)
       .eq("is_finalized", true);
 
-    if (error || !allMatches) {
-      console.error("Error fetching matches for recalculation:", error);
-      return;
-    }
+    if (error || !allMatches) return;
 
-    // Calculate standings for each manager
     const standings: Record<string, { wins: number; losses: number; points: number }> = {};
-
-    // Initialize all managers with zero
     for (const manager of managers) {
       standings[manager.id] = { wins: 0, losses: 0, points: 0 };
     }
 
-    // Process all finalized matches
     for (const match of allMatches) {
       const homeId = match.home_manager_id;
       const awayId = match.away_manager_id;
@@ -453,7 +496,6 @@ export const useRealtimeGame = () => {
         if (homeScore > awayScore) standings[homeId].wins += 1;
         else if (homeScore < awayScore) standings[homeId].losses += 1;
       }
-
       if (awayId && standings[awayId]) {
         standings[awayId].points += awayScore;
         if (awayScore > homeScore) standings[awayId].wins += 1;
@@ -461,7 +503,6 @@ export const useRealtimeGame = () => {
       }
     }
 
-    // Update all managers with recalculated standings
     for (const [managerId, stats] of Object.entries(standings)) {
       await supabase
         .from("managers")
@@ -480,7 +521,8 @@ export const useRealtimeGame = () => {
     role: "Batsman" | "Bowler" | "All Rounder" | "Wicket Keeper",
     isInternational: boolean = false,
   ) => {
-    await supabase.from("players").insert({ name, team, role, is_international: isInternational });
+    if (!leagueId) return;
+    await supabase.from("players").insert({ name, team, role, is_international: isInternational, league_id: leagueId });
   };
 
   const executeTrade = async (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => {
@@ -489,7 +531,6 @@ export const useRealtimeGame = () => {
 
     if (!manager1 || !manager2) return;
 
-    // Update manager 1
     const new1Roster = [
       ...manager1.activeRoster.filter((id) => !players1.includes(id)),
       ...players2.filter((id) => manager2.activeRoster.includes(id)),
@@ -498,8 +539,6 @@ export const useRealtimeGame = () => {
       ...manager1.bench.filter((id) => !players1.includes(id)),
       ...players2.filter((id) => manager2.bench.includes(id)),
     ];
-
-    // Update manager 2
     const new2Roster = [
       ...manager2.activeRoster.filter((id) => !players2.includes(id)),
       ...players1.filter((id) => manager1.activeRoster.includes(id)),
@@ -517,33 +556,30 @@ export const useRealtimeGame = () => {
     const player1Names = players1.map((id) => players.find((p) => p.id === id)?.name).join(", ");
     const player2Names = players2.map((id) => players.find((p) => p.id === id)?.name).join(", ");
 
-    await supabase.from("transactions").insert({
-      type: "trade" as const,
+    await (supabase.from("transactions").insert({
+      type: "trade" as any,
       manager_id: manager1Id,
       manager_team_name: manager1.teamName,
       description: `${manager1.teamName} traded ${player1Names} to ${manager2.teamName} for ${player2Names}`,
-    });
+      league_id: leagueId,
+    }) as any);
   };
 
   const resetLeague = async () => {
-    // Reset all managers
+    if (!leagueId) return;
     for (const manager of managers) {
       await supabase
         .from("managers")
         .update({ wins: 0, losses: 0, points: 0, roster: [], bench: [] })
         .eq("id", manager.id);
     }
-
-    // Reset all schedule
     for (const match of schedule) {
       await supabase
         .from("schedule")
         .update({ home_score: null, away_score: null, is_finalized: false })
         .eq("id", match.id);
     }
-
-    // Clear transactions
-    await supabase.from("transactions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("transactions").delete().eq("league_id", leagueId);
   };
 
   return {
@@ -555,8 +591,13 @@ export const useRealtimeGame = () => {
     currentWeek,
     currentManagerId,
     setCurrentManagerId,
+    config,
+    leagueName,
+    leagueOwnerId,
     getFreeAgents,
+
     getManagerRosterCount,
+
     addFreeAgent,
     dropPlayerOnly,
     moveToActive,
@@ -567,6 +608,8 @@ export const useRealtimeGame = () => {
     addNewPlayer,
     executeTrade,
     resetLeague,
+    refetch: fetchAllData,
     isWeekLocked: () => false,
   };
 };
+

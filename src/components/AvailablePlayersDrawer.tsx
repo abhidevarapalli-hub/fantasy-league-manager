@@ -92,10 +92,10 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
   };
 
   return (
-    <div 
+    <div
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border shadow-lg transition-all duration-300",
-        isExpanded ? "h-[60vh]" : "h-14"
+        "fixed bottom-0 left-0 right-0 z-[60] bg-background border-t border-border shadow-lg transition-all duration-300 pb-[env(safe-area-inset-bottom)]",
+        isExpanded ? "h-[60vh]" : "h-[calc(3.5rem+env(safe-area-inset-bottom))]"
       )}
     >
       {/* Header / Toggle Bar */}

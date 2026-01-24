@@ -10,9 +10,6 @@ import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
 import { cn } from '@/lib/utils';
 
-const ROUNDS = 14;
-const POSITIONS = 8;
-
 // Default color for empty cells
 const defaultCellColor = 'bg-muted/50 border-border text-muted-foreground';
 
@@ -79,7 +76,7 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
       onClearPick();
     }
   };
-  
+
   return (
     <div
       onClick={manager && !readOnly ? onCellClick : undefined}
@@ -123,7 +120,7 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
           <p className="font-bold text-sm truncate leading-tight w-full">
             {player.name.split(' ').slice(1).join(' ')}
           </p>
-          <Badge 
+          <Badge
             className={cn(
               "text-[8px] px-1 py-0 mt-1 font-semibold",
               teamBadgeColors[player.team] || 'bg-muted text-muted-foreground'
@@ -146,7 +143,7 @@ interface DraftBoardProps {
 }
 
 export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
-  const { managers, players } = useGame();
+  const { managers, players, config } = useGame();
   const {
     draftState,
     loading,
@@ -195,7 +192,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
   const selectedPick = selectedCell ? getPick(selectedCell.round, selectedCell.position) : null;
 
   // Get all assigned manager IDs to filter available managers
-  const assignedManagerIds = Array.from({ length: POSITIONS }, (_, i) => {
+  const assignedManagerIds = Array.from({ length: config.managerCount }, (_, i) => {
     const manager = getManagerAtPosition(i + 1);
     return manager?.id;
   }).filter(Boolean) as string[];
@@ -208,14 +205,20 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     );
   }
 
+  const rounds = config.activeSize + config.benchSize;
+  const positions = config.managerCount;
+
   return (
-    <div className="space-y-4 pb-16">
+    <div className="space-y-4 pb-28">
       {/* Scrollable Draft Container */}
       <div className="overflow-x-auto -mx-4 px-4">
         <div className="min-w-[700px]">
           {/* Header Row - Manager Selection */}
-          <div className="grid grid-cols-8 gap-2 mb-2 sticky top-0 bg-background z-10 pb-2">
-            {Array.from({ length: POSITIONS }, (_, i) => {
+          <div
+            className="grid gap-2 mb-2 sticky top-0 bg-background z-10 pb-2"
+            style={{ gridTemplateColumns: `repeat(${positions}, minmax(80px, 1fr))` }}
+          >
+            {Array.from({ length: positions }, (_, i) => {
               const position = i + 1;
               const manager = getManagerAtPosition(position);
               const availableManagers = managers.filter(
@@ -252,20 +255,19 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
           </div>
 
           {/* Draft Grid */}
-          <div className="grid grid-cols-8 gap-2">
-            {Array.from({ length: ROUNDS }, (_, roundIdx) => {
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${positions}, minmax(80px, 1fr))` }}
+          >
+            {Array.from({ length: rounds }, (_, roundIdx) => {
               const round = roundIdx + 1;
 
-              // Each column represents a fixed manager position (1-8)
-              // Snake draft affects the ORDER picks are made, not the display layout
-              return Array.from({ length: POSITIONS }, (_, colIdx) => {
-                const position = colIdx + 1; // Column 1 = position 1, Column 4 = position 4, etc.
-                
+              return Array.from({ length: positions }, (_, colIdx) => {
+                const position = colIdx + 1;
+
                 const manager = getManagerAtPosition(position);
                 const pick = getPick(round, position);
                 const player = getPlayerForPick(pick);
-                
-                // Pick number shows round.position (matches the column/manager position)
                 const pickNumber = `${round}.${position}`;
 
                 return (
@@ -298,7 +300,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
             </span>
           ) : (
             <span>
-              {getDraftedPlayerIds().length} / {ROUNDS * POSITIONS} picks made
+              {getDraftedPlayerIds().length} / {rounds * positions} picks made
             </span>
           )}
         </div>
@@ -307,8 +309,8 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
             <Button variant="outline" onClick={handleReset}>
               Reset Draft
             </Button>
-            <Button 
-              onClick={handleFinalize} 
+            <Button
+              onClick={handleFinalize}
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Finalizing...' : draftState?.isFinalized ? 'Re-finalize Draft' : 'Finalize Draft'}

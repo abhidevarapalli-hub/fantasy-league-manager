@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
-  const { managers, schedule, currentWeek, currentManagerId, loading } = useGame();
+  const { managers, schedule, currentWeek, currentManagerId, loading, leagueName } = useGame();
   const { managerProfile } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -21,6 +21,11 @@ const Dashboard = () => {
     setTimeout(() => setIsRefreshing(false), 1000);
   }, []);
 
+  const totalWeeks = useMemo(() => {
+    if (!schedule.length) return 7;
+    return Math.max(...schedule.map(m => m.week));
+  }, [schedule]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -31,8 +36,9 @@ const Dashboard = () => {
 
   return (
     <AppLayout
-      title="Premier League Manager"
-      subtitle={`Week ${currentWeek} of 7`}
+      title={leagueName}
+      subtitle={`Week ${currentWeek} of ${totalWeeks}`}
+
       headerActions={
         <button
           onClick={handleRefresh}

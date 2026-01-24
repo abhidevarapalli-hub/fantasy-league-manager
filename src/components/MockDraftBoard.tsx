@@ -16,9 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const ROUNDS = 14;
-const POSITIONS = 8;
-
 // Team colors based on IPL teams
 const teamColors: Record<string, string> = {
   SRH: 'bg-[#FF822A] border-[#FF822A] text-white',
@@ -71,13 +68,13 @@ interface MockDraftCellProps {
   colorClass: string;
 }
 
-const MockDraftCell = ({ 
-  player, 
-  pickNumber, 
-  isCurrentPick, 
+const MockDraftCell = ({
+  player,
+  pickNumber,
+  isCurrentPick,
   isUserTeam,
-  onCellClick, 
-  colorClass 
+  onCellClick,
+  colorClass
 }: MockDraftCellProps) => {
   return (
     <div
@@ -118,7 +115,7 @@ const MockDraftCell = ({
           <p className="font-bold text-sm truncate leading-tight w-full">
             {player.name.split(' ').slice(1).join(' ')}
           </p>
-          <Badge 
+          <Badge
             className={cn(
               "text-[8px] px-1 py-0 mt-1 font-semibold",
               teamBadgeColors[player.team] || 'bg-muted text-muted-foreground'
@@ -137,7 +134,7 @@ const MockDraftCell = ({
 };
 
 export const MockDraftBoard = () => {
-  const { players } = useGame();
+  const { players, config } = useGame();
   const {
     state,
     isUserTurn,
@@ -151,7 +148,7 @@ export const MockDraftBoard = () => {
     getPickByTeam,
     getPickDisplayNumber,
     getTeamForPick,
-  } = useMockDraft(players);
+  } = useMockDraft(players, config);
 
   const [selectedPosition, setSelectedPosition] = useState<string>('1');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -166,7 +163,7 @@ export const MockDraftBoard = () => {
       }, 500);
       return () => clearTimeout(timeout);
     }
-  }, [state.isActive]);
+  }, [state.isActive, isUserTurn]);
 
   const handleStartDraft = () => {
     const position = parseInt(selectedPosition);
@@ -175,15 +172,15 @@ export const MockDraftBoard = () => {
 
   const handleCellClick = (round: number, teamIndex: number) => {
     if (!isUserTurn) return;
-    
+
     // Check if this is the current pick position for the user
     const currentTeamIndex = getTeamForPick(state.currentRound, state.currentPickIndex);
     const userTeamIndex = (state.userPosition || 1) - 1;
-    
+
     if (currentTeamIndex !== userTeamIndex) return;
     if (round !== state.currentRound) return;
     if (teamIndex !== userTeamIndex) return;
-    
+
     setSelectedCell({ round, teamIndex });
     setDialogOpen(true);
   };
@@ -191,10 +188,13 @@ export const MockDraftBoard = () => {
   const handlePickConfirm = async (playerId: string) => {
     makeUserPick(playerId);
     setDialogOpen(false);
-    
+
     // Continue auto-picking after user pick
     continueAfterUserPick();
   };
+
+  const rounds = config.activeSize + config.benchSize;
+  const positions = config.managerCount;
 
   // Pre-draft setup screen
   if (!state.isActive) {
@@ -215,7 +215,7 @@ export const MockDraftBoard = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: 8 }, (_, i) => (
+                {Array.from({ length: positions }, (_, i) => (
                   <SelectItem key={i + 1} value={String(i + 1)}>
                     #{i + 1}
                   </SelectItem>
@@ -231,7 +231,7 @@ export const MockDraftBoard = () => {
         </div>
 
         <div className="text-xs text-muted-foreground text-center max-w-md">
-          <p>8 teams × 14 rounds snake draft</p>
+          <p>{positions} teams × {rounds} rounds snake draft</p>
           <p>AI will auto-draft for other teams based on roster requirements</p>
         </div>
       </div>
@@ -239,7 +239,7 @@ export const MockDraftBoard = () => {
   }
 
   return (
-    <div className="space-y-4 pb-16">
+    <div className="space-y-4 pb-28">
       {/* Status Bar */}
       <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
         <div className="flex items-center gap-4">
@@ -247,7 +247,7 @@ export const MockDraftBoard = () => {
             {state.isComplete ? 'Complete' : isUserTurn ? 'Your Pick!' : 'AI Drafting...'}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            Round {Math.min(state.currentRound, ROUNDS)} | Pick {state.currentPickIndex + 1}/8
+            Round {Math.min(state.currentRound, rounds)} | Pick {state.currentPickIndex + 1}/{positions}
           </span>
           <span className="text-sm text-muted-foreground">
             Your position: #{state.userPosition}
@@ -270,14 +270,17 @@ export const MockDraftBoard = () => {
       <div className="overflow-x-auto -mx-4 px-4">
         <div className="min-w-[700px]">
           {/* Header Row - Team Positions */}
-          <div className="grid grid-cols-8 gap-2 mb-2 sticky top-0 bg-background z-10 pb-2">
-            {Array.from({ length: POSITIONS }, (_, i) => {
+          <div
+            className="grid gap-2 mb-2 sticky top-0 bg-background z-10 pb-2"
+            style={{ gridTemplateColumns: `repeat(${positions}, minmax(80px, 1fr))` }}
+          >
+            {Array.from({ length: positions }, (_, i) => {
               const position = i + 1;
               const isUserTeam = position === state.userPosition;
 
               return (
-                <div 
-                  key={position} 
+                <div
+                  key={position}
                   className={cn(
                     "flex flex-col items-center gap-1",
                     isUserTeam && "font-bold"
@@ -291,8 +294,8 @@ export const MockDraftBoard = () => {
                   </div>
                   <div className={cn(
                     "h-8 text-xs rounded-md w-full flex items-center justify-center px-1 border",
-                    isUserTeam 
-                      ? "bg-primary/10 border-primary text-primary" 
+                    isUserTeam
+                      ? "bg-primary/10 border-primary text-primary"
                       : "bg-muted border-border text-muted-foreground"
                   )}>
                     <span className="truncate text-[10px]">
@@ -305,26 +308,29 @@ export const MockDraftBoard = () => {
           </div>
 
           {/* Draft Grid */}
-          <div className="grid grid-cols-8 gap-2">
-            {Array.from({ length: ROUNDS }, (_, roundIdx) => {
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${positions}, minmax(80px, 1fr))` }}
+          >
+            {Array.from({ length: rounds }, (_, roundIdx) => {
               const round = roundIdx + 1;
 
-              return Array.from({ length: POSITIONS }, (_, colIdx) => {
-                const teamIndex = colIdx; // Column index = team index (0-7)
-                
+              return Array.from({ length: positions }, (_, colIdx) => {
+                const teamIndex = colIdx;
+
                 // Find the pick for this cell by team index
                 const pick = getPickByTeam(round, teamIndex);
                 const player = pick ? getPlayerById(pick.playerId) : null;
-                
+
                 // Get proper snake draft pick number
                 const pickNumber = getPickDisplayNumber(round, teamIndex);
-                
+
                 // Check if this is the current pick
                 const currentTeamIndex = getTeamForPick(state.currentRound, state.currentPickIndex);
-                const isCurrentPick = !state.isComplete && 
-                  round === state.currentRound && 
+                const isCurrentPick = !state.isComplete &&
+                  round === state.currentRound &&
                   teamIndex === currentTeamIndex;
-                
+
                 const isUserTeam = (state.userPosition || 0) - 1 === teamIndex;
                 const canClick = isUserTurn && isCurrentPick && isUserTeam;
 

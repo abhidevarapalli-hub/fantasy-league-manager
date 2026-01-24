@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Manager } from '@/lib/supabase-types';
 import { ChevronRight } from 'lucide-react';
@@ -11,7 +11,9 @@ interface StandingsTableProps {
 
 export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }: StandingsTableProps) => {
   const navigate = useNavigate();
-  
+  const { leagueId } = useParams();
+  const routePrefix = leagueId || 'legacy';
+
   // Sort by wins first, then by points as tiebreaker
   const sortedManagers = [...managers].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
@@ -26,11 +28,12 @@ export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">L</span>
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Pts</span>
       </div>
-      
+
       {sortedManagers.map((manager, index) => (
         <button
           key={manager.id}
-          onClick={() => navigate(`/team/${manager.id}`)}
+          onClick={() => navigate(`/${routePrefix}/team/${manager.id}`)}
+
           className={cn(
             "w-full grid grid-cols-[1fr_40px_40px_50px] gap-2 px-4 py-3 transition-colors hover:bg-muted/30 items-center",
             index !== sortedManagers.length - 1 && "border-b border-border",

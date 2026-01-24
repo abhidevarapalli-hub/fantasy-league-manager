@@ -21,11 +21,12 @@ interface ScheduleListProps {
 
 export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListProps) => {
   const [headToHead, setHeadToHead] = useState<HeadToHead[]>([]);
-  const { user } = useAuth();
-  
+  const { managerProfile } = useAuth();
+
   // Find the logged-in user's manager
-  const loggedInManager = managers.find(m => m.name === user?.name);
-  
+  const loggedInManager = managerProfile ? managers.find(m => m.id === managerProfile.id) : null;
+
+
   useEffect(() => {
     const fetchH2H = async () => {
       const { data } = await supabase.from('head_to_head').select('*');
@@ -35,22 +36,22 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
   }, []);
 
   const getManager = (id: string) => managers.find(m => m.id === id);
-  
+
   // Check if this match involves the logged-in user's team
   const isUserMatch = (match: Match): boolean => {
     if (!loggedInManager) return false;
     return match.home === loggedInManager.id || match.away === loggedInManager.id;
   };
-  
+
   // Get historical H2H record between two managers
   const getHistoricalH2H = (manager1Name: string, manager2Name: string): { wins: number; losses: number } => {
     const record = headToHead.find(
       h => (h.manager1_name === manager1Name && h.manager2_name === manager2Name) ||
-           (h.manager1_name === manager2Name && h.manager2_name === manager1Name)
+        (h.manager1_name === manager2Name && h.manager2_name === manager1Name)
     );
-    
+
     if (!record) return { wins: 0, losses: 0 };
-    
+
     if (record.manager1_name === manager1Name) {
       return { wins: record.manager1_wins, losses: record.manager2_wins };
     } else {
@@ -62,18 +63,18 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
   const getCurrentSeasonH2H = (manager1Name: string, manager2Name: string): { wins: number; losses: number } => {
     let wins = 0;
     let losses = 0;
-    
+
     schedule.filter(match => match.completed).forEach(match => {
       const homeManager = getManager(match.home);
       const awayManager = getManager(match.away);
-      
+
       if (!homeManager || !awayManager) return;
       if (match.homeScore === undefined || match.awayScore === undefined) return;
-      
+
       // Check if this match involves both managers
       const isHome1 = homeManager.name === manager1Name && awayManager.name === manager2Name;
       const isAway1 = awayManager.name === manager1Name && homeManager.name === manager2Name;
-      
+
       if (isHome1) {
         if (match.homeScore > match.awayScore) wins++;
         else losses++;
@@ -82,7 +83,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
         else losses++;
       }
     });
-    
+
     return { wins, losses };
   };
 
@@ -95,7 +96,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
       losses: historical.losses + current.losses
     };
   };
-  
+
   const groupedByWeek = schedule.reduce((acc, match) => {
     if (!acc[match.week]) acc[match.week] = [];
     acc[match.week].push(match);
@@ -121,16 +122,16 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
               <Trophy className="ml-auto w-4 h-4 text-amber-400" />
             )}
           </div>
-          
+
           <div className="divide-y divide-border">
             {matches.map((match, idx) => {
               const homeManager = getManager(match.home);
               const awayManager = getManager(match.away);
-              const h2h = homeManager && awayManager 
-                ? getCombinedH2H(homeManager.name, awayManager.name) 
+              const h2h = homeManager && awayManager
+                ? getCombinedH2H(homeManager.name, awayManager.name)
                 : { wins: 0, losses: 0 };
               const userPlaying = isUserMatch(match);
-              
+
               return (
                 <div key={idx} className={cn(
                   "px-4 py-3",
@@ -145,7 +146,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
                         {homeManager?.teamName}
                       </p>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 px-4">
                       {match.homeScore !== undefined && match.awayScore !== undefined ? (
                         <>
@@ -167,7 +168,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
                         <span className="text-xs text-muted-foreground uppercase tracking-wider">vs</span>
                       )}
                     </div>
-                    
+
                     <div className="flex-1 min-w-0 text-right">
                       <p className={cn(
                         "font-medium truncate",
@@ -177,7 +178,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* H2H Record - shows home team's record vs away team */}
                   {homeManager && awayManager && (h2h.wins > 0 || h2h.losses > 0) && (
                     <div className="mt-1 text-center">

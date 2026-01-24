@@ -46,8 +46,9 @@ const nationalityFilterColors: Record<string, string> = {
 };
 
 const Players = () => {
-  const { players, managers } = useGame();
-  const { managerProfile, isLeagueManager } = useAuth();
+  const { players, managers, isLeagueManager } = useGame();
+  const { managerProfile } = useAuth();
+
   const { proposeTrade } = useTrades();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');

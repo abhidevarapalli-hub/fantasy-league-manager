@@ -2,11 +2,19 @@ import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGame } from '@/contexts/GameContext';
 
 export const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isLeagueManager } = useAuth();
+  const { isLeagueManager: authIsLM } = useAuth();
+
+  let gameContext;
+  try {
+    gameContext = useGame();
+  } catch (e) { }
+  const isLeagueManager = gameContext ? gameContext.isLeagueManager : authIsLM;
+
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Home', path: '/' },
@@ -23,17 +31,17 @@ export const BottomNav = () => {
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path || 
+          const isActive = location.pathname === item.path ||
             (item.path === '/' && location.pathname.startsWith('/team/'));
-          
+
           return (
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
                 "flex flex-col items-center justify-center w-full h-full gap-1 transition-colors",
-                isActive 
-                  ? "text-primary" 
+                isActive
+                  ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
