@@ -3,19 +3,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 
-// List of manager names
-export const MANAGER_NAMES = [
-  'Akash',
-  'Krithik',
-  'Vamsi',
-  'Krishna',
-  'Jasthi',
-  'Santosh',
-  'Sahith',
-  'Abhi',
-];
 
 interface ManagerProfile {
+
   id: string;
   name: string;
   teamName: string;
@@ -112,12 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       let query = supabase.from('managers').select('*');
-
-      if (leagueId === 'legacy') {
-        query = (query as any).is('league_id', null);
-      } else {
-        query = (query as any).eq('league_id', leagueId);
-      }
+      query = (query as any).eq('league_id', leagueId);
 
       // Map database row to ManagerProfile interface
       const mapResult = (data: any) => ({

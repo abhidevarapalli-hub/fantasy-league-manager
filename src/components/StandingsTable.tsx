@@ -12,7 +12,7 @@ interface StandingsTableProps {
 export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }: StandingsTableProps) => {
   const navigate = useNavigate();
   const { leagueId } = useParams();
-  const routePrefix = leagueId || 'legacy';
+
 
   // Sort by wins first, then by points as tiebreaker
   const sortedManagers = [...managers].sort((a, b) => {
@@ -32,7 +32,8 @@ export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }
       {sortedManagers.map((manager, index) => (
         <button
           key={manager.id}
-          onClick={() => navigate(`/${routePrefix}/team/${manager.id}`)}
+          onClick={() => navigate(`/${leagueId}/team/${manager.id}`)}
+
 
           className={cn(
             "w-full grid grid-cols-[1fr_40px_40px_50px] gap-2 px-4 py-3 transition-colors hover:bg-muted/30 items-center",

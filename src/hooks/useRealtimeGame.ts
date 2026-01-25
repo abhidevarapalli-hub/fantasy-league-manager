@@ -87,44 +87,32 @@ export const useRealtimeGame = (leagueId?: string) => {
 
     setLoading(true);
     try {
-      const isLegacy = leagueId === 'legacy';
+      // Fetch League Config first
+      const { data: leagueData } = await (supabase
+        .from("leagues" as any)
+        .select("*")
+        .eq("id", leagueId)
+        .single() as any);
 
-      if (!isLegacy) {
-        // Fetch League Config first
-        const { data: leagueData } = await (supabase
-          .from("leagues" as any)
-          .select("*")
-          .eq("id", leagueId)
-          .single() as any);
+      if (leagueData) {
+        setLeagueName(leagueData.name);
+        setLeagueOwnerId(leagueData.league_manager_id);
+        setConfig({
+          managerCount: leagueData.manager_count,
+          activeSize: leagueData.active_size,
+          benchSize: leagueData.bench_size,
+          minBatsmen: leagueData.min_batsmen,
 
-        if (leagueData) {
-          setLeagueName(leagueData.name);
-          setLeagueOwnerId(leagueData.league_manager_id);
-          setConfig({
-
-
-            managerCount: leagueData.manager_count,
-            activeSize: leagueData.active_size,
-            benchSize: leagueData.bench_size,
-            minBatsmen: leagueData.min_batsmen,
-            maxBatsmen: leagueData.max_batsmen,
-            minBowlers: leagueData.min_bowlers,
-            minWks: leagueData.min_wks,
-            minAllRounders: leagueData.min_all_rounders,
-            maxInternational: leagueData.max_international,
-          });
-        }
-      } else {
-        setLeagueName("Legacy League");
-        setConfig(DEFAULT_LEAGUE_CONFIG);
+          maxBatsmen: leagueData.max_batsmen,
+          minBowlers: leagueData.min_bowlers,
+          minWks: leagueData.min_wks,
+          minAllRounders: leagueData.min_all_rounders,
+          maxInternational: leagueData.max_international,
+        });
       }
 
       const buildQuery = (table: string) => {
-        let query = supabase.from(table as any).select("*");
-        if (isLegacy) {
-          return query.is("league_id", null);
-        }
-        return query.eq("league_id", leagueId);
+        return supabase.from(table as any).select("*").eq("league_id", leagueId);
       };
 
       const [playersRes, managersRes, scheduleRes, transactionsRes] = await Promise.all([
@@ -133,6 +121,7 @@ export const useRealtimeGame = (leagueId?: string) => {
         (buildQuery("schedule") as any).order("week").order("created_at"),
         (buildQuery("transactions") as any).order("created_at", { ascending: false }).limit(50),
       ]);
+
 
 
       if (playersRes.data) {

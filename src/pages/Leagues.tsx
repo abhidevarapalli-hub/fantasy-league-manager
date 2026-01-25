@@ -141,20 +141,8 @@ const Leagues = () => {
                             </div>
                         ) : (
                             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                                {/* Legacy League Button */}
-                                <Button
-                                    variant="secondary"
-                                    className="w-full h-24 justify-between px-8 border-2 border-muted hover:border-primary/50 hover:bg-primary/5 transition-all text-left shadow-lg"
-                                    onClick={() => navigate(`/legacy`)}
-                                >
-                                    <div className="flex flex-col gap-1">
-                                        <span className="font-extrabold text-2xl tracking-tight uppercase italic opacity-70">Old League</span>
-                                        <span className="text-xs text-muted-foreground font-semibold">Legacy Data • Standard Rules</span>
-                                    </div>
-                                    <Loader2 className="w-6 h-6 rotate-45 text-muted-foreground" />
-                                </Button>
-
                                 {leagues.map((league) => (
+
                                     <div key={league.id} className="relative group">
                                         <Button
                                             variant="outline"

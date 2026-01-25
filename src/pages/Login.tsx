@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 
-import { AlertCircle, Trophy, Crown, Loader2 } from 'lucide-react';
-import { useAuth, MANAGER_NAMES } from '@/contexts/AuthContext';
+import { AlertCircle, Trophy, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 const Login = () => {
@@ -18,7 +16,7 @@ const Login = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedManager, setSelectedManager] = useState('');
+
 
   useEffect(() => {
     // If we have a user and leagueId but no managerProfile, try to fetch it automatically by user_id
@@ -52,22 +50,8 @@ const Login = () => {
     }
   };
 
-  const handleClaimManager = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
 
-    setIsLoading(true);
-    setError('');
 
-    try {
-      await selectManager(selectedManager, leagueId || undefined);
-      toast.success(`Welcome, ${selectedManager}!`);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   if (authLoading) {
     return (
@@ -82,67 +66,9 @@ const Login = () => {
     return <Navigate to="/leagues/setup" replace />;
   }
 
-  // State: Authenticated with username, but viewing legacy league without a linked manager
-  if (user && leagueId === 'legacy' && !managerProfile) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-2 border-primary/10 shadow-2xl glass-morphism">
-          <CardHeader className="text-center">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 border-2 border-primary/20">
-              <Crown className="w-10 h-10 text-primary" />
-            </div>
-            <CardTitle className="text-3xl font-black italic uppercase tracking-tighter">Enter Legacy League</CardTitle>
-            <CardDescription className="text-base font-medium">
-              Claim your original identity from the historic 2024 season.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleClaimManager} className="space-y-6">
-              {error && (
-                <div className="flex items-center gap-2 p-4 rounded-xl bg-destructive/10 border border-destructive/20">
-                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-                  <p className="text-sm font-semibold text-destructive">{error}</p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="manager" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Select Your Name</Label>
-                <Select value={selectedManager} onValueChange={setSelectedManager}>
-                  <SelectTrigger className="h-14 text-lg font-bold bg-background/50 border-primary/20">
-                    <SelectValue placeholder="Which one are you?" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MANAGER_NAMES.map(name => (
-                      <SelectItem key={name} value={name} className="py-3 text-lg font-medium">{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button type="submit" className="w-full h-14 text-lg font-black italic uppercase tracking-tight shadow-lg shadow-primary/20" disabled={isLoading || !selectedManager}>
-                {isLoading ? <Loader2 className="w-5 h-5 mr-3 animate-spin" /> : null}
-                Claim Legacy Profile
-              </Button>
-            </form>
-          </CardContent>
-          <CardFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full text-muted-foreground hover:text-foreground"
-              onClick={() => navigate('/leagues')}
-            >
-              Go Back
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
-
-
   // State 1: Authentication (Google Only)
   return (
+
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">

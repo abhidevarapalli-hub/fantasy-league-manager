@@ -39,10 +39,11 @@ const AppRoutes = () => {
   // Auto-fetch manager profile when league changing
   const { leagueId } = useParams<{ leagueId: string }>();
   useEffect(() => {
-    if (user && leagueId && (!managerProfile || (managerProfile.league_id || 'legacy') !== leagueId)) {
+    if (user && leagueId && (!managerProfile || managerProfile.league_id !== leagueId)) {
       fetchManagerProfile(undefined, leagueId);
     }
   }, [leagueId, user, managerProfile, fetchManagerProfile]);
+
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center p-4">Loading...</div>;

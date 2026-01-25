@@ -266,18 +266,9 @@ const PLAYERS_DATA = [
   { name: "Jack Edwards", team: "SRH", role: "All Rounder" },
 ];
 
-const MANAGERS_DATA = [
-  { name: "Abhi", team_name: "Abhi" },
-  { name: "Sahith", team_name: "Sahith" },
-  { name: "Jasthi", team_name: "Jasthi" },
-  { name: "Vamsi", team_name: "Vamsi" },
-  { name: "Krishna", team_name: "Krishna" },
-  { name: "Krithik", team_name: "Krithik" },
-  { name: "Akash", team_name: "Akash" },
-  { name: "Santosh", team_name: "Santosh" },
-];
 
 export const useSeedDatabase = () => {
+
   const [seeding, setSeeding] = useState(false);
 
   const seedDatabase = useCallback(async (leagueId?: string) => {
@@ -310,24 +301,6 @@ export const useSeedDatabase = () => {
         } else {
           console.log("Players seeded successfully for league", leagueId);
         }
-      }
-
-      // ONLY seed default managers for the legacy case or if explicitly null
-      // For new dynamic leagues, we don't automatedly seed 8 managers.
-      const isLegacy = !leagueId || leagueId === 'legacy';
-
-      if (!hasManagers && isLegacy) {
-        const managersWithLeague = MANAGERS_DATA.map(m => ({ ...m, league_id: leagueId === 'legacy' ? null : leagueId }));
-        const { data: insertedManagers, error: managersError } = await (supabase
-          .from("managers")
-          .insert(managersWithLeague)
-          .select() as any);
-
-        if (managersError) {
-          console.error("Error seeding managers:", managersError);
-          throw managersError;
-        }
-        console.log("Managers seeded successfully for legacy league");
       }
 
       return true;
