@@ -3,6 +3,7 @@ import { useRealtimeGame } from '@/hooks/useRealtimeGame';
 import { useSeedDatabase } from '@/hooks/useSeedDatabase';
 import { Player, Manager, Match, Activity } from '@/lib/supabase-types';
 import { LeagueConfig } from '@/lib/roster-validation';
+import { ScoringRules } from '@/lib/scoring-types';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -41,6 +42,8 @@ interface GameContextType {
   leagueName: string;
   leagueOwnerId: string | null;
   isLeagueManager: boolean;
+  scoringRules: ScoringRules;
+  updateScoringRules: (newRules: ScoringRules) => Promise<{ success: boolean; error?: string }>;
 }
 
 

@@ -8,6 +8,7 @@ import {
   validateActiveRoster,
   canAddToActive,
 } from "@/lib/roster-validation";
+import { ScoringRules, DEFAULT_SCORING_RULES, mergeScoringRules } from "@/lib/scoring-types";
 
 interface DbLeague {
   id: string;
@@ -75,6 +76,7 @@ export const useRealtimeGame = (leagueId?: string) => {
   const [currentManagerId, setCurrentManagerId] = useState("");
   const [leagueName, setLeagueName] = useState("IPL Fantasy");
   const [leagueOwnerId, setLeagueOwnerId] = useState<string | null>(null);
+  const [scoringRules, setScoringRules] = useState<ScoringRules>(DEFAULT_SCORING_RULES);
 
   const ROSTER_CAP = config.activeSize + config.benchSize;
 
@@ -102,13 +104,14 @@ export const useRealtimeGame = (leagueId?: string) => {
           activeSize: leagueData.active_size,
           benchSize: leagueData.bench_size,
           minBatsmen: leagueData.min_batsmen,
-
           maxBatsmen: leagueData.max_batsmen,
           minBowlers: leagueData.min_bowlers,
           minWks: leagueData.min_wks,
           minAllRounders: leagueData.min_all_rounders,
           maxInternational: leagueData.max_international,
         });
+        // Merge scoring rules with defaults to handle missing/partial data
+        setScoringRules(mergeScoringRules(leagueData.scoring_rules));
       }
 
       const buildQuery = (table: string) => {
@@ -539,6 +542,23 @@ export const useRealtimeGame = (leagueId?: string) => {
     await supabase.from("transactions").delete().eq("league_id", leagueId);
   };
 
+  const updateScoringRules = async (newRules: ScoringRules): Promise<{ success: boolean; error?: string }> => {
+    if (!leagueId) return { success: false, error: "No league selected" };
+
+    const { error } = await (supabase
+      .from("leagues" as any)
+      .update({ scoring_rules: newRules })
+      .eq("id", leagueId) as any);
+
+    if (error) {
+      console.error("Error updating scoring rules:", error);
+      return { success: false, error: error.message };
+    }
+
+    setScoringRules(newRules);
+    return { success: true };
+  };
+
   return {
     players,
     managers,
@@ -551,6 +571,7 @@ export const useRealtimeGame = (leagueId?: string) => {
     config,
     leagueName,
     leagueOwnerId,
+    scoringRules,
     getFreeAgents,
 
     getManagerRosterCount,
@@ -565,6 +586,7 @@ export const useRealtimeGame = (leagueId?: string) => {
     addNewPlayer,
     executeTrade,
     resetLeague,
+    updateScoringRules,
     refetch: fetchAllData,
     isWeekLocked: () => false,
   };
