@@ -85,7 +85,7 @@ export const useAuthStore = create<AuthState>()(
 
                     const { data, error } = await query.maybeSingle();
                     if (!error && data) {
-                        set({ managerProfile: data as ManagerProfile });
+                        set({ managerProfile: data as unknown as ManagerProfile });
                     }
                 } catch (e) {
                     console.error('Error selecting manager:', e);
@@ -115,7 +115,7 @@ export const useAuthStore = create<AuthState>()(
                     const { data, error } = await query.maybeSingle();
 
                     if (!error && data) {
-                        set({ managerProfile: data as ManagerProfile });
+                        set({ managerProfile: data as unknown as ManagerProfile });
                     } else {
                         set({ managerProfile: null });
                     }
@@ -160,7 +160,7 @@ export const useAuthStore = create<AuthState>()(
                     if (error) {
                         console.error('Error fetching user profile:', error);
                     } else if (data) {
-                        set({ userProfile: data as UserProfile });
+                        set({ userProfile: data as unknown as UserProfile });
                     } else {
                         // Create profile if it doesn't exist
                         const { data: newProfile } = await supabase
@@ -170,7 +170,7 @@ export const useAuthStore = create<AuthState>()(
                             .maybeSingle();
 
                         if (newProfile) {
-                            set({ userProfile: newProfile as UserProfile });
+                            set({ userProfile: newProfile as unknown as UserProfile });
                         }
                     }
                 } catch (e) {

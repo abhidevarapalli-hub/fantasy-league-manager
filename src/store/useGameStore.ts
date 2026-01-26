@@ -357,7 +357,7 @@ export const useGameStore = create<GameState>()(
                     }
                 }
 
-                await supabase.rpc('update_league_standings', { league_uuid: currentLeagueId });
+                await (supabase.rpc as any)('update_league_standings', { league_uuid: currentLeagueId });
                 await supabase.from("transactions").insert({
                     type: "score" as any,
                     manager_id: null,
@@ -420,7 +420,8 @@ export const useGameStore = create<GameState>()(
                 set({ loading: true, currentLeagueId: leagueId });
 
                 try {
-                    const { data: leagueData } = await supabase.from("leagues" as any).select("*").eq("id", leagueId).single();
+                    const { data: leagueDataRaw } = await supabase.from("leagues" as any).select("*").eq("id", leagueId).single();
+                    const leagueData = leagueDataRaw as any;
 
                     if (leagueData) {
                         set({
@@ -448,10 +449,10 @@ export const useGameStore = create<GameState>()(
                     ]);
 
                     set({
-                        players: playersRes.data?.map(mapDbPlayer) || [],
-                        managers: managersRes.data?.map(mapDbManager) || [],
-                        schedule: scheduleRes.data?.map(mapDbSchedule) || [],
-                        activities: transactionsRes.data?.map(mapDbTransaction) || [],
+                        players: (playersRes.data as any)?.map(mapDbPlayer) || [],
+                        managers: (managersRes.data as any)?.map(mapDbManager) || [],
+                        schedule: (scheduleRes.data as any)?.map(mapDbSchedule) || [],
+                        activities: (transactionsRes.data as any)?.map(mapDbTransaction) || [],
                     });
                 } finally {
                     set({ loading: false });
