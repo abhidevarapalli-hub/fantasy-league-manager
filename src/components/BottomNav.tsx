@@ -1,19 +1,12 @@
 import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, History, ArrowLeftRight } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
-import { useGame } from '@/contexts/GameContext';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isLeagueManager: authIsLM } = useAuth();
-
-  let gameContext;
-  try {
-    gameContext = useGame();
-  } catch (e) { }
-  const isLeagueManager = gameContext ? gameContext.isLeagueManager : authIsLM;
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
 
   const navItems = [

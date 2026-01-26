@@ -245,7 +245,7 @@ const LeagueHistory = () => {
                       key={record.name}
                       className={cn(
                         !record.isActive && "opacity-60",
-                        record.name === userProfile?.name && "bg-secondary/10 border-l-2 border-l-secondary"
+                        record.name === userProfile?.username && "bg-secondary/10 border-l-2 border-l-secondary"
                       )}
                     >
                       <TableCell className="font-medium">
@@ -306,11 +306,11 @@ const LeagueHistory = () => {
                   {ALL_MANAGER_NAMES.map(rowManager => (
                     <TableRow
                       key={rowManager}
-                      className={cn(rowManager === userProfile?.name && "bg-secondary/10")}
+                      className={cn(rowManager === userProfile?.username && "bg-secondary/10")}
                     >
                       <TableCell className={cn(
                         "sticky left-0 z-10 font-semibold text-xs",
-                        rowManager === userProfile?.name ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
+                        rowManager === userProfile?.username ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
                       )}>
                         {rowManager}
                       </TableCell>

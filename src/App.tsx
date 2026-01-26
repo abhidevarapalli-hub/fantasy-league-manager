@@ -1,14 +1,13 @@
 import { Toaster } from "@/components/ui/toaster";
 import React, { useEffect } from 'react';
 import { StoreInitializer } from "@/components/StoreInitializer";
+import { useAuthStore } from '@/store/useAuthStore';
 
 
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { GameProvider } from "./contexts/GameContext";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Activity from "./pages/Activity";
 import Admin from "./pages/Admin";
 import TeamView from "./pages/TeamView";
@@ -37,7 +36,12 @@ import { Outlet, useParams } from "react-router-dom";
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { user, userProfile, managerProfile, isLeagueManager, isLoading, fetchManagerProfile } = useAuth();
+  const user = useAuthStore(state => state.user);
+  const userProfile = useAuthStore(state => state.userProfile);
+  const managerProfile = useAuthStore(state => state.managerProfile);
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
+  const isLoading = useAuthStore(state => state.isLoading);
+  const fetchManagerProfile = useAuthStore(state => state.fetchManagerProfile);
 
   // Auto-fetch manager profile when league changing
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -89,10 +93,10 @@ const AppRoutes = () => {
 
   const LeagueLayout = () => {
     return (
-      <GameProvider>
+      <>
         <StoreInitializer />
         <Outlet />
-      </GameProvider>
+      </>
     );
   };
 
@@ -144,9 +148,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
+        <AppRoutes />
       </BrowserRouter>
 
     </TooltipProvider>
