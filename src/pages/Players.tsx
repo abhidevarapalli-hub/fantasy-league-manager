@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Search, X, Filter } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,6 +52,8 @@ const Players = () => {
 
   const { proposeTrade } = useTrades();
   const [searchQuery, setSearchQuery] = useState('');
+  // Debounce search query to prevent re-filtering on every keystroke
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [selectedTeam, setSelectedTeam] = useState('All');
   const [selectedRole, setSelectedRole] = useState('All');
   const [selectedNationality, setSelectedNationality] = useState('All');
@@ -94,8 +97,8 @@ const Players = () => {
 
   const filteredPlayers = useMemo(() => {
     const filtered = players.filter(player => {
-      const matchesSearch = player.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        player.team.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = player.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        player.team.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
       const matchesTeam = selectedTeam === 'All' || player.team === selectedTeam;
       const matchesRole = selectedRole === 'All' || player.role === selectedRole;
       const matchesNationality = selectedNationality === 'All' ||
@@ -107,7 +110,7 @@ const Players = () => {
     });
 
     return sortPlayersByPriority(filtered);
-  }, [players, searchQuery, selectedTeam, selectedRole, selectedNationality, playerToManagerMap, showOnlyFreeAgents]);
+  }, [players, debouncedSearchQuery, selectedTeam, selectedRole, selectedNationality, playerToManagerMap, showOnlyFreeAgents]);
 
   const handleAddPlayer = (playerId: string) => {
     const player = players.find(p => p.id === playerId);
