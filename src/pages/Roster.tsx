@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { AppLayout } from '@/components/AppLayout';
 import { Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -119,7 +119,12 @@ const RosterCell = ({ slot, isBench }: RosterCellProps) => {
 const Roster = () => {
   const navigate = useNavigate();
   const { leagueId } = useParams<{ leagueId: string }>();
-  const { managers, players, config, currentManagerId } = useGame();
+
+  // Zustand selectors
+  const managers = useGameStore(state => state.managers);
+  const players = useGameStore(state => state.players);
+  const config = useGameStore(state => state.config);
+  const currentManagerId = useGameStore(state => state.currentManagerId);
 
   // Get roster slots for a manager
   const getRosterSlots = (manager: Manager): { activeSlots: SlotRequirement[]; benchSlots: SlotRequirement[] } => {

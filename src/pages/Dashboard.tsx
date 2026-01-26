@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { RefreshCw, Calendar, Trophy, UserPlus, Copy, Check } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useGameStore } from '@/store/useGameStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useParams } from 'react-router-dom';
 import { StandingsTable } from '@/components/StandingsTable';
 import { ScheduleList } from '@/components/ScheduleList';
@@ -14,8 +14,16 @@ import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
-  const { managers, schedule, currentWeek, currentManagerId, loading, leagueName, isLeagueManager } = useGame();
-  const { managerProfile } = useAuth();
+
+  // Zustand selectors - only subscribe to what we need
+  const managers = useGameStore(state => state.managers);
+  const schedule = useGameStore(state => state.schedule);
+  const currentWeek = useGameStore(state => state.currentWeek);
+  const currentManagerId = useGameStore(state => state.currentManagerId);
+  const loading = useGameStore(state => state.loading);
+  const leagueName = useGameStore(state => state.leagueName);
+  const managerProfile = useAuthStore(state => state.managerProfile);
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
 

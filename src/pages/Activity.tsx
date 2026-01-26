@@ -1,9 +1,10 @@
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { AppLayout } from '@/components/AppLayout';
 
 const Activity = () => {
-  const { activities } = useGame();
+  // Zustand selector - ONLY subscribe to activities  
+  const activities = useGameStore(state => state.activities);
 
   return (
     <AppLayout title="Activity Log" subtitle="Recent transactions & updates">
