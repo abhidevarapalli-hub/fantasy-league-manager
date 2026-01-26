@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,21 +22,50 @@ const Leagues = () => {
     const [leagues, setLeagues] = useState<League[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (user) {
-            fetchLeagues();
-        } else if (!isLoading) {
-            setLoading(false);
-        }
-    }, [user, isLoading]);
+    const fetchLeagues = useCallback(async () => {
+        console.log('fetchLeagues called - user:', user, 'isLoading:', isLoading);
 
-    const fetchLeagues = async () => {
+        if (!user || !user.id) {
+            console.log('No user or user.id, skipping fetch');
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
-            console.log("Fetching leagues...");
+            console.log("Fetching leagues for user:", user.id);
+
+            // Fetch leagues where the user is the owner OR a manager
+            const { data: managerData, error: managerError } = await (supabase
+                .from('managers' as any)
+                .select('league_id')
+                .eq('user_id', user.id) as any);
+
+            if (managerError) {
+                console.error('Error fetching manager data:', managerError);
+                throw managerError;
+            }
+
+            console.log('Manager data:', managerData);
+
+            // Get unique league IDs and filter out nulls
+            const leagueIds = (managerData?.map((m: any) => m.league_id) || [])
+                .filter((id: string | null) => id !== null);
+
+            console.log('League IDs (filtered):', leagueIds);
+
+            if (leagueIds.length === 0) {
+                console.log('No leagues found for user');
+                setLeagues([]);
+                setLoading(false);
+                return;
+            }
+
+            // Fetch the actual league details
             const { data, error } = await (supabase
                 .from('leagues' as any)
-                .select('*') as any);
+                .select('*')
+                .in('id', leagueIds) as any);
 
             if (error) {
                 console.error('Error fetching leagues:', error);
@@ -51,7 +80,16 @@ const Leagues = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user, isLoading]);
+
+    useEffect(() => {
+        console.log('useEffect triggered - user:', user, 'isLoading:', isLoading);
+        if (user && user.id) {
+            fetchLeagues();
+        } else if (!isLoading) {
+            setLoading(false);
+        }
+    }, [user, isLoading, fetchLeagues]);
 
 
     const handleSignOut = async () => {

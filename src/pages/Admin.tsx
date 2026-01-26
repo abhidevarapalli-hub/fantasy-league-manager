@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const IPL_TEAMS = ['MI', 'KKR', 'CSK', 'RR', 'RCB', 'DC', 'GT', 'LSG', 'PBKS', 'SRH'];
 
@@ -34,7 +36,10 @@ const Admin = () => {
     config,
     isLeagueManager,
     loading: gameLoading,
+    leagueOwnerId,
+    refetch,
   } = useGame();
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
 
   const ROSTER_CAP = config.activeSize + config.benchSize;
 
@@ -244,6 +249,48 @@ const Admin = () => {
     });
     // Then finalize
     finalizeWeekScores(weekNum);
+  };
+
+  const handleRemoveMember = async (managerId: string) => {
+    if (!managerId || removingMember) return;
+
+    setRemovingMember(managerId);
+    try {
+      // Get the manager to find its original index
+      const { data: allManagers, error: fetchError } = await (supabase
+        .from('managers' as any)
+        .select('id, created_at')
+        .eq('league_id', managers[0]?.id ? (managers[0] as any).league_id : '')
+        .order('created_at', { ascending: true }) as any);
+
+      if (fetchError) throw fetchError;
+
+      // Find the index of this manager
+      const managerIndex = allManagers?.findIndex((m: any) => m.id === managerId) || 0;
+      const placeholderIndex = managerIndex + 1;
+
+      // Reset the manager to placeholder state
+      const { error: updateError } = await (supabase
+        .from('managers' as any)
+        .update({
+          user_id: null,
+          name: `Manager ${placeholderIndex}`,
+          team_name: `Empty Team ${placeholderIndex}`,
+          roster: [],
+          bench: []
+        })
+        .eq('id', managerId) as any);
+
+      if (updateError) throw updateError;
+
+      toast.success('Member removed successfully');
+      await refetch();
+    } catch (error: any) {
+      console.error('Error removing member:', error);
+      toast.error(`Failed to remove member: ${error.message}`);
+    } finally {
+      setRemovingMember(null);
+    }
   };
 
   if (gameLoading) {
@@ -612,6 +659,70 @@ const Admin = () => {
           >
             Execute Trade
           </Button>
+        </section>
+
+        {/* League Members */}
+        <section className="bg-card rounded-xl border border-border p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <UserPlus className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold text-foreground">League Members</h2>
+          </div>
+
+          <div className="space-y-3">
+            {managers
+              .filter(manager => {
+                // Find manager's user_id by checking if they have one
+                const hasUserId = manager.name && !manager.name.startsWith('Manager ');
+                return hasUserId;
+              })
+              .map(manager => {
+                const isOwner = (manager as any).user_id === leagueOwnerId;
+
+                return (
+                  <div
+                    key={manager.id}
+                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="font-medium text-foreground">{manager.name}</p>
+                          <p className="text-sm text-muted-foreground">{manager.teamName}</p>
+                        </div>
+                        {isOwner && (
+                          <Badge variant="default" className="text-xs">
+                            League Manager
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    {!isOwner && (
+                      <Button
+                        onClick={() => handleRemoveMember(manager.id)}
+                        disabled={removingMember === manager.id}
+                        variant="destructive"
+                        size="sm"
+                        className="shrink-0"
+                      >
+                        {removingMember === manager.id ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Remove
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            {managers.filter(m => m.name && !m.name.startsWith('Manager ')).length === 0 && (
+              <div className="p-8 text-center text-muted-foreground">
+                No members have joined yet. Share the invite link to get started!
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Danger Zone */}

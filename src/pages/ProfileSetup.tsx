@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { UserCircle, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { UserCircle, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+
 
 const ProfileSetup = () => {
     const { user, userProfile, updateUsername } = useAuth();
@@ -60,7 +62,16 @@ const ProfileSetup = () => {
             const { error } = await updateUsername(username.toLowerCase());
             if (error) throw error;
             toast.success("Profile setup complete!");
-            navigate("/leagues");
+
+            // Check if there's a saved redirect (e.g., from join link)
+            const redirectPath = sessionStorage.getItem('redirectAfterSetup');
+            if (redirectPath) {
+                console.log('Redirecting to saved path:', redirectPath);
+                sessionStorage.removeItem('redirectAfterSetup');
+                navigate(redirectPath);
+            } else {
+                navigate("/leagues");
+            }
         } catch (error: any) {
             toast.error(error.message);
         } finally {
@@ -94,7 +105,12 @@ const ProfileSetup = () => {
                                         setUsername(val);
                                         checkAvailability(val);
                                     }}
-                                    className="h-14 text-xl font-bold bg-background/50 border-primary/20 focus:border-primary pl-4 pr-12"
+                                    className={cn(
+                                        "h-14 text-xl font-bold bg-background/50 pl-4 pr-12 transition-all duration-300",
+                                        available === true && "border-green-500/50 focus:border-green-500 bg-green-500/5",
+                                        available === false && "border-destructive/50 focus:border-destructive bg-destructive/5",
+                                        available === null && "border-primary/20 focus:border-primary"
+                                    )}
                                     disabled={loading}
                                     autoComplete="off"
                                 />
@@ -102,17 +118,33 @@ const ProfileSetup = () => {
                                     {checking ? (
                                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                                     ) : available === true ? (
-                                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                        <CheckCircle2 className="w-5 h-5 text-green-500 animate-in zoom-in duration-300" />
                                     ) : available === false ? (
-                                        <AlertCircle className="w-5 h-5 text-destructive" />
+                                        <AlertCircle className="w-5 h-5 text-destructive animate-in shake duration-300" />
                                     ) : null}
                                 </div>
                             </div>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 px-1 py-1">
-                                <AlertCircle className="w-3.5 h-3.5" />
-                                Only letters, numbers, and underscores allowed. Min 3 chars.
-                            </p>
+
+                            <div className="min-h-[20px]">
+                                {available === false ? (
+                                    <p className="text-xs text-destructive font-bold flex items-center gap-1.5 px-1 py-1 animate-in slide-in-from-top-1 duration-300">
+                                        <X className="w-3.5 h-3.5" />
+                                        This handle is already taken. Try another?
+                                    </p>
+                                ) : username.length > 0 && username.length < 3 ? (
+                                    <p className="text-xs text-amber-500 font-medium flex items-center gap-1.5 px-1 py-1">
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        Username must be at least 3 characters.
+                                    </p>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 px-1 py-1 transition-opacity duration-300">
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        Only letters, numbers, and underscores allowed.
+                                    </p>
+                                )}
+                            </div>
                         </div>
+
                     </CardContent>
                     <CardFooter className="bg-primary/5 border-t border-primary/10 p-6">
                         <Button

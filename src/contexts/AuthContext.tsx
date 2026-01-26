@@ -90,10 +90,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .eq('id', session.user.id) as any);
 
     if (!error) {
+      // Optmistically update local state for instant redirection
+      setUserProfile(prev => prev ? { ...prev, username } : { id: session.user.id, username, full_name: null, avatar_url: null });
       await refreshProfile();
     }
     return { error };
   }, [session?.user, refreshProfile]);
+
 
   const fetchManagerProfile = useCallback(async (name?: string, leagueId?: string) => {
     if (!leagueId) return;

@@ -28,6 +28,16 @@ const Login = () => {
   useEffect(() => {
     // If fully authenticated and has a profile for this context, go to dashboard
     if (!authLoading && user && userProfile?.username) {
+      // Check if there's a saved redirect from join link
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectPath) {
+        console.log('Redirecting to saved path after login:', redirectPath);
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(redirectPath);
+        return;
+      }
+
+      // Otherwise, normal navigation
       if (!leagueId) {
         navigate('/leagues');
       } else if (managerProfile) {
@@ -63,6 +73,12 @@ const Login = () => {
 
   // State: Authenticated but missing username (Handled by App.tsx ProtectedRoute usually, but here for safety)
   if (user && !userProfile?.username) {
+    // Transfer the redirect from login to setup if it exists
+    const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+    if (redirectPath) {
+      sessionStorage.removeItem('redirectAfterLogin');
+      sessionStorage.setItem('redirectAfterSetup', redirectPath);
+    }
     return <Navigate to="/leagues/setup" replace />;
   }
 

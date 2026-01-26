@@ -1,25 +1,47 @@
 import { useState, useCallback, useMemo } from 'react';
-import { RefreshCw, Calendar, Trophy } from 'lucide-react';
+import { RefreshCw, Calendar, Trophy, UserPlus, Copy, Check } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useParams } from 'react-router-dom';
 import { StandingsTable } from '@/components/StandingsTable';
 import { ScheduleList } from '@/components/ScheduleList';
 import { AppLayout } from '@/components/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const Dashboard = () => {
-  const { managers, schedule, currentWeek, currentManagerId, loading, leagueName } = useGame();
+  const { leagueId } = useParams<{ leagueId: string }>();
+  const { managers, schedule, currentWeek, currentManagerId, loading, leagueName, isLeagueManager } = useGame();
   const { managerProfile } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Find the logged-in user's manager ID
   const loggedInManagerId = managerProfile?.id;
+
+  // Check if there are available slots
+  const hasAvailableSlots = useMemo(() => {
+    return managers.some(manager => !manager.name || manager.name.startsWith('Manager '));
+  }, [managers]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 1000);
   }, []);
+
+  const handleCopyInviteLink = useCallback(() => {
+    const inviteUrl = `${window.location.origin}/join/${leagueId}`;
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopied(true);
+      toast.success('Invite link copied to clipboard!');
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      toast.error('Failed to copy invite link');
+    });
+  }, [leagueId]);
 
   const totalWeeks = useMemo(() => {
     if (!schedule.length) return 7;
@@ -70,7 +92,45 @@ const Dashboard = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="standings" className="mt-0">
+          <TabsContent value="standings" className="mt-0 space-y-4">
+            {isLeagueManager && hasAvailableSlots && (
+              <Card className="border-2 border-primary/20 bg-primary/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <UserPlus className="w-5 h-5 text-primary" />
+                    Invite Members
+                  </CardTitle>
+                  <CardDescription>
+                    Share this link to invite users to join your league
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 bg-background/50 border border-primary/20 rounded-lg font-mono text-sm text-muted-foreground overflow-x-auto">
+                      {window.location.origin}/join/{leagueId}
+                    </div>
+                    <Button
+                      onClick={handleCopyInviteLink}
+                      variant="default"
+                      size="sm"
+                      className="shrink-0"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-4 h-4 mr-1" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4 mr-1" />
+                          Copy Link
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <StandingsTable managers={managers} currentManagerId={currentManagerId} loggedInManagerId={loggedInManagerId} />
           </TabsContent>
 
