@@ -1,8 +1,7 @@
 import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Menu, Target } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useGame } from '@/contexts/GameContext';
+import { useAuthStore } from '@/store/useAuthStore';
 import {
   Sidebar,
   SidebarContent,
@@ -21,19 +20,8 @@ export function AppSidebar() {
   const { state, isMobile } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const { isLeagueManager: authIsLM } = useAuth();
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const { leagueId } = useParams<{ leagueId: string }>();
-
-  // Attempt to get robust LM status from GameContext if we have a leagueId
-  let gameContext;
-  try {
-    gameContext = useGame();
-  } catch (e) {
-    // Outside GameProvider
-  }
-  const isLeagueManager = gameContext
-    ? (gameContext.loading ? (gameContext.isLeagueManager || authIsLM) : gameContext.isLeagueManager)
-    : authIsLM;
 
 
 

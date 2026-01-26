@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UserPlus, UserMinus, ArrowRight, AlertTriangle } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { Player } from '@/lib/supabase-types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -29,7 +29,10 @@ const teamBadgeColors: Record<string, string> = {
 };
 
 export const RosterManagementDialog = ({ open, onOpenChange, player, preselectedManagerId }: RosterManagementDialogProps) => {
-  const { managers, players, addFreeAgent, getManagerRosterCount } = useGame();
+  const managers = useGameStore(state => state.managers);
+  const players = useGameStore(state => state.players);
+  const addFreeAgent = useGameStore(state => state.addFreeAgent);
+  const getManagerRosterCount = useGameStore(state => state.getManagerRosterCount);
   const [selectedManagerId, setSelectedManagerId] = useState<string>('');
   const [dropPlayerId, setDropPlayerId] = useState<string>('none');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,21 +72,21 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
 
   const handleSubmit = async () => {
     if (!player || !selectedManagerId) return;
-    
+
     setIsSubmitting(true);
     try {
       const dropPlayer = dropPlayerId !== 'none' ? dropPlayerId : undefined;
       await addFreeAgent(selectedManagerId, player.id, dropPlayer);
-      
+
       const manager = managers.find(m => m.id === selectedManagerId);
       const droppedPlayer = dropPlayer ? players.find(p => p.id === dropPlayer) : null;
-      
+
       if (droppedPlayer) {
         toast.success(`Added ${player.name} and dropped ${droppedPlayer.name} for ${manager?.teamName}`);
       } else {
         toast.success(`Added ${player.name} to ${manager?.teamName}`);
       }
-      
+
       onOpenChange(false);
     } catch (error) {
       toast.error('Failed to complete transaction');
@@ -114,8 +117,8 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
               <div className="flex-1">
                 <p className="font-medium text-foreground">{player.name}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className={`text-[10px] ${teamBadgeColors[player.team] || 'bg-muted text-muted-foreground'}`}
                   >
                     {player.team}
@@ -180,7 +183,7 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
                   {rosterCount}/14 players
                 </span>
               </div>
-              
+
               {mustDrop && (
                 <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="w-4 h-4 text-destructive" />
@@ -235,14 +238,14 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
 
           {/* Actions */}
           <div className="flex gap-2 pt-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="flex-1"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               className="flex-1"
               disabled={!canSubmit || isSubmitting}
               onClick={handleSubmit}

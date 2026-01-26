@@ -1,7 +1,7 @@
 import { LogOut, RefreshCw, Shield, LayoutGrid } from 'lucide-react';
 
-import { useAuth } from '@/contexts/AuthContext';
-import { useGame } from '@/contexts/GameContext';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useGameStore } from '@/store/useGameStore';
 import { Button } from '@/components/ui/button';
 
 import { useNavigate, useParams } from 'react-router-dom';
@@ -16,18 +16,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export const UserMenu = () => {
-  const { managerProfile, userProfile, signOut, isLoading: authLoading } = useAuth();
+  const managerProfile = useAuthStore(state => state.managerProfile);
+  const userProfile = useAuthStore(state => state.userProfile);
+  const signOut = useAuthStore(state => state.signOut);
+  const authLoading = useAuthStore(state => state.isLoading);
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
+  const gameLoading = useGameStore(state => state.loading);
   const navigate = useNavigate();
   const { leagueId } = useParams();
-
-  // Robust LM check from GameContext if possible
-  let gameContext;
-  try {
-    gameContext = useGame();
-  } catch (e) { }
-
-  const isLeagueManager = gameContext ? gameContext.isLeagueManager : false;
-  const gameLoading = gameContext ? gameContext.loading : false;
 
   // If we're loading either auth or game data, show a subtle loading state
   if (authLoading || (leagueId && gameLoading && !managerProfile)) {

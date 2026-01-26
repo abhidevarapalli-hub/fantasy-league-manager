@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UserPlus, Search, X } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { Player, Manager } from '@/lib/supabase-types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -73,7 +73,7 @@ export const DraftPickDialog = ({
   onConfirm,
   isMockDraft = false,
 }: DraftPickDialogProps) => {
-  const { players } = useGame();
+  const players = useGameStore(state => state.players);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('All');
@@ -98,27 +98,27 @@ export const DraftPickDialog = ({
       const isCurrentPlayer = p.id === currentPlayerId;
       // Exclude already drafted players (unless it's the current player being edited)
       const isAvailable = isCurrentPlayer || !draftedPlayerIds.includes(p.id);
-      
+
       if (!isAvailable) return false;
-      
+
       // Apply search filter
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           p.team.toLowerCase().includes(searchQuery.toLowerCase());
-      
+        p.team.toLowerCase().includes(searchQuery.toLowerCase());
+
       // Apply team filter
       const matchesTeam = selectedTeam === 'All' || p.team === selectedTeam;
-      
+
       // Apply role filter
       const matchesRole = selectedRole === 'All' || p.role === selectedRole;
-      
+
       // Apply nationality filter
-      const matchesNationality = selectedNationality === 'All' || 
-                                 (selectedNationality === 'International' && p.isInternational) ||
-                                 (selectedNationality === 'Domestic' && !p.isInternational);
-      
+      const matchesNationality = selectedNationality === 'All' ||
+        (selectedNationality === 'International' && p.isInternational) ||
+        (selectedNationality === 'Domestic' && !p.isInternational);
+
       return matchesSearch && matchesTeam && matchesRole && matchesNationality;
     });
-    
+
     return sortPlayersByPriority(filtered);
   }, [players, draftedPlayerIds, currentPlayerId, searchQuery, selectedTeam, selectedRole, selectedNationality]);
 
@@ -193,8 +193,8 @@ export const DraftPickDialog = ({
                   onClick={() => setSelectedTeam(team)}
                   className={cn(
                     "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
-                    selectedTeam === team 
-                      ? teamFilterColors[team] 
+                    selectedTeam === team
+                      ? teamFilterColors[team]
                       : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                   )}
                 >
@@ -217,8 +217,8 @@ export const DraftPickDialog = ({
                       onClick={() => setSelectedRole(role)}
                       className={cn(
                         "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
-                        selectedRole === role 
-                          ? roleFilterColors[role] 
+                        selectedRole === role
+                          ? roleFilterColors[role]
                           : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                       )}
                     >
@@ -238,8 +238,8 @@ export const DraftPickDialog = ({
                       onClick={() => setSelectedNationality(nationality)}
                       className={cn(
                         "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
-                        selectedNationality === nationality 
-                          ? nationalityFilterColors[nationality] 
+                        selectedNationality === nationality
+                          ? nationalityFilterColors[nationality]
                           : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                       )}
                     >
@@ -255,7 +255,7 @@ export const DraftPickDialog = ({
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-shrink-0">
               Select Player ({filteredPlayers.length} available)
             </label>
-            
+
             <div className="flex-1 overflow-y-auto border border-border rounded-lg p-2 space-y-2 min-h-[200px] max-h-[300px]">
               {filteredPlayers.length === 0 ? (
                 <div className="py-8 text-center">
@@ -294,8 +294,8 @@ export const DraftPickDialog = ({
                 <div className="flex-1">
                   <p className="font-medium text-foreground text-sm">{selectedPlayer.name}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={cn(
                         "text-[10px] border",
                         teamFilterColors[selectedPlayer.team] || 'bg-muted text-muted-foreground'
@@ -315,14 +315,14 @@ export const DraftPickDialog = ({
 
           {/* Actions */}
           <div className="flex gap-2 pt-1 flex-shrink-0">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="flex-1"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               className="flex-1"
               disabled={!selectedPlayerId}
               onClick={handleConfirm}

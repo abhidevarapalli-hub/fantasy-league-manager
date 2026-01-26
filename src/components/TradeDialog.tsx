@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { Player, Manager } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
 
@@ -41,7 +41,7 @@ export const TradeDialog = ({
   onSubmit,
   mode = 'propose',
 }: TradeDialogProps) => {
-  const { players } = useGame();
+  const players = useGameStore(state => state.players);
   const [selectedProposerPlayers, setSelectedProposerPlayers] = useState<Set<string>>(new Set());
   const [selectedTargetPlayers, setSelectedTargetPlayers] = useState<Set<string>>(
     initialTargetPlayer ? new Set([initialTargetPlayer.id]) : new Set()
