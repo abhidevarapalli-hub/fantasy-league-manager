@@ -53,6 +53,12 @@ const Players = () => {
   const managerProfile = useAuthStore(state => state.managerProfile);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
+  console.log('[Players] Component rendered');
+  console.log('[Players] players:', players?.length, 'items');
+  console.log('[Players] managers:', managers?.length, 'items');
+  console.log('[Players] managerProfile:', managerProfile?.name);
+  console.log('[Players] isLeagueManager:', isLeagueManager);
+
   const { proposeTrade } = useTrades();
   const [searchQuery, setSearchQuery] = useState('');
   // Debounce search query to prevent re-filtering on every keystroke

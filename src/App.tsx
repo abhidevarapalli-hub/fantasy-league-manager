@@ -90,6 +90,7 @@ const AppRoutes = () => {
   const LeagueLayout = () => {
     return (
       <GameProvider>
+        <StoreInitializer />
         <Outlet />
       </GameProvider>
     );
@@ -144,7 +145,6 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <StoreInitializer />
           <AppRoutes />
         </AuthProvider>
       </BrowserRouter>

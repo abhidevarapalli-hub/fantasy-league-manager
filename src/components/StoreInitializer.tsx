@@ -20,11 +20,13 @@ export function StoreInitializer() {
 
     // Initialize auth on mount
     useEffect(() => {
+        console.log('[StoreInitializer] Initializing auth...');
         initializeAuth();
     }, [initializeAuth]);
 
     // Initialize game data when leagueId changes
     useEffect(() => {
+        console.log('[StoreInitializer] leagueId changed:', leagueId);
         if (!leagueId) return;
 
         const initializeGame = async () => {

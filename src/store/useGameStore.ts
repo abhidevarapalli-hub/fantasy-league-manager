@@ -417,6 +417,7 @@ export const useGameStore = create<GameState>()(
 
             // Data fetching
             fetchAllData: async (leagueId) => {
+                console.log('[useGameStore] fetchAllData called for league:', leagueId);
                 set({ loading: true, currentLeagueId: leagueId });
 
                 try {
@@ -448,11 +449,18 @@ export const useGameStore = create<GameState>()(
                         supabase.from("transactions" as any).select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
                     ]);
 
+                    const players = (playersRes.data as any)?.map(mapDbPlayer) || [];
+                    const managers = (managersRes.data as any)?.map(mapDbManager) || [];
+                    const schedule = (scheduleRes.data as any)?.map(mapDbSchedule) || [];
+                    const activities = (transactionsRes.data as any)?.map(mapDbTransaction) || [];
+
+                    console.log('[useGameStore] Fetched', players.length, 'players,', managers.length, 'managers');
+
                     set({
-                        players: (playersRes.data as any)?.map(mapDbPlayer) || [],
-                        managers: (managersRes.data as any)?.map(mapDbManager) || [],
-                        schedule: (scheduleRes.data as any)?.map(mapDbSchedule) || [],
-                        activities: (transactionsRes.data as any)?.map(mapDbTransaction) || [],
+                        players,
+                        managers,
+                        schedule,
+                        activities,
                     });
                 } finally {
                     set({ loading: false });
