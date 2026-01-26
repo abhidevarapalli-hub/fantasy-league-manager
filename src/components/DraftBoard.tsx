@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, User, Plane } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { useDraft } from '@/hooks/useDraft';
 import type { Manager, Player } from '@/lib/supabase-types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -143,7 +143,9 @@ interface DraftBoardProps {
 }
 
 export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
-  const { managers, players, config } = useGame();
+  const managers = useGameStore(state => state.managers);
+  const players = useGameStore(state => state.players);
+  const config = useGameStore(state => state.config);
   const {
     draftState,
     loading,

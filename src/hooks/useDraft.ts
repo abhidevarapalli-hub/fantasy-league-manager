@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DraftPick, DraftOrder, DraftState, mapDbDraftPick, mapDbDraftOrder, mapDbDraftState, DbDraftPick, DbDraftOrder, DbDraftState } from '@/lib/draft-types';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { toast } from 'sonner';
 import { Player } from '@/lib/supabase-types';
 import { buildOptimalActive11 } from '@/lib/roster-validation';
 
 export const useDraft = () => {
-  const { managers, players } = useGame();
+  const managers = useGameStore(state => state.managers);
+  const players = useGameStore(state => state.players);
   const [draftPicks, setDraftPicks] = useState<DraftPick[]>([]);
   const [draftOrder, setDraftOrder] = useState<DraftOrder[]>([]);
   const [draftState, setDraftState] = useState<DraftState | null>(null);
@@ -17,7 +18,7 @@ export const useDraft = () => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      
+
       const [picksRes, orderRes, stateRes] = await Promise.all([
         supabase.from('draft_picks').select('*'),
         supabase.from('draft_order').select('*').order('position'),
@@ -102,7 +103,7 @@ export const useDraft = () => {
     if (!orderItem) return;
 
     // Optimistic update
-    setDraftOrder(prev => prev.map(o => 
+    setDraftOrder(prev => prev.map(o =>
       o.position === position ? { ...o, managerId } : o
     ));
 
@@ -113,7 +114,7 @@ export const useDraft = () => {
 
     if (error) {
       // Revert on error
-      setDraftOrder(prev => prev.map(o => 
+      setDraftOrder(prev => prev.map(o =>
         o.position === position ? { ...o, managerId: orderItem.managerId } : o
       ));
       toast.error('Failed to assign manager');
@@ -134,7 +135,7 @@ export const useDraft = () => {
     if (existingPick) {
       // Optimistic update for existing pick
       const oldPlayerId = existingPick.playerId;
-      setDraftPicks(prev => prev.map(p => 
+      setDraftPicks(prev => prev.map(p =>
         p.id === existingPick.id ? { ...p, playerId, managerId: orderItem.managerId } : p
       ));
 
@@ -145,7 +146,7 @@ export const useDraft = () => {
 
       if (error) {
         // Revert on error
-        setDraftPicks(prev => prev.map(p => 
+        setDraftPicks(prev => prev.map(p =>
           p.id === existingPick.id ? { ...p, playerId: oldPlayerId } : p
         ));
         toast.error('Failed to update pick');
@@ -183,7 +184,7 @@ export const useDraft = () => {
         console.error(error);
       } else if (data) {
         // Replace temp pick with real one
-        setDraftPicks(prev => prev.map(p => 
+        setDraftPicks(prev => prev.map(p =>
           p.id === tempId ? mapDbDraftPick(data as unknown as DbDraftPick) : p
         ));
       }
@@ -211,7 +212,7 @@ export const useDraft = () => {
     try {
       // Group picks by manager
       const picksByManager = new Map<string, string[]>();
-      
+
       for (const pick of draftPicks) {
         if (pick.managerId && pick.playerId) {
           const existing = picksByManager.get(pick.managerId) || [];
@@ -243,10 +244,10 @@ export const useDraft = () => {
         const draftedPlayers: Player[] = playerIds
           .map(id => players.find(p => p.id === id))
           .filter((p): p is Player => p !== undefined);
-        
+
         // Build optimal Active 11 based on positional requirements
         const { active, bench } = buildOptimalActive11(draftedPlayers);
-        
+
         const activeRoster = active.map(p => p.id);
         const benchRoster = bench.map(p => p.id);
 
@@ -293,7 +294,7 @@ export const useDraft = () => {
     try {
       // Delete all picks
       await supabase.from('draft_picks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      
+
       // Reset draft order (remove manager assignments)
       for (const order of draftOrder) {
         await supabase.from('draft_order').update({ manager_id: null }).eq('id', order.id);

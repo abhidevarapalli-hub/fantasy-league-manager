@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Trade, DbTrade, mapDbTrade } from '@/lib/trade-types';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 
 export const useTrades = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
-  const { managers, players, executeTrade } = useGame();
+  const managers = useGameStore(state => state.managers);
+  const players = useGameStore(state => state.players);
+  const executeTrade = useGameStore(state => state.executeTrade);
 
   // Fetch trades
   useEffect(() => {

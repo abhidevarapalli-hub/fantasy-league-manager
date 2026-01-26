@@ -3,7 +3,7 @@ import { ChevronUp, ChevronDown, Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlayerCard } from '@/components/PlayerCard';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { sortPlayersByPriority } from '@/lib/player-order';
 import { cn } from '@/lib/utils';
 
@@ -45,7 +45,7 @@ interface AvailablePlayersDrawerProps {
 }
 
 export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: AvailablePlayersDrawerProps) => {
-  const { players } = useGame();
+  const players = useGameStore(state => state.players);
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
