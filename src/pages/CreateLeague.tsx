@@ -8,13 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/useAuthStore';
 
 import { toast } from 'sonner';
 
 const CreateLeague = () => {
     const navigate = useNavigate();
-    const { user, userProfile, selectManager } = useAuth();
+    const user = useAuthStore(state => state.user);
+    const userProfile = useAuthStore(state => state.userProfile);
+    const selectManager = useAuthStore(state => state.selectManager);
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
 

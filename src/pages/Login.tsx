@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 
 import { AlertCircle, Trophy, Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,12 @@ const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const leagueId = searchParams.get('leagueId');
-  const { user, userProfile, managerProfile, selectManager, fetchManagerProfile, isLoading: authLoading } = useAuth();
+  const user = useAuthStore(state => state.user);
+  const userProfile = useAuthStore(state => state.userProfile);
+  const managerProfile = useAuthStore(state => state.managerProfile);
+  const selectManager = useAuthStore(state => state.selectManager);
+  const fetchManagerProfile = useAuthStore(state => state.fetchManagerProfile);
+  const authLoading = useAuthStore(state => state.isLoading);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');

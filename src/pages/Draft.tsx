@@ -1,13 +1,14 @@
 import { AppLayout } from '@/components/AppLayout';
 import { DraftBoard } from '@/components/DraftBoard';
 import { MockDraftBoard } from '@/components/MockDraftBoard';
-import { useGame } from '@/contexts/GameContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useGameStore } from '@/store/useGameStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { Lock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Draft = () => {
-  const { loading, isLeagueManager } = useGame();
+  const loading = useGameStore(state => state.loading);
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
 
   if (loading) {

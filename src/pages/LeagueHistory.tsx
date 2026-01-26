@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
-import { useGame } from '@/contexts/GameContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useGameStore } from '@/store/useGameStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trophy, Medal, TrendingUp, Calendar, User } from 'lucide-react';
@@ -38,8 +38,9 @@ interface CombinedRecord {
 const ALL_MANAGER_NAMES = ['Abhi', 'Akash', 'Jasthi', 'Krishna', 'Krithik', 'Kush', 'Sahith', 'Santosh', 'Vamsi'];
 
 const LeagueHistory = () => {
-  const { managers, schedule } = useGame();
-  const { user } = useAuth();
+  const managers = useGameStore(state => state.managers);
+  const schedule = useGameStore(state => state.schedule);
+  const userProfile = useAuthStore(state => state.userProfile);
   const [historicalRecords, setHistoricalRecords] = useState<HistoricalRecord[]>([]);
   const [headToHead, setHeadToHead] = useState<HeadToHead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +90,7 @@ const LeagueHistory = () => {
   // Calculate current season H2H from finalized matches
   const getCurrentSeasonH2H = (): Map<string, Map<string, { wins: number; losses: number }>> => {
     const h2hMap = new Map<string, Map<string, { wins: number; losses: number }>>();
-    
+
     // Initialize map for all managers
     managers.forEach(m => {
       h2hMap.set(m.name, new Map());
@@ -99,11 +100,11 @@ const LeagueHistory = () => {
     schedule.filter(match => match.completed).forEach(match => {
       const homeManager = managers.find(m => m.id === match.home);
       const awayManager = managers.find(m => m.id === match.away);
-      
+
       if (!homeManager || !awayManager || match.homeScore === undefined || match.awayScore === undefined) return;
 
       const homeWins = match.homeScore > match.awayScore;
-      
+
       // Update home manager's record vs away
       const homeVsAway = h2hMap.get(homeManager.name)?.get(awayManager.name) || { wins: 0, losses: 0 };
       homeVsAway.wins += homeWins ? 1 : 0;
@@ -123,16 +124,16 @@ const LeagueHistory = () => {
   // Combine historical + current season records
   const getCombinedRecords = (): CombinedRecord[] => {
     const activeManagerNames = managers.map(m => m.name);
-    
+
     return ALL_MANAGER_NAMES.map(name => {
       const historical = historicalRecords.find(r => r.manager_name === name);
       const current = getCurrentSeasonRecord(name);
       const isActive = activeManagerNames.includes(name);
-      
+
       const totalWins = (historical?.historical_wins || 0) + current.wins;
       const totalLosses = (historical?.historical_losses || 0) + current.losses;
       const totalGames = totalWins + totalLosses;
-      
+
       return {
         name,
         championships: historical?.championships || 0,
@@ -153,17 +154,17 @@ const LeagueHistory = () => {
   // Get combined H2H record (historical + current)
   const getCombinedH2H = (manager1: string, manager2: string): { wins: number; losses: number } => {
     if (manager1 === manager2) return { wins: 0, losses: 0 };
-    
+
     // Find historical record
     let historicalWins = 0;
     let historicalLosses = 0;
-    
+
     // Check both orderings since we store alphabetically
     const record = headToHead.find(
       h => (h.manager1_name === manager1 && h.manager2_name === manager2) ||
-           (h.manager1_name === manager2 && h.manager2_name === manager1)
+        (h.manager1_name === manager2 && h.manager2_name === manager1)
     );
-    
+
     if (record) {
       if (record.manager1_name === manager1) {
         historicalWins = record.manager1_wins;
@@ -173,11 +174,11 @@ const LeagueHistory = () => {
         historicalLosses = record.manager1_wins;
       }
     }
-    
+
     // Add current season
     const currentH2H = getCurrentSeasonH2H();
     const currentRecord = currentH2H.get(manager1)?.get(manager2) || { wins: 0, losses: 0 };
-    
+
     return {
       wins: historicalWins + currentRecord.wins,
       losses: historicalLosses + currentRecord.losses
@@ -240,11 +241,11 @@ const LeagueHistory = () => {
                 </TableHeader>
                 <TableBody>
                   {combinedRecords.map((record, index) => (
-                    <TableRow 
+                    <TableRow
                       key={record.name}
                       className={cn(
                         !record.isActive && "opacity-60",
-                        record.name === user?.name && "bg-secondary/10 border-l-2 border-l-secondary"
+                        record.name === userProfile?.name && "bg-secondary/10 border-l-2 border-l-secondary"
                       )}
                     >
                       <TableCell className="font-medium">
@@ -292,8 +293,8 @@ const LeagueHistory = () => {
                   <TableRow className="bg-muted/50">
                     <TableHead className="sticky left-0 bg-muted/50 z-10 min-w-[80px]"></TableHead>
                     {ALL_MANAGER_NAMES.map(name => (
-                      <TableHead 
-                        key={name} 
+                      <TableHead
+                        key={name}
                         className="text-center text-xs font-semibold min-w-[60px] px-1"
                       >
                         {name}
@@ -303,13 +304,13 @@ const LeagueHistory = () => {
                 </TableHeader>
                 <TableBody>
                   {ALL_MANAGER_NAMES.map(rowManager => (
-                    <TableRow 
+                    <TableRow
                       key={rowManager}
-                      className={cn(rowManager === user?.name && "bg-secondary/10")}
+                      className={cn(rowManager === userProfile?.name && "bg-secondary/10")}
                     >
                       <TableCell className={cn(
                         "sticky left-0 z-10 font-semibold text-xs",
-                        rowManager === user?.name ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
+                        rowManager === userProfile?.name ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
                       )}>
                         {rowManager}
                       </TableCell>
@@ -323,8 +324,8 @@ const LeagueHistory = () => {
                         }
                         const record = getCombinedH2H(rowManager, colManager);
                         return (
-                          <TableCell 
-                            key={colManager} 
+                          <TableCell
+                            key={colManager}
                             className={cn(
                               "text-center text-xs font-medium whitespace-nowrap",
                               record.wins > record.losses && "text-green-600",

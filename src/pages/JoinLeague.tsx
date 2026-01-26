@@ -6,13 +6,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/useAuthStore';
 import { toast } from 'sonner';
 
 const JoinLeague = () => {
     const { leagueId } = useParams<{ leagueId: string }>();
     const navigate = useNavigate();
-    const { user, userProfile } = useAuth();
+    const user = useAuthStore(state => state.user);
+    const userProfile = useAuthStore(state => state.userProfile);
     const [teamName, setTeamName] = useState('');
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(false);

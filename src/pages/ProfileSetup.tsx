@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,9 @@ import { cn } from "@/lib/utils";
 
 
 const ProfileSetup = () => {
-    const { user, userProfile, updateUsername } = useAuth();
+    const user = useAuthStore(state => state.user);
+    const userProfile = useAuthStore(state => state.userProfile);
+    const updateUsername = useAuthStore(state => state.updateUsername);
     const navigate = useNavigate();
     const [username, setUsername] = useState("");
     const [loading, setLoading] = useState(false);

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 import { PlusCircle, Loader2, ChevronRight, Trash2, UserCircle, LogOut } from 'lucide-react';
 
@@ -16,7 +16,10 @@ interface League {
 }
 
 const Leagues = () => {
-    const { user, userProfile, signOut, isLoading } = useAuth();
+    const user = useAuthStore(state => state.user);
+    const userProfile = useAuthStore(state => state.userProfile);
+    const signOut = useAuthStore(state => state.signOut);
+    const isLoading = useAuthStore(state => state.isLoading);
 
     const navigate = useNavigate();
     const [leagues, setLeagues] = useState<League[]>([]);
