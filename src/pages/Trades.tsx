@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ArrowLeftRight, Inbox, Send, Check, X, RotateCcw, Loader2 } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useGameStore } from '@/store/useGameStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useTrades } from '@/hooks/useTrades';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,12 @@ import { Trade } from '@/lib/trade-types';
 import { cn } from '@/lib/utils';
 
 const Trades = () => {
-  const { managers, players, isLeagueManager, loading: gameLoading } = useGame();
-  const { managerProfile } = useAuth();
+  // Zustand selectors
+  const managers = useGameStore(state => state.managers);
+  const players = useGameStore(state => state.players);
+  const gameLoading = useGameStore(state => state.loading);
+  const managerProfile = useAuthStore(state => state.managerProfile);
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
   const {
     trades,

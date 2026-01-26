@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowLeftRight, Trophy, Lock } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useGameStore } from '@/store/useGameStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { PlayerCard } from '@/components/PlayerCard';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -36,9 +36,16 @@ const roleIcons: Record<string, string> = {
 const TeamView = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
-  const { managers, players, moveToActive, moveToBench, dropPlayerOnly, swapPlayers, config } = useGame();
 
-  const { canEditTeam } = useAuth();
+  // Zustand selectors
+  const managers = useGameStore(state => state.managers);
+  const players = useGameStore(state => state.players);
+  const config = useGameStore(state => state.config);
+  const moveToActive = useGameStore(state => state.moveToActive);
+  const moveToBench = useGameStore(state => state.moveToBench);
+  const dropPlayerOnly = useGameStore(state => state.dropPlayerOnly);
+  const swapPlayers = useGameStore(state => state.swapPlayers);
+  const canEditTeam = useAuthStore(state => state.canEditTeam);
 
   // Swap states
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);

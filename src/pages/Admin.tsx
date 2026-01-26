@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check, RefreshCw } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useGameStore } from '@/store/useGameStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,37 +18,34 @@ const IPL_TEAMS = ['MI', 'KKR', 'CSK', 'RR', 'RCB', 'DC', 'GT', 'LSG', 'PBKS', '
 const Admin = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const {
-    managers,
-    players,
-    schedule,
-    updateMatchScore,
-    finalizeWeekScores,
-    resetLeague,
-    executeTrade,
-    addFreeAgent,
-    getFreeAgents,
-    getManagerRosterCount,
-    addNewPlayer,
-    dropPlayerOnly,
-    reseedPlayers,
-    reseeding,
-    config,
-    isLeagueManager,
-    loading: gameLoading,
-    leagueOwnerId,
-    refetch,
-  } = useGame();
+
+  // Zustand selectors
+  const managers = useGameStore(state => state.managers);
+  const players = useGameStore(state => state.players);
+  const schedule = useGameStore(state => state.schedule);
+  const config = useGameStore(state => state.config);
+  const loading = useGameStore(state => state.loading);
+  const updateMatchScore = useGameStore(state => state.updateMatchScore);
+  const finalizeWeekScores = useGameStore(state => state.finalizeWeekScores);
+  const resetLeague = useGameStore(state => state.resetLeague);
+  const executeTrade = useGameStore(state => state.executeTrade);
+  const addFreeAgent = useGameStore(state => state.addFreeAgent);
+  const getFreeAgents = useGameStore(state => state.getFreeAgents);
+  const getManagerRosterCount = useGameStore(state => state.getManagerRosterCount);
+  const addNewPlayer = useGameStore(state => state.addNewPlayer);
+  const dropPlayerOnly = useGameStore(state => state.dropPlayerOnly);
+  const leagueOwnerId = useGameStore(state => state.leagueOwnerId);
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const [removingMember, setRemovingMember] = useState<string | null>(null);
 
   const ROSTER_CAP = config.activeSize + config.benchSize;
 
   // If not league manager, redirect home
   useEffect(() => {
-    if (!gameLoading && !isLeagueManager) {
+    if (!loading && !isLeagueManager) {
       navigate('/');
     }
-  }, [isLeagueManager, gameLoading, navigate]);
+  }, [isLeagueManager, loading, navigate]);
 
 
 
@@ -283,7 +280,6 @@ const Admin = () => {
       if (updateError) throw updateError;
 
       toast.success('Member removed successfully');
-      await refetch();
     } catch (error: any) {
       toast.error(`Failed to remove member: ${error.message}`);
     } finally {
@@ -291,7 +287,7 @@ const Admin = () => {
     }
   };
 
-  if (gameLoading) {
+  if (loading) {
     return (
       <AppLayout title="League Manager Settings" subtitle="Checking credentials...">
         <div className="min-h-[400px] flex items-center justify-center">
@@ -734,40 +730,15 @@ const Admin = () => {
             {/* Reseed Players */}
             {!showReseedConfirm ? (
               <Button
-                onClick={() => setShowReseedConfirm(true)}
+                onClick={() => toast.warning('Reseed functionality coming soon')}
                 variant="outline"
-                disabled={reseeding}
+                disabled={true}
                 className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Reseed Player Database
+                Reseed Player Database (Not Available)
               </Button>
-            ) : (
-              <div className="space-y-3 p-3 bg-primary/10 rounded-lg border border-primary/30">
-                <p className="text-sm text-primary">
-                  ⚠️ This will delete all players and reload from the updated roster list. All manager rosters will be cleared!
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setShowReseedConfirm(false)}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      await reseedPlayers();
-                      setShowReseedConfirm(false);
-                    }}
-                    disabled={reseeding}
-                    className="flex-1"
-                  >
-                    {reseeding ? 'Reseeding...' : 'Confirm Reseed'}
-                  </Button>
-                </div>
-              </div>
-            )}
+            ) : null}
 
             {/* Reset League */}
             {!showResetConfirm ? (
