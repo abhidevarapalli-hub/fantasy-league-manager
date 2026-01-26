@@ -461,46 +461,14 @@ export const useRealtimeGame = (leagueId?: string) => {
 
   const recalculateAllStandings = async () => {
     if (!leagueId) return;
-    const { data: allMatches, error } = await supabase
-      .from("schedule")
-      .select("*")
-      .eq("league_id", leagueId)
-      .eq("is_finalized", true);
 
-    if (error || !allMatches) return;
+    // Call Postgres function to recalculate standings in a single transaction
+    const { error } = await supabase.rpc('update_league_standings', {
+      league_uuid: leagueId
+    });
 
-    const standings: Record<string, { wins: number; losses: number; points: number }> = {};
-    for (const manager of managers) {
-      standings[manager.id] = { wins: 0, losses: 0, points: 0 };
-    }
-
-    for (const match of allMatches) {
-      const homeId = match.home_manager_id;
-      const awayId = match.away_manager_id;
-      const homeScore = match.home_score ?? 0;
-      const awayScore = match.away_score ?? 0;
-
-      if (homeId && standings[homeId]) {
-        standings[homeId].points += homeScore;
-        if (homeScore > awayScore) standings[homeId].wins += 1;
-        else if (homeScore < awayScore) standings[homeId].losses += 1;
-      }
-      if (awayId && standings[awayId]) {
-        standings[awayId].points += awayScore;
-        if (awayScore > homeScore) standings[awayId].wins += 1;
-        else if (awayScore < homeScore) standings[awayId].losses += 1;
-      }
-    }
-
-    for (const [managerId, stats] of Object.entries(standings)) {
-      await supabase
-        .from("managers")
-        .update({
-          wins: stats.wins,
-          losses: stats.losses,
-          points: stats.points,
-        })
-        .eq("id", managerId);
+    if (error) {
+      console.error('Error updating standings:', error);
     }
   };
 
