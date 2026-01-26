@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Search, X, Filter } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useGameStore } from '@/store/useGameStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useTrades } from '@/hooks/useTrades';
 import { PlayerCard } from '@/components/PlayerCard';
 import { AppLayout } from '@/components/AppLayout';
@@ -47,8 +47,11 @@ const nationalityFilterColors: Record<string, string> = {
 };
 
 const Players = () => {
-  const { players, managers, isLeagueManager } = useGame();
-  const { managerProfile } = useAuth();
+  // Zustand selectors - ONLY re-render when these specific pieces change
+  const players = useGameStore(state => state.players);
+  const managers = useGameStore(state => state.managers);
+  const managerProfile = useAuthStore(state => state.managerProfile);
+  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
   const { proposeTrade } = useTrades();
   const [searchQuery, setSearchQuery] = useState('');
