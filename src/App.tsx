@@ -54,7 +54,7 @@ const AppRoutes = () => {
   // Helper for protected routes
   // - Must be logged in
   // - Must have claimed a profile (unless we are on the login page which handles claiming)
-  const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const ProtectedRoute = ({ children, requireUsername = true }: { children: React.ReactNode; requireUsername?: boolean }) => {
     if (!user) {
 
       // Save the intended destination for join links
@@ -71,8 +71,8 @@ const AppRoutes = () => {
       return <div className="min-h-screen flex items-center justify-center p-4">Loading profile...</div>;
     }
 
-    // Enforce username setup if not on setup page
-    if (!userProfile?.username && window.location.pathname !== '/leagues/setup') {
+    // Only enforce username for routes that require it
+    if (requireUsername && !userProfile?.username && window.location.pathname !== '/leagues/setup') {
 
       // Save the intended destination for join links
       if (window.location.pathname.startsWith('/join/')) {
@@ -110,6 +110,9 @@ const AppRoutes = () => {
       } />
       <Route path="/join/:leagueId" element={
         <ProtectedRoute><JoinLeague /></ProtectedRoute>
+      } />
+      <Route path="/scores/live" element={
+        <ProtectedRoute requireUsername={false}><LiveScores /></ProtectedRoute>
       } />
 
 

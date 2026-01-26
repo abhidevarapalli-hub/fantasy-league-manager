@@ -1,73 +1,105 @@
-# Welcome to your Lovable project
+# Fantasy League Manager
 
-## Project info
+A fantasy cricket league management application that lets you create leagues, draft players, manage rosters, and track live scores.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **League Management**: Create and manage multiple fantasy cricket leagues
+- **Player Drafts**: Conduct live drafts with your league members or run mock drafts to practice
+- **Roster Management**: Build and manage your team roster with validation rules
+- **Live Scores**: Track real-time cricket match scores via Cricbuzz integration
+- **Trading System**: Propose and negotiate trades with other managers
+- **Standings & History**: View league standings and historical performance
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI Components**: shadcn/ui + Radix UI primitives
+- **Styling**: Tailwind CSS
+- **State Management**: Zustand + React Query
+- **Backend**: Supabase (PostgreSQL, Authentication, Realtime)
+- **Cricket Data**: RapidAPI Cricbuzz Cricket API
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js 18+ (install via [nvm](https://github.com/nvm-sh/nvm))
+- npm or bun package manager
+- [Supabase](https://supabase.com/) account and project
+- [RapidAPI](https://rapidapi.com/) account with Cricbuzz Cricket API subscription
 
-**Use your preferred IDE**
+## Getting Started
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 1. Clone the repository
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+git clone <repository-url>
+cd fantasy-league-manager
 ```
 
-**Edit a file directly in GitHub**
+### 2. Set up environment variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Copy the example environment file and fill in your credentials:
 
-**Use GitHub Codespaces**
+```bash
+cp .env.example .env
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Edit `.env` with your actual values:
 
-## What technologies are used for this project?
+- `VITE_SUPABASE_PROJECT_ID`: Your Supabase project ID
+- `VITE_SUPABASE_PUBLISHABLE_KEY`: Your Supabase anon/public key
+- `VITE_SUPABASE_URL`: Your Supabase project URL
+- `VITE_RAPIDAPI_KEY`: Your RapidAPI key for Cricbuzz
+- `VITE_RAPIDAPI_HOST`: Cricbuzz API host (usually `cricbuzz-cricket.p.rapidapi.com`)
 
-This project is built with:
+### 3. Install dependencies
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+npm install
+# or
+bun install
+```
 
-## How can I deploy this project?
+### 4. Run the development server
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```bash
+npm run dev
+# or
+bun dev
+```
 
-## Can I connect a custom domain to my Lovable project?
+The app will be available at `http://localhost:5173`
 
-Yes, you can!
+## Available Scripts
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server with hot reload |
+| `npm run build` | Build for production |
+| `npm run build:dev` | Build in development mode |
+| `npm run lint` | Run ESLint |
+| `npm run preview` | Preview production build locally |
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Database Setup
+
+This project uses Supabase. Database migrations are located in the `supabase/migrations/` directory. To apply migrations:
+
+1. Install the [Supabase CLI](https://supabase.com/docs/guides/cli)
+2. Link your project: `supabase link --project-ref <your-project-id>`
+3. Push migrations: `supabase db push`
+
+## Project Structure
+
+```
+src/
+├── components/     # React components (UI, features)
+├── contexts/       # React contexts (Auth, Game state)
+├── hooks/          # Custom React hooks
+├── integrations/   # External service clients (Supabase, Cricbuzz)
+├── lib/            # Utilities and type definitions
+└── pages/          # Page components (routes)
+```
+
+## License
+
+This project is private.
