@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Menu, Target } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,9 +47,11 @@ export function AppSidebar() {
     { title: 'Trades', url: `/${leagueId}/trades`, icon: ArrowLeftRight },
     { title: 'Activity', url: `/${leagueId}/activity`, icon: Activity },
     { title: 'Draft', url: `/${leagueId}/draft`, icon: ClipboardList },
-    ...(isLeagueManager ? [{ title: 'Admin', url: `/${leagueId}/admin`, icon: Settings }] : []),
+    ...(isLeagueManager ? [
+      { title: 'Scoring', url: `/${leagueId}/scoring`, icon: Target },
+      { title: 'Admin', url: `/${leagueId}/admin`, icon: Settings },
+    ] : []),
   ] : [
-
     { title: 'Leagues', url: '/leagues', icon: LayoutDashboard },
   ];
 

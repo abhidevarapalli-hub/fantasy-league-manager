@@ -24,6 +24,8 @@ import ProfileSetup from "./pages/ProfileSetup";
 import Leagues from "@/pages/Leagues";
 import CreateLeague from "@/pages/CreateLeague";
 import JoinLeague from "@/pages/JoinLeague";
+import LiveScores from "@/pages/LiveScores";
+import ScoringRules from "@/pages/ScoringRules";
 
 
 import NotFound from "./pages/NotFound";
@@ -118,7 +120,7 @@ const AppRoutes = () => {
         <Route path="/:leagueId/activity" element={<Activity />} />
         <Route path="/:leagueId/trades" element={<Trades />} />
         <Route path="/:leagueId/admin" element={<Admin />} />
-
+        <Route path="/:leagueId/scoring" element={<ScoringRules />} />
         <Route path="/:leagueId/draft" element={<Draft />} />
         <Route path="/:leagueId/history" element={<LeagueHistory />} />
         <Route path="/:leagueId/team/:teamId" element={<TeamView />} />
