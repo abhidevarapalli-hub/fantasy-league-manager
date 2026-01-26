@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/toaster";
 import React, { useEffect } from 'react';
+import { StoreInitializer } from "@/components/StoreInitializer";
 
 
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -143,6 +144,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <StoreInitializer />
           <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
