@@ -417,7 +417,6 @@ export const useGameStore = create<GameState>()(
 
             // Data fetching
             fetchAllData: async (leagueId) => {
-                console.log('[useGameStore] fetchAllData called for league:', leagueId);
                 set({ loading: true, currentLeagueId: leagueId });
 
                 try {
