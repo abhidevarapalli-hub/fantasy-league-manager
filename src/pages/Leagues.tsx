@@ -23,17 +23,14 @@ const Leagues = () => {
     const [loading, setLoading] = useState(true);
 
     const fetchLeagues = useCallback(async () => {
-        console.log('fetchLeagues called - user:', user, 'isLoading:', isLoading);
 
         if (!user || !user.id) {
-            console.log('No user or user.id, skipping fetch');
             setLoading(false);
             return;
         }
 
         setLoading(true);
         try {
-            console.log("Fetching leagues for user:", user.id);
 
             // Fetch leagues where the user is the owner OR a manager
             const { data: managerData, error: managerError } = await (supabase
@@ -46,16 +43,13 @@ const Leagues = () => {
                 throw managerError;
             }
 
-            console.log('Manager data:', managerData);
 
             // Get unique league IDs and filter out nulls
             const leagueIds = (managerData?.map((m: any) => m.league_id) || [])
                 .filter((id: string | null) => id !== null);
 
-            console.log('League IDs (filtered):', leagueIds);
 
             if (leagueIds.length === 0) {
-                console.log('No leagues found for user');
                 setLeagues([]);
                 setLoading(false);
                 return;
@@ -72,7 +66,6 @@ const Leagues = () => {
                 throw error;
             }
 
-            console.log("Leagues fetched:", data);
             setLeagues(data || []);
         } catch (error: any) {
             console.error('Error in fetchLeagues:', error.message);
@@ -83,7 +76,6 @@ const Leagues = () => {
     }, [user, isLoading]);
 
     useEffect(() => {
-        console.log('useEffect triggered - user:', user, 'isLoading:', isLoading);
         if (user && user.id) {
             fetchLeagues();
         } else if (!isLoading) {

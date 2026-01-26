@@ -41,7 +41,7 @@ export const UserMenu = () => {
   if (!managerProfile && !userProfile) return null;
 
   const displayName = managerProfile?.name || userProfile?.username || 'User';
-  const displayTeam = managerProfile?.teamName || (leagueId ? 'Joining...' : '');
+  const displayTeam = managerProfile?.teamName || '';
 
 
   return (

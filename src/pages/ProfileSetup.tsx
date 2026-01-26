@@ -66,7 +66,6 @@ const ProfileSetup = () => {
             // Check if there's a saved redirect (e.g., from join link)
             const redirectPath = sessionStorage.getItem('redirectAfterSetup');
             if (redirectPath) {
-                console.log('Redirecting to saved path:', redirectPath);
                 sessionStorage.removeItem('redirectAfterSetup');
                 navigate(redirectPath);
             } else {

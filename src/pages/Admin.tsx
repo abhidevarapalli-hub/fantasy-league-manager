@@ -46,7 +46,6 @@ const Admin = () => {
   // If not league manager, redirect home
   useEffect(() => {
     if (!gameLoading && !isLeagueManager) {
-      console.log("Redirecting unauthorized user from Admin suite");
       navigate('/');
     }
   }, [isLeagueManager, gameLoading, navigate]);
@@ -286,7 +285,6 @@ const Admin = () => {
       toast.success('Member removed successfully');
       await refetch();
     } catch (error: any) {
-      console.error('Error removing member:', error);
       toast.error(`Failed to remove member: ${error.message}`);
     } finally {
       setRemovingMember(null);
@@ -295,7 +293,7 @@ const Admin = () => {
 
   if (gameLoading) {
     return (
-      <AppLayout title="Admin Suite" subtitle="Checking credentials...">
+      <AppLayout title="League Manager Settings" subtitle="Checking credentials...">
         <div className="min-h-[400px] flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <RefreshCw className="w-8 h-8 animate-spin text-primary opacity-50" />
@@ -307,7 +305,7 @@ const Admin = () => {
   }
 
   return (
-    <AppLayout title="Admin Suite" subtitle="League management tools">
+    <AppLayout title="League Manager Settings" subtitle="League management tools">
 
       <div className="px-4 py-4 space-y-6">
         {/* Score Input */}

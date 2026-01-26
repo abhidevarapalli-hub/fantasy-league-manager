@@ -110,7 +110,7 @@ const Trades = () => {
       <div className="px-4 py-4">
         {!currentManager ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">Please log in to view trades</p>
+            <p className="text-muted-foreground">Loading your manager profile...</p>
           </div>
         ) : (
           <Tabs defaultValue="incoming" className="w-full">

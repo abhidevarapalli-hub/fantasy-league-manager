@@ -36,18 +36,10 @@ const queryClient = new QueryClient();
 const AppRoutes = () => {
   const { user, userProfile, managerProfile, isLeagueManager, isLoading, fetchManagerProfile } = useAuth();
 
-  console.log('=== AppRoutes rendered ===');
-  console.log('Current path:', window.location.pathname);
-  console.log('user:', user?.id);
-  console.log('userProfile:', userProfile);
-  console.log('isLoading:', isLoading);
-
   // Auto-fetch manager profile when league changing
   const { leagueId } = useParams<{ leagueId: string }>();
   useEffect(() => {
-    console.log('AppRoutes useEffect - leagueId:', leagueId);
     if (user && leagueId && (!managerProfile || managerProfile.league_id !== leagueId)) {
-      console.log('Fetching manager profile for leagueId:', leagueId);
       fetchManagerProfile(undefined, leagueId);
     }
   }, [leagueId, user, managerProfile, fetchManagerProfile]);
@@ -61,17 +53,10 @@ const AppRoutes = () => {
   // - Must be logged in
   // - Must have claimed a profile (unless we are on the login page which handles claiming)
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    console.log('=== ProtectedRoute check ===');
-    console.log('Path:', window.location.pathname);
-    console.log('user:', !!user);
-    console.log('userProfile.username:', userProfile?.username);
-
     if (!user) {
-      console.log('No user, redirecting to /login');
 
       // Save the intended destination for join links
       if (window.location.pathname.startsWith('/join/')) {
-        console.log('Saving join link for after login');
         sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
       }
 
@@ -81,24 +66,20 @@ const AppRoutes = () => {
     // Wait for userProfile to load before checking username
     // This prevents false redirects when profile is still loading
     if (userProfile === null) {
-      console.log('userProfile is null, showing loading state');
       return <div className="min-h-screen flex items-center justify-center p-4">Loading profile...</div>;
     }
 
     // Enforce username setup if not on setup page
     if (!userProfile?.username && window.location.pathname !== '/leagues/setup') {
-      console.log('No username, redirecting to /leagues/setup');
 
       // Save the intended destination for join links
       if (window.location.pathname.startsWith('/join/')) {
-        console.log('Saving join link for after profile setup');
         sessionStorage.setItem('redirectAfterSetup', window.location.pathname);
       }
 
       return <Navigate to="/leagues/setup" replace />;
     }
 
-    console.log('ProtectedRoute passed, rendering children');
     return <>{children}</>;
   };
 

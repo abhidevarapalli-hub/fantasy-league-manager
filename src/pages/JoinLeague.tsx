@@ -22,19 +22,13 @@ const JoinLeague = () => {
 
     useEffect(() => {
         const checkLeagueStatus = async () => {
-            console.log('=== JoinLeague: checkLeagueStatus started ===');
-            console.log('leagueId:', leagueId);
-            console.log('user:', user);
-            console.log('userProfile:', userProfile);
 
             if (!leagueId || !user) {
-                console.log('Missing leagueId or user, exiting early');
                 setLoading(false);
                 return;
             }
 
             try {
-                console.log('Fetching league details for:', leagueId);
                 // Fetch league details
                 const { data: league, error: leagueError } = await (supabase
                     .from('leagues' as any)
@@ -42,21 +36,17 @@ const JoinLeague = () => {
                     .eq('id', leagueId)
                     .single() as any);
 
-                console.log('League query result:', { league, leagueError });
 
                 if (leagueError) {
                     console.error('Error fetching league:', leagueError);
                     toast.error('League not found');
-                    console.log('Redirecting to /leagues due to league error');
                     navigate('/leagues');
                     return;
                 }
 
-                console.log('League found:', league.name);
                 setLeagueName(league.name);
 
                 // Check if user is already a manager in this league
-                console.log('Checking if user is already a manager...');
                 const { data: existingManager } = await (supabase
                     .from('managers' as any)
                     .select('id')
@@ -64,23 +54,19 @@ const JoinLeague = () => {
                     .eq('user_id', user.id)
                     .maybeSingle() as any);
 
-                console.log('Existing manager check:', existingManager);
 
                 if (existingManager) {
-                    console.log('User is already a member, redirecting to dashboard');
                     setIsAlreadyMember(true);
                     navigate(`/${leagueId}`);
                     return;
                 }
 
                 // Check if there are available slots
-                console.log('Checking for available slots...');
                 const { data: managers, error: managersError } = await (supabase
                     .from('managers' as any)
                     .select('id, user_id')
                     .eq('league_id', leagueId) as any);
 
-                console.log('Managers query result:', { managers, managersError });
 
                 if (managersError) {
                     console.error('Error fetching managers:', managersError);
@@ -89,11 +75,9 @@ const JoinLeague = () => {
                 }
 
                 const availableSlots = managers?.filter((m: any) => m.user_id === null) || [];
-                console.log('Available slots:', availableSlots.length, 'Total managers:', managers?.length);
 
                 setIsFull(availableSlots.length === 0);
 
-                console.log('=== JoinLeague: checkLeagueStatus completed ===');
             } catch (error) {
                 console.error('Error checking league status:', error);
                 toast.error('An error occurred');

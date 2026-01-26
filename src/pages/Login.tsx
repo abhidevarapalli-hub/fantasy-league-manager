@@ -31,7 +31,6 @@ const Login = () => {
       // Check if there's a saved redirect from join link
       const redirectPath = sessionStorage.getItem('redirectAfterLogin');
       if (redirectPath) {
-        console.log('Redirecting to saved path after login:', redirectPath);
         sessionStorage.removeItem('redirectAfterLogin');
         navigate(redirectPath);
         return;
