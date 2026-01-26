@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, Plane, Play, RotateCcw, Timer } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
 import { useMockDraft } from '@/hooks/useMockDraft';
 import type { Player } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
@@ -134,7 +134,8 @@ const MockDraftCell = ({
 };
 
 export const MockDraftBoard = () => {
-  const { players, config } = useGame();
+  const players = useGameStore(state => state.players);
+  const config = useGameStore(state => state.config);
   const {
     state,
     isUserTurn,

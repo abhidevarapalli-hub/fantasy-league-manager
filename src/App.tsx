@@ -29,7 +29,7 @@ import ScoringRules from "@/pages/ScoringRules";
 
 
 import NotFound from "./pages/NotFound";
-import { Outlet, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 
 

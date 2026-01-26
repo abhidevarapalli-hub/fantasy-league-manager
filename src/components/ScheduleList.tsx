@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Match, Manager } from '@/lib/supabase-types';
 import { Calendar, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface HeadToHead {
   id: string;
@@ -21,7 +21,7 @@ interface ScheduleListProps {
 
 export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListProps) => {
   const [headToHead, setHeadToHead] = useState<HeadToHead[]>([]);
-  const { managerProfile } = useAuth();
+  const managerProfile = useAuthStore(state => state.managerProfile);
 
   // Find the logged-in user's manager
   const loggedInManager = managerProfile ? managers.find(m => m.id === managerProfile.id) : null;
