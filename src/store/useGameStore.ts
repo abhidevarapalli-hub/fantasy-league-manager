@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { Player, Manager, Match, Activity, PlayerTransaction } from '@/lib/supabase-types';
 import { DEFAULT_LEAGUE_CONFIG, LeagueConfig, canAddToActive } from '@/lib/roster-validation';
+import { ScoringRules, DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
 
 // Helper mappers from DB types to frontend types
 const mapDbPlayer = (db: Tables<"players">): Player => ({
@@ -50,6 +51,11 @@ interface RosterMoveResult {
     error?: string;
 }
 
+interface ScoringRulesResult {
+    success: boolean;
+    error?: string;
+}
+
 interface GameState {
     // Core data - subscribe to these individually for performance
     players: Player[];
@@ -57,6 +63,7 @@ interface GameState {
     schedule: Match[];
     activities: Activity[];
     config: LeagueConfig;
+    scoringRules: ScoringRules;
     leagueName: string;
     leagueOwnerId: string | null;
     currentWeek: number;
@@ -75,6 +82,7 @@ interface GameState {
     setSchedule: (schedule: Match[]) => void;
     setActivities: (activities: Activity[]) => void;
     setConfig: (config: LeagueConfig) => void;
+    setScoringRules: (rules: ScoringRules) => void;
     setLeagueName: (name: string) => void;
     setLeagueOwnerId: (id: string | null) => void;
     setLoading: (loading: boolean) => void;
@@ -115,6 +123,7 @@ interface GameState {
     addNewPlayer: (name: string, team: string, role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper', isInternational?: boolean) => Promise<void>;
     executeTrade: (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => Promise<void>;
     resetLeague: () => Promise<void>;
+    updateScoringRules: (rules: ScoringRules) => Promise<ScoringRulesResult>;
 
     // Data fetching
     fetchAllData: (leagueId: string) => Promise<void>;
@@ -132,6 +141,7 @@ export const useGameStore = create<GameState>()(
             schedule: [],
             activities: [],
             config: DEFAULT_LEAGUE_CONFIG,
+            scoringRules: DEFAULT_SCORING_RULES,
             leagueName: 'IPL Fantasy',
             leagueOwnerId: null,
             currentWeek: 1,
@@ -150,6 +160,7 @@ export const useGameStore = create<GameState>()(
             setSchedule: (schedule) => set({ schedule }),
             setActivities: (activities) => set({ activities }),
             setConfig: (config) => set({ config }),
+            setScoringRules: (scoringRules) => set({ scoringRules }),
             setLeagueName: (leagueName) => set({ leagueName }),
             setLeagueOwnerId: (leagueOwnerId) => set({ leagueOwnerId }),
             setLoading: (loading) => set({ loading }),
@@ -435,6 +446,32 @@ export const useGameStore = create<GameState>()(
                 await supabase.from("transactions").delete().eq("league_id", currentLeagueId);
             },
 
+            updateScoringRules: async (rules) => {
+                const { currentLeagueId } = get();
+                if (!currentLeagueId) {
+                    return { success: false, error: 'No league selected' };
+                }
+
+                try {
+                    const { error } = await supabase
+                        .from('leagues' as any)
+                        .update({ scoring_rules: rules })
+                        .eq('id', currentLeagueId);
+
+                    if (error) {
+                        console.error('Error updating scoring rules:', error);
+                        return { success: false, error: error.message };
+                    }
+
+                    // Update local state
+                    set({ scoringRules: rules });
+                    return { success: true };
+                } catch (e) {
+                    console.error('Exception updating scoring rules:', e);
+                    return { success: false, error: 'Failed to update scoring rules' };
+                }
+            },
+
             // Data fetching
             fetchAllData: async (leagueId) => {
                 const fetchStartTime = performance.now();
@@ -464,7 +501,8 @@ export const useGameStore = create<GameState>()(
                                 minWks: leagueData.min_wks,
                                 minAllRounders: leagueData.min_all_rounders,
                                 maxInternational: leagueData.max_international,
-                            }
+                            },
+                            scoringRules: mergeScoringRules(leagueData.scoring_rules),
                         });
                     }
 

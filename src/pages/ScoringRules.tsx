@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Target, Zap, Shield, Save } from 'lucide-react';
-import { useGame } from '@/contexts/GameContext';
+import { useGameStore } from '@/store/useGameStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,12 +12,10 @@ import { ScoringRules as ScoringRulesType } from '@/lib/scoring-types';
 
 const ScoringRules = () => {
   const navigate = useNavigate();
-  const {
-    scoringRules,
-    updateScoringRules,
-    isLeagueManager,
-    loading: gameLoading,
-  } = useGame();
+  const scoringRules = useGameStore((state) => state.scoringRules);
+  const updateScoringRules = useGameStore((state) => state.updateScoringRules);
+  const gameLoading = useGameStore((state) => state.loading);
+  const isLeagueManager = useAuthStore((state) => state.isLeagueManager());
 
   // Local state for form
   const [rules, setRules] = useState<ScoringRulesType>(scoringRules);
