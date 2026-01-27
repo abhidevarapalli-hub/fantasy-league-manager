@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useGameStore } from '@/store/useGameStore';
 import { useNavigate } from 'react-router-dom';
 import { PlusCircle, Loader2, ChevronRight, Trash2, UserCircle, LogOut } from 'lucide-react';
 
@@ -20,63 +21,95 @@ const Leagues = () => {
     const userProfile = useAuthStore(state => state.userProfile);
     const signOut = useAuthStore(state => state.signOut);
     const isLoading = useAuthStore(state => state.isLoading);
+    const isLeaguesInitialized = useGameStore(state => state.isLeaguesInitialized);
+    const setIsLeaguesInitialized = useGameStore(state => state.setIsLeaguesInitialized);
 
     const navigate = useNavigate();
     const [leagues, setLeagues] = useState<League[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchLeagues = useCallback(async () => {
+        const fetchStartTime = performance.now();
+        console.log('[Leagues] 🏟️  Starting leagues fetch...');
+
+        // Skip if leagues already initialized
+        if (isLeaguesInitialized) {
+            console.log('[Leagues] ✅ Leagues data already initialized, skipping fetch...');
+            setLoading(false);
+            return;
+        }
 
         if (!user || !user.id) {
+            console.log('[Leagues] ⚠️  No user found, skipping fetch');
             setLoading(false);
             return;
         }
 
         setLoading(true);
         try {
+            // Step 1: Fetch managers for this user
+            const managersStartTime = performance.now();
+            console.log('[Leagues] 👥 Fetching managers for user...');
 
-            // Fetch leagues where the user is the owner OR a manager
             const { data: managerData, error: managerError } = await (supabase
                 .from('managers' as any)
                 .select('league_id')
                 .eq('user_id', user.id) as any);
 
+            const managersDuration = performance.now() - managersStartTime;
+            console.log(`[Leagues] ✅ Managers fetch completed in ${managersDuration.toFixed(2)}ms (${managerData?.length || 0} managers)`);
+
             if (managerError) {
-                console.error('Error fetching manager data:', managerError);
+                console.error('[Leagues] ❌ Error fetching manager data:', managerError);
                 throw managerError;
             }
-
 
             // Get unique league IDs and filter out nulls
             const leagueIds = (managerData?.map((m: any) => m.league_id) || [])
                 .filter((id: string | null) => id !== null);
 
+            console.log(`[Leagues] 🎯 Found ${leagueIds.length} unique league IDs`);
 
             if (leagueIds.length === 0) {
+                const totalDuration = performance.now() - fetchStartTime;
+                console.log(`[Leagues] ℹ️  No leagues found. Total time: ${totalDuration.toFixed(2)}ms`);
                 setLeagues([]);
                 setLoading(false);
                 return;
             }
 
-            // Fetch the actual league details
+            // Step 2: Fetch the actual league details
+            const leaguesStartTime = performance.now();
+            console.log('[Leagues] 🏆 Fetching league details...');
+
             const { data, error } = await (supabase
                 .from('leagues' as any)
                 .select('*')
                 .in('id', leagueIds) as any);
 
+            const leaguesDuration = performance.now() - leaguesStartTime;
+            console.log(`[Leagues] ✅ Leagues fetch completed in ${leaguesDuration.toFixed(2)}ms (${data?.length || 0} leagues)`);
+
             if (error) {
-                console.error('Error fetching leagues:', error);
+                console.error('[Leagues] ❌ Error fetching leagues:', error);
                 throw error;
             }
 
+            const totalDuration = performance.now() - fetchStartTime;
+            console.log(`[Leagues] 🎉 Total leagues fetch completed in ${totalDuration.toFixed(2)}ms (Managers: ${managersDuration.toFixed(2)}ms, Leagues: ${leaguesDuration.toFixed(2)}ms)`);
+
             setLeagues(data || []);
+
+            // Mark as initialized
+            setIsLeaguesInitialized(true);
         } catch (error: any) {
-            console.error('Error in fetchLeagues:', error.message);
+            const duration = performance.now() - fetchStartTime;
+            console.error(`[Leagues] ❌ Error in fetchLeagues after ${duration.toFixed(2)}ms:`, error.message);
             toast.error("Failed to load leagues. Please check your database connection.");
         } finally {
             setLoading(false);
         }
-    }, [user, isLoading]);
+    }, [user, isLoading, isLeaguesInitialized, setIsLeaguesInitialized]);
 
     useEffect(() => {
         if (user && user.id) {

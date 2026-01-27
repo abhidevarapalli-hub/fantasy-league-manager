@@ -9,6 +9,8 @@ import { buildOptimalActive11 } from '@/lib/roster-validation';
 export const useDraft = () => {
   const managers = useGameStore(state => state.managers);
   const players = useGameStore(state => state.players);
+  const isDraftInitialized = useGameStore(state => state.isDraftInitialized);
+  const setIsDraftInitialized = useGameStore(state => state.setIsDraftInitialized);
   const [draftPicks, setDraftPicks] = useState<DraftPick[]>([]);
   const [draftOrder, setDraftOrder] = useState<DraftOrder[]>([]);
   const [draftState, setDraftState] = useState<DraftState | null>(null);
@@ -16,30 +18,69 @@ export const useDraft = () => {
 
   // Fetch initial data
   useEffect(() => {
+    // Skip if draft data already initialized
+    if (isDraftInitialized) {
+      console.log('[useDraft] ✅ Draft data already initialized, skipping fetch...');
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
+      const fetchStartTime = performance.now();
+      console.log('[useDraft] 🎯 Starting draft data fetch...');
+
       setLoading(true);
 
-      const [picksRes, orderRes, stateRes] = await Promise.all([
-        supabase.from('draft_picks').select('*'),
-        supabase.from('draft_order').select('*').order('position'),
-        supabase.from('draft_state').select('*').maybeSingle(),
-      ]);
+      try {
+        const parallelFetchStart = performance.now();
+        const [picksRes, orderRes, stateRes] = await Promise.all([
+          supabase.from('draft_picks').select('*'),
+          supabase.from('draft_order').select('*').order('position'),
+          supabase.from('draft_state').select('*').maybeSingle(),
+        ]);
+        const parallelFetchDuration = performance.now() - parallelFetchStart;
+        console.log(`[useDraft] ✅ Parallel fetch completed in ${parallelFetchDuration.toFixed(2)}ms`);
 
-      if (picksRes.data) {
-        setDraftPicks((picksRes.data as unknown as DbDraftPick[]).map(mapDbDraftPick));
-      }
-      if (orderRes.data) {
-        setDraftOrder((orderRes.data as unknown as DbDraftOrder[]).map(mapDbDraftOrder));
-      }
-      if (stateRes.data) {
-        setDraftState(mapDbDraftState(stateRes.data as unknown as DbDraftState));
-      }
+        // Check for errors
+        if (picksRes.error) {
+          console.error('[useDraft] ❌ Error fetching draft picks:', picksRes.error);
+        }
+        if (orderRes.error) {
+          console.error('[useDraft] ❌ Error fetching draft order:', orderRes.error);
+        }
+        if (stateRes.error) {
+          console.error('[useDraft] ❌ Error fetching draft state:', stateRes.error);
+        }
 
-      setLoading(false);
+        const mappingStart = performance.now();
+        if (picksRes.data) {
+          setDraftPicks((picksRes.data as unknown as DbDraftPick[]).map(mapDbDraftPick));
+        }
+        if (orderRes.data) {
+          setDraftOrder((orderRes.data as unknown as DbDraftOrder[]).map(mapDbDraftOrder));
+        }
+        if (stateRes.data) {
+          setDraftState(mapDbDraftState(stateRes.data as unknown as DbDraftState));
+        }
+        const mappingDuration = performance.now() - mappingStart;
+
+        const totalDuration = performance.now() - fetchStartTime;
+        console.log(`[useDraft] 🗂️  Data mapping completed in ${mappingDuration.toFixed(2)}ms`);
+        console.log(`[useDraft] 🎯 Draft data: ${picksRes.data?.length || 0} picks, ${orderRes.data?.length || 0} positions, state: ${stateRes.data ? 'loaded' : 'none'}`);
+        console.log(`[useDraft] 🎉 Total draft fetch completed in ${totalDuration.toFixed(2)}ms (Fetch: ${parallelFetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
+
+        // Mark as initialized
+        setIsDraftInitialized(true);
+      } catch (error) {
+        console.error('[useDraft] ❌ Fatal error fetching draft data:', error);
+        toast.error('Failed to load draft data. Please refresh the page.');
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
-  }, []);
+  }, [isDraftInitialized, setIsDraftInitialized]);
 
   // Set up realtime subscriptions
   useEffect(() => {

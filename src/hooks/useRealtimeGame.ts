@@ -167,7 +167,12 @@ export const useRealtimeGame = (leagueId?: string) => {
       .channel(`game-changes-${leagueId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
-          setPlayers((prev) => [...prev, mapDbPlayer(payload.new as Tables<"players">)]);
+          // Prevent duplicates: only add if player doesn't already exist
+          setPlayers((prev) => {
+            const existingPlayer = prev.find(p => p.id === payload.new.id);
+            if (existingPlayer) return prev;
+            return [...prev, mapDbPlayer(payload.new as Tables<"players">)];
+          });
         } else if (payload.eventType === "UPDATE") {
           setPlayers((prev) =>
             prev.map((p) => (p.id === payload.new.id ? mapDbPlayer(payload.new as Tables<"players">) : p)),
@@ -178,7 +183,12 @@ export const useRealtimeGame = (leagueId?: string) => {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "managers", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
-          setManagers((prev) => [...prev, mapDbManager(payload.new as Tables<"managers">)]);
+          // Prevent duplicates: only add if manager doesn't already exist
+          setManagers((prev) => {
+            const existingManager = prev.find(m => m.id === payload.new.id);
+            if (existingManager) return prev;
+            return [...prev, mapDbManager(payload.new as Tables<"managers">)];
+          });
         } else if (payload.eventType === "UPDATE") {
           setManagers((prev) =>
             prev.map((m) => (m.id === payload.new.id ? mapDbManager(payload.new as Tables<"managers">) : m)),
@@ -189,7 +199,12 @@ export const useRealtimeGame = (leagueId?: string) => {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "schedule", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
-          setSchedule((prev) => [...prev, mapDbSchedule(payload.new as Tables<"schedule">)]);
+          // Prevent duplicates: only add if match doesn't already exist
+          setSchedule((prev) => {
+            const existingMatch = prev.find(s => s.id === payload.new.id);
+            if (existingMatch) return prev;
+            return [...prev, mapDbSchedule(payload.new as Tables<"schedule">)];
+          });
         } else if (payload.eventType === "UPDATE") {
           setSchedule((prev) =>
             prev.map((s) => (s.id === payload.new.id ? mapDbSchedule(payload.new as Tables<"schedule">) : s)),
@@ -200,7 +215,12 @@ export const useRealtimeGame = (leagueId?: string) => {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
-          setActivities((prev) => [mapDbTransaction(payload.new as Tables<"transactions">), ...prev]);
+          // Prevent duplicates: only add if activity doesn't already exist
+          setActivities((prev) => {
+            const existingActivity = prev.find(a => a.id === payload.new.id);
+            if (existingActivity) return prev;
+            return [mapDbTransaction(payload.new as Tables<"transactions">), ...prev];
+          });
         } else if (payload.eventType === "UPDATE") {
           setActivities((prev) =>
             prev.map((a) => (a.id === payload.new.id ? mapDbTransaction(payload.new as Tables<"transactions">) : a)),

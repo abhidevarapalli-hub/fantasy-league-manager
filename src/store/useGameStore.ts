@@ -63,6 +63,11 @@ interface GameState {
     currentManagerId: string;
     loading: boolean;
     currentLeagueId: string | null;
+    isInitializing: boolean; // Track if initialization is in progress
+    initializedLeagueId: string | null; // Track which league is initialized
+    isDraftInitialized: boolean; // Track if draft data has been loaded
+    isTradesInitialized: boolean; // Track if trades data has been loaded
+    isLeaguesInitialized: boolean; // Track if leagues data has been loaded
 
     // Setters (used internally and by real-time subscriptions)
     setPlayers: (players: Player[]) => void;
@@ -75,6 +80,11 @@ interface GameState {
     setLoading: (loading: boolean) => void;
     setCurrentManagerId: (id: string) => void;
     setCurrentLeagueId: (id: string | null) => void;
+    setIsInitializing: (isInitializing: boolean) => void;
+    setInitializedLeagueId: (id: string | null) => void;
+    setIsDraftInitialized: (isDraftInitialized: boolean) => void;
+    setIsTradesInitialized: (isTradesInitialized: boolean) => void;
+    setIsLeaguesInitialized: (isLeaguesInitialized: boolean) => void;
 
     // Real-time mutations (called by Supabase subscriptions)
     addPlayer: (player: Player) => void;
@@ -128,6 +138,11 @@ export const useGameStore = create<GameState>()(
             currentManagerId: '',
             loading: true,
             currentLeagueId: null,
+            isInitializing: false,
+            initializedLeagueId: null,
+            isDraftInitialized: false,
+            isTradesInitialized: false,
+            isLeaguesInitialized: false,
 
             // Setters
             setPlayers: (players) => set({ players }),
@@ -140,6 +155,11 @@ export const useGameStore = create<GameState>()(
             setLoading: (loading) => set({ loading }),
             setCurrentManagerId: (currentManagerId) => set({ currentManagerId }),
             setCurrentLeagueId: (currentLeagueId) => set({ currentLeagueId }),
+            setIsInitializing: (isInitializing) => set({ isInitializing }),
+            setInitializedLeagueId: (initializedLeagueId) => set({ initializedLeagueId }),
+            setIsDraftInitialized: (isDraftInitialized) => set({ isDraftInitialized }),
+            setIsTradesInitialized: (isTradesInitialized) => set({ isTradesInitialized }),
+            setIsLeaguesInitialized: (isLeaguesInitialized) => set({ isLeaguesInitialized }),
 
             // Real-time mutations - these trigger granular re-renders
             addPlayer: (player) => set((state) => ({ players: [...state.players, player] })),
@@ -417,11 +437,18 @@ export const useGameStore = create<GameState>()(
 
             // Data fetching
             fetchAllData: async (leagueId) => {
+                const fetchStartTime = performance.now();
+                console.log(`[useGameStore] 📊 fetchAllData started for league: ${leagueId}`);
+
                 set({ loading: true, currentLeagueId: leagueId });
 
                 try {
+                    // Fetch league config
+                    const leagueConfigStart = performance.now();
                     const { data: leagueDataRaw } = await supabase.from("leagues" as any).select("*").eq("id", leagueId).single();
                     const leagueData = leagueDataRaw as any;
+                    const leagueConfigDuration = performance.now() - leagueConfigStart;
+                    console.log(`[useGameStore] ⚙️  League config fetched in ${leagueConfigDuration.toFixed(2)}ms`);
 
                     if (leagueData) {
                         set({
@@ -441,6 +468,10 @@ export const useGameStore = create<GameState>()(
                         });
                     }
 
+                    // Fetch all game data in parallel
+                    const parallelFetchStart = performance.now();
+                    console.log(`[useGameStore] 🔄 Starting parallel fetch of players, managers, schedule, transactions...`);
+
                     const [playersRes, managersRes, scheduleRes, transactionsRes] = await Promise.all([
                         supabase.from("players" as any).select("*").eq("league_id", leagueId).order("name"),
                         supabase.from("managers" as any).select("*").eq("league_id", leagueId).order("name"),
@@ -448,12 +479,19 @@ export const useGameStore = create<GameState>()(
                         supabase.from("transactions" as any).select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
                     ]);
 
+                    const parallelFetchDuration = performance.now() - parallelFetchStart;
+                    console.log(`[useGameStore] ✅ Parallel fetch completed in ${parallelFetchDuration.toFixed(2)}ms`);
+
+                    // Map data to frontend types
+                    const mappingStart = performance.now();
                     const players = (playersRes.data as any)?.map(mapDbPlayer) || [];
                     const managers = (managersRes.data as any)?.map(mapDbManager) || [];
                     const schedule = (scheduleRes.data as any)?.map(mapDbSchedule) || [];
                     const activities = (transactionsRes.data as any)?.map(mapDbTransaction) || [];
+                    const mappingDuration = performance.now() - mappingStart;
 
-                    console.log('[useGameStore] Fetched', players.length, 'players,', managers.length, 'managers');
+                    console.log(`[useGameStore] 🗂️  Data mapping completed in ${mappingDuration.toFixed(2)}ms`);
+                    console.log(`[useGameStore] 📊 Fetched ${players.length} players, ${managers.length} managers, ${schedule.length} matches, ${activities.length} activities`);
 
                     set({
                         players,
@@ -461,6 +499,12 @@ export const useGameStore = create<GameState>()(
                         schedule,
                         activities,
                     });
+
+                    const totalFetchDuration = performance.now() - fetchStartTime;
+                    console.log(`[useGameStore] 🎉 fetchAllData completed in ${totalFetchDuration.toFixed(2)}ms (Config: ${leagueConfigDuration.toFixed(2)}ms, Fetch: ${parallelFetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
+                } catch (error) {
+                    console.error('[useGameStore] ❌ Error in fetchAllData:', error);
+                    throw error;
                 } finally {
                     set({ loading: false });
                 }
@@ -473,22 +517,46 @@ export const useGameStore = create<GameState>()(
                 const channel = supabase
                     .channel(`game-changes-${leagueId}`)
                     .on("postgres_changes", { event: "*", schema: "public", table: "players", filter }, (payload) => {
-                        if (payload.eventType === "INSERT") get().addPlayer(mapDbPlayer(payload.new as Tables<"players">));
+                        if (payload.eventType === "INSERT") {
+                            // Prevent duplicates: only add if player doesn't already exist
+                            const existingPlayer = get().players.find(p => p.id === payload.new.id);
+                            if (!existingPlayer) {
+                                get().addPlayer(mapDbPlayer(payload.new as Tables<"players">));
+                            }
+                        }
                         else if (payload.eventType === "UPDATE") get().updatePlayer(payload.new.id, mapDbPlayer(payload.new as Tables<"players">));
                         else if (payload.eventType === "DELETE") get().removePlayer(payload.old.id);
                     })
                     .on("postgres_changes", { event: "*", schema: "public", table: "managers", filter }, (payload) => {
-                        if (payload.eventType === "INSERT") get().addManager(mapDbManager(payload.new as Tables<"managers">));
+                        if (payload.eventType === "INSERT") {
+                            // Prevent duplicates: only add if manager doesn't already exist
+                            const existingManager = get().managers.find(m => m.id === payload.new.id);
+                            if (!existingManager) {
+                                get().addManager(mapDbManager(payload.new as Tables<"managers">));
+                            }
+                        }
                         else if (payload.eventType === "UPDATE") get().updateManager(payload.new.id, mapDbManager(payload.new as Tables<"managers">));
                         else if (payload.eventType === "DELETE") get().removeManager(payload.old.id);
                     })
                     .on("postgres_changes", { event: "*", schema: "public", table: "schedule", filter }, (payload) => {
-                        if (payload.eventType === "INSERT") get().addMatch(mapDbSchedule(payload.new as Tables<"schedule">));
+                        if (payload.eventType === "INSERT") {
+                            // Prevent duplicates: only add if match doesn't already exist
+                            const existingMatch = get().schedule.find(s => s.id === payload.new.id);
+                            if (!existingMatch) {
+                                get().addMatch(mapDbSchedule(payload.new as Tables<"schedule">));
+                            }
+                        }
                         else if (payload.eventType === "UPDATE") get().updateMatch(payload.new.id, mapDbSchedule(payload.new as Tables<"schedule">));
                         else if (payload.eventType === "DELETE") get().removeMatch(payload.old.id);
                     })
                     .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter }, (payload) => {
-                        if (payload.eventType === "INSERT") get().addActivity(mapDbTransaction(payload.new as Tables<"transactions">));
+                        if (payload.eventType === "INSERT") {
+                            // Prevent duplicates: only add if activity doesn't already exist
+                            const existingActivity = get().activities.find(a => a.id === payload.new.id);
+                            if (!existingActivity) {
+                                get().addActivity(mapDbTransaction(payload.new as Tables<"transactions">));
+                            }
+                        }
                         else if (payload.eventType === "UPDATE") get().updateActivity(payload.new.id, mapDbTransaction(payload.new as Tables<"transactions">));
                         else if (payload.eventType === "DELETE") get().removeActivity(payload.old.id);
                     })

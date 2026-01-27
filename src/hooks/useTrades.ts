@@ -9,26 +9,69 @@ export const useTrades = () => {
   const managers = useGameStore(state => state.managers);
   const players = useGameStore(state => state.players);
   const executeTrade = useGameStore(state => state.executeTrade);
+  const isTradesInitialized = useGameStore(state => state.isTradesInitialized);
+  const setIsTradesInitialized = useGameStore(state => state.setIsTradesInitialized);
 
   // Fetch trades
   useEffect(() => {
-    const fetchTrades = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('trades')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching trades:', error);
-      } else if (data) {
-        setTrades(data.map((t) => mapDbTrade(t as unknown as DbTrade)));
-      }
+    // Skip if trades data already initialized
+    if (isTradesInitialized) {
+      console.log('[useTrades] ✅ Trades data already initialized, skipping fetch...');
       setLoading(false);
+      return;
+    }
+
+    const fetchTrades = async () => {
+      const fetchStartTime = performance.now();
+      console.log('[useTrades] 🔄 Starting trades data fetch...');
+
+      setLoading(true);
+
+      try {
+        // Add timeout protection - if query takes > 5s, assume table doesn't exist
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Query timeout - trades table may not exist')), 5000)
+        );
+
+        const queryPromise = supabase
+          .from('trades')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+
+        const fetchDuration = performance.now() - fetchStartTime;
+
+        if (error) {
+          console.error('[useTrades] ❌ Error fetching trades:', error);
+          console.warn('[useTrades] ⚠️  Trades table may not exist - using empty array');
+          setTrades([]);
+          setIsTradesInitialized(true); // Mark as initialized even on error to prevent retries
+        } else if (data) {
+          const mappingStart = performance.now();
+          setTrades(data.map((t) => mapDbTrade(t as unknown as DbTrade)));
+          const mappingDuration = performance.now() - mappingStart;
+
+          const totalDuration = performance.now() - fetchStartTime;
+          console.log(`[useTrades] 📊 Fetched ${data.length} trades`);
+          console.log(`[useTrades] 🎉 Total fetch completed in ${totalDuration.toFixed(2)}ms (Fetch: ${fetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
+
+          // Mark as initialized
+          setIsTradesInitialized(true);
+        }
+      } catch (error: any) {
+        const duration = performance.now() - fetchStartTime;
+        console.error(`[useTrades] ❌ Fatal error fetching trades (${duration.toFixed(2)}ms):`, error.message || error);
+        console.warn('[useTrades] ⚠️  Using empty trades array - trades table may not exist in database');
+        setTrades([]);
+        setIsTradesInitialized(true); // Mark as initialized to prevent infinite retries
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchTrades();
-  }, []);
+  }, [isTradesInitialized, setIsTradesInitialized]);
 
   // Real-time subscription
   useEffect(() => {

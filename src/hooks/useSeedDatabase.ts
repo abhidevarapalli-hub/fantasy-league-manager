@@ -273,22 +273,32 @@ export const useSeedDatabase = () => {
 
   const seedDatabase = useCallback(async (leagueId?: string) => {
     if (!leagueId) return false;
+
+    const seedStartTime = performance.now();
+    console.log(`[useSeedDatabase] 🌱 seedDatabase started for league: ${leagueId}`);
+
     setSeeding(true);
     try {
       // Check if data already exists for this league
+      const checkStartTime = performance.now();
       const { data: existingPlayers } = await (supabase.from("players").select("id").eq("league_id", leagueId).limit(1) as any);
       const { data: existingManagers } = await (supabase.from("managers").select("id").eq("league_id", leagueId).limit(1) as any);
+      const checkDuration = performance.now() - checkStartTime;
+      console.log(`[useSeedDatabase] 🔍 Existence check completed in ${checkDuration.toFixed(2)}ms`);
 
       const hasPlayers = (existingPlayers?.length ?? 0) > 0;
       const hasManagers = (existingManagers?.length ?? 0) > 0;
 
       if (hasPlayers && hasManagers) {
-        console.log(`League ${leagueId} already seeded`);
+        console.log(`[useSeedDatabase] ✅ League ${leagueId} already seeded (skipping), total time: ${(performance.now() - seedStartTime).toFixed(2)}ms`);
         return true;
       }
 
       // Seed players
       if (!hasPlayers) {
+        const insertStartTime = performance.now();
+        console.log(`[useSeedDatabase] 📥 Inserting ${PLAYERS_DATA.length} players...`);
+
         // Add is_international flag to players data
         const playersWithData = PLAYERS_DATA.map((player) => ({
           ...player,
@@ -296,17 +306,23 @@ export const useSeedDatabase = () => {
           league_id: leagueId,
         }));
         const { error: playersError } = await (supabase.from("players").insert(playersWithData) as any);
+        const insertDuration = performance.now() - insertStartTime;
+
         if (playersError) {
-          console.error("Error seeding players:", playersError);
+          console.error(`[useSeedDatabase] ❌ Error seeding players (${insertDuration.toFixed(2)}ms):`, playersError);
         } else {
-          console.log("Players seeded successfully for league", leagueId);
+          console.log(`[useSeedDatabase] ✅ Players seeded successfully for league ${leagueId} in ${insertDuration.toFixed(2)}ms`);
         }
+      } else {
+        console.log(`[useSeedDatabase] ✅ Players already exist, skipping insert`);
       }
 
+      const totalSeedDuration = performance.now() - seedStartTime;
+      console.log(`[useSeedDatabase] 🎉 seedDatabase completed in ${totalSeedDuration.toFixed(2)}ms`);
       return true;
 
     } catch (error) {
-      console.error("Error seeding database:", error);
+      console.error(`[useSeedDatabase] ❌ Error seeding database (${(performance.now() - seedStartTime).toFixed(2)}ms):`, error);
       return false;
     } finally {
       setSeeding(false);

@@ -30,10 +30,14 @@ const CreateLeague = () => {
     const [teamName, setTeamName] = useState('');
 
     const handleCreateLeague = async () => {
+        const overallStartTime = performance.now();
+        console.log('[CreateLeague] 🏆 Starting league creation...');
+
         // Use username from profile, fallback to email prefix or ID if somehow missing
         const displayName = userProfile?.username || user?.email?.split('@')[0] || user?.id || 'Unknown';
 
         if (!user || !leagueName || !teamName) {
+            console.log('[CreateLeague] ❌ Validation failed: missing fields');
             toast.error("Please fill in all required fields");
             return;
         }
@@ -41,6 +45,9 @@ const CreateLeague = () => {
         setLoading(true);
         try {
             // 1. Create the league
+            console.log('[CreateLeague] 📝 Step 1: Creating league record...');
+            const step1Start = performance.now();
+
             const { data: league, error: leagueError } = await (supabase
                 .from('leagues' as any)
                 .insert({
@@ -59,11 +66,18 @@ const CreateLeague = () => {
                 .select()
                 .single() as any);
 
+            const step1Duration = performance.now() - step1Start;
+            console.log(`[CreateLeague] ✅ Step 1 completed in ${step1Duration.toFixed(2)}ms`);
 
-
-            if (leagueError) throw leagueError;
+            if (leagueError) {
+                console.error('[CreateLeague] ❌ Error creating league:', leagueError);
+                throw leagueError;
+            }
 
             // 2. Create the creator's manager record
+            console.log('[CreateLeague] 👤 Step 2: Creating manager record...');
+            const step2Start = performance.now();
+
             const { error: managerError } = await supabase
                 .from('managers')
                 .insert({
@@ -79,10 +93,18 @@ const CreateLeague = () => {
                     bench: []
                 });
 
-            if (managerError) throw managerError;
+            const step2Duration = performance.now() - step2Start;
+            console.log(`[CreateLeague] ✅ Step 2 completed in ${step2Duration.toFixed(2)}ms`);
 
+            if (managerError) {
+                console.error('[CreateLeague] ❌ Error creating manager:', managerError);
+                throw managerError;
+            }
 
             // 3. Create placeholder teams for the rest
+            console.log(`[CreateLeague] 👥 Step 3: Creating ${managerCount - 1} placeholder managers...`);
+            const step3Start = performance.now();
+
             const placeholders = [];
             for (let i = 1; i < managerCount; i++) {
                 placeholders.push({
@@ -105,7 +127,10 @@ const CreateLeague = () => {
                     .insert(placeholders)
                     .select();
 
-                if (placeholderError) throw placeholderError;
+                if (placeholderError) {
+                    console.error('[CreateLeague] ❌ Error creating placeholders:', placeholderError);
+                    throw placeholderError;
+                }
 
                 // Fetch the creator manager we just made to get its real ID
                 const { data: creatorManager } = await (supabase
@@ -126,7 +151,13 @@ const CreateLeague = () => {
                 allManagers = [creatorManager];
             }
 
+            const step3Duration = performance.now() - step3Start;
+            console.log(`[CreateLeague] ✅ Step 3 completed in ${step3Duration.toFixed(2)}ms (created ${allManagers.length} total managers)`);
+
             // 4. Generate Randomized Schedule (7 Weeks)
+            console.log('[CreateLeague] 📅 Step 4: Generating schedule...');
+            const step4Start = performance.now();
+
             const managerIds = allManagers.map(m => m.id);
             const numTeams = managerIds.length;
             const weeks = 7;
@@ -183,21 +214,42 @@ const CreateLeague = () => {
                 });
             }
 
+            const step4Duration = performance.now() - step4Start;
+            console.log(`[CreateLeague] ✅ Step 4 completed in ${step4Duration.toFixed(2)}ms (generated ${matchups.length} matchups)`);
+
+            // 5. Insert schedule
+            console.log('[CreateLeague] 💾 Step 5: Inserting schedule into database...');
+            const step5Start = performance.now();
+
             const { error: scheduleError } = await (supabase
                 .from('schedule' as any)
                 .insert(matchups) as any);
 
+            const step5Duration = performance.now() - step5Start;
+            console.log(`[CreateLeague] ✅ Step 5 completed in ${step5Duration.toFixed(2)}ms`);
 
-            if (scheduleError) console.error("Error creating schedule:", scheduleError);
+            if (scheduleError) {
+                console.error("[CreateLeague] ⚠️  Error creating schedule:", scheduleError);
+            }
 
-            // 5. Mark in AuthContext that this is the selected manager
+            // 6. Mark in AuthContext that this is the selected manager
+            console.log('[CreateLeague] 🎯 Step 6: Selecting manager...');
+            const step6Start = performance.now();
+
             await selectManager(displayName, league.id);
 
+            const step6Duration = performance.now() - step6Start;
+            console.log(`[CreateLeague] ✅ Step 6 completed in ${step6Duration.toFixed(2)}ms`);
+
+            const totalDuration = performance.now() - overallStartTime;
+            console.log(`[CreateLeague] 🎉 League creation completed in ${totalDuration.toFixed(2)}ms`);
+            console.log(`[CreateLeague] 📊 Breakdown: League:${step1Duration.toFixed(0)}ms, Manager:${step2Duration.toFixed(0)}ms, Placeholders:${step3Duration.toFixed(0)}ms, Schedule:${step4Duration.toFixed(0)}ms, Insert:${step5Duration.toFixed(0)}ms, Select:${step6Duration.toFixed(0)}ms`);
 
             toast.success("League created successfully!");
             navigate(`/${league.id}`);
         } catch (error: any) {
-            console.error(error);
+            const duration = performance.now() - overallStartTime;
+            console.error(`[CreateLeague] ❌ Error after ${duration.toFixed(2)}ms:`, error);
             toast.error(`Error: ${error.message}`);
         } finally {
             setLoading(false);

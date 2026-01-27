@@ -35,6 +35,17 @@ import { useParams } from "react-router-dom";
 
 const queryClient = new QueryClient();
 
+// Root-level auth initialization hook
+const AuthInitializer = () => {
+  const initializeAuth = useAuthStore(state => state.initialize);
+
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
+  return null;
+};
+
 const AppRoutes = () => {
   const user = useAuthStore(state => state.user);
   const userProfile = useAuthStore(state => state.userProfile);
@@ -148,6 +159,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AuthInitializer />
         <AppRoutes />
       </BrowserRouter>
 
