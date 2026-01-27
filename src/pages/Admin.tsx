@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check, RefreshCw } from 'lucide-react';
+import { Settings, TrendingUp, ArrowLeftRight, AlertTriangle, Trash2, UserPlus, Search, Plus, Check, RefreshCw, Globe, Zap } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
@@ -12,6 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useSeedDatabase } from '@/hooks/useSeedDatabase';
+import { SUPPORTED_TOURNAMENTS, getTournamentById } from '@/lib/tournaments';
 
 const IPL_TEAMS = ['MI', 'KKR', 'CSK', 'RR', 'RCB', 'DC', 'GT', 'LSG', 'PBKS', 'SRH'];
 
@@ -35,8 +37,14 @@ const Admin = () => {
   const addNewPlayer = useGameStore(state => state.addNewPlayer);
   const dropPlayerOnly = useGameStore(state => state.dropPlayerOnly);
   const leagueOwnerId = useGameStore(state => state.leagueOwnerId);
+  const leagueId = useGameStore(state => state.leagueId);
+  const loadGameData = useGameStore(state => state.loadGameData);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const [removingMember, setRemovingMember] = useState<string | null>(null);
+
+  // Seeding hooks
+  const { reseedFromTournament, seeding: isReseeding } = useSeedDatabase();
+  const [reseedTournamentId, setReseedTournamentId] = useState<string>('');
 
   const ROSTER_CAP = config.activeSize + config.benchSize;
 
@@ -730,15 +738,77 @@ const Admin = () => {
             {/* Reseed Players */}
             {!showReseedConfirm ? (
               <Button
-                onClick={() => toast.warning('Reseed functionality coming soon')}
+                onClick={() => setShowReseedConfirm(true)}
                 variant="outline"
-                disabled={true}
                 className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Reseed Player Database (Not Available)
+                Reseed Player Database from Tournament
               </Button>
-            ) : null}
+            ) : (
+              <div className="space-y-3 p-3 bg-primary/10 rounded-lg border border-primary/30">
+                <p className="text-sm text-primary">
+                  Select a tournament to reseed players from. This will clear all existing players and rosters!
+                </p>
+                <Select value={reseedTournamentId} onValueChange={setReseedTournamentId}>
+                  <SelectTrigger className="bg-muted border-border">
+                    <SelectValue placeholder="Select tournament" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_TOURNAMENTS.map(t => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        <div className="flex items-center gap-2">
+                          {t.type === 'international' ? (
+                            <Globe className="w-4 h-4 text-blue-500" />
+                          ) : (
+                            <Zap className="w-4 h-4 text-yellow-500" />
+                          )}
+                          {t.shortName}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => { setShowReseedConfirm(false); setReseedTournamentId(''); }}
+                    variant="outline"
+                    className="flex-1"
+                    disabled={isReseeding}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!leagueId || !reseedTournamentId) return;
+                      const tournament = getTournamentById(Number(reseedTournamentId));
+                      toast.info(`Reseeding players from ${tournament?.shortName}...`);
+                      const success = await reseedFromTournament(leagueId, Number(reseedTournamentId));
+                      if (success) {
+                        toast.success(`Players reseeded from ${tournament?.shortName}`);
+                        // Reload game data to refresh players
+                        await loadGameData(leagueId);
+                      } else {
+                        toast.error('Failed to reseed players. Check console for details.');
+                      }
+                      setShowReseedConfirm(false);
+                      setReseedTournamentId('');
+                    }}
+                    disabled={!reseedTournamentId || isReseeding}
+                    className="flex-1"
+                  >
+                    {isReseeding ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Reseeding...
+                      </>
+                    ) : (
+                      'Confirm Reseed'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Reset League */}
             {!showResetConfirm ? (

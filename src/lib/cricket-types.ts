@@ -250,3 +250,80 @@ export function extractMatchesFromResponse(response: LiveMatchesResponse): Crick
 
   return matches;
 }
+
+// ============================================
+// Tournament/Series Types (for player seeding)
+// ============================================
+
+// Squad info from series/squads endpoint
+export interface TournamentSquad {
+  squadId: number;
+  teamName: string;  // e.g., "India", "Australia" or "Mumbai Indians"
+  teamId: number;
+  imageId?: number;
+}
+
+// Raw API response for series squads
+export interface SeriesSquadsResponse {
+  squads: Array<{
+    squadId?: number;
+    squadType: string;  // Team name or header like "T20"
+    teamId?: number;
+    imageId?: number;
+    isHeader?: boolean;
+  }>;
+  seriesName: string;
+  seriesId: number;
+}
+
+// Player info from series/squads/{squadId} endpoint
+export interface TournamentPlayer {
+  id: string;
+  name: string;
+  role: string;  // API roles: Batsman, Bowler, WK-Batsman, Batting Allrounder, Bowling Allrounder
+  captain?: boolean;
+  imageId?: number;
+  battingStyle?: string;
+  bowlingStyle?: string;
+}
+
+// Raw API response for squad players
+export interface SquadPlayersResponse {
+  player: Array<{
+    id?: string;
+    name: string;
+    role?: string;
+    captain?: boolean;
+    imageId?: number;
+    battingStyle?: string;
+    bowlingStyle?: string;
+    isHeader?: boolean;
+  }>;
+}
+
+// Helper to extract squads from API response (filters out headers)
+export function extractSquadsFromResponse(response: SeriesSquadsResponse): TournamentSquad[] {
+  return response.squads
+    .filter(squad => !squad.isHeader && squad.squadId !== undefined)
+    .map(squad => ({
+      squadId: squad.squadId!,
+      teamName: squad.squadType,
+      teamId: squad.teamId || 0,
+      imageId: squad.imageId,
+    }));
+}
+
+// Helper to extract players from API response (filters out headers)
+export function extractPlayersFromResponse(response: SquadPlayersResponse): TournamentPlayer[] {
+  return response.player
+    .filter(player => !player.isHeader && player.id !== undefined)
+    .map(player => ({
+      id: player.id!,
+      name: player.name,
+      role: player.role || 'Unknown',
+      captain: player.captain,
+      imageId: player.imageId,
+      battingStyle: player.battingStyle,
+      bowlingStyle: player.bowlingStyle,
+    }));
+}
