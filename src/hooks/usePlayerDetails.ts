@@ -91,19 +91,21 @@ export function useExtendedPlayer(playerId: string | null) {
     queryKey: ['extended-player', playerId],
     queryFn: async () => {
       if (!playerId) throw new Error('Player ID required');
-      
+
       const { data, error } = await supabase
         .from('extended_players' as any)
         .select('*')
         .eq('player_id', playerId)
-        .single();
-      
+        .maybeSingle();
+
       if (error) {
-        // Not found is expected for players without extended data
-        if (error.code === 'PGRST116') {
+        // Table doesn't exist or permission issues - return null gracefully
+        if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('406')) {
           return null;
         }
-        throw error;
+        // Log but don't throw for other errors - extended data is optional
+        console.warn('[useExtendedPlayerData] Error fetching extended data:', error.message);
+        return null;
       }
       
       if (!data) return null;

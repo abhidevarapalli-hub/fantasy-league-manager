@@ -58,13 +58,11 @@ function sleepMs(ms: number): Promise<void> {
 async function fetchFromApi<T>(endpoint: string, retryCount = 0): Promise<T> {
   const MAX_RETRIES = 3;
   const BASE_DELAY = 500; // 500ms base delay for retries
-  
-  if (retryCount === 0) {
-    console.log(`[CricbuzzAPI] 📡 Fetching: ${endpoint}`);
-  } else {
-    console.log(`[CricbuzzAPI] 🔄 Retry ${retryCount}/${MAX_RETRIES} for: ${endpoint}`);
+
+  if (retryCount > 0) {
+    console.log(`[CricbuzzAPI] Retry ${retryCount}/${MAX_RETRIES}: ${endpoint}`);
   }
-  
+
   if (!isApiConfigured()) {
     throw new CricbuzzApiError(
       'RapidAPI key is not configured. Please add VITE_RAPIDAPI_KEY to your .env file.'
@@ -72,7 +70,7 @@ async function fetchFromApi<T>(endpoint: string, retryCount = 0): Promise<T> {
   }
 
   const url = `${BASE_URL}${endpoint}`;
-  
+
   try {
     const response = await fetch(url, {
       method: 'GET',
@@ -81,15 +79,15 @@ async function fetchFromApi<T>(endpoint: string, retryCount = 0): Promise<T> {
 
     // Handle rate limiting with retry
     if (response.status === 429 && retryCount < MAX_RETRIES) {
-      const delay = BASE_DELAY * Math.pow(2, retryCount); // Exponential backoff
-      console.log(`[CricbuzzAPI] ⏳ Rate limited, waiting ${delay}ms before retry...`);
+      const delay = BASE_DELAY * Math.pow(2, retryCount);
+      console.log(`[CricbuzzAPI] Rate limited, retrying in ${delay}ms...`);
       await sleepMs(delay);
       return fetchFromApi<T>(endpoint, retryCount + 1);
     }
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`[CricbuzzAPI] ❌ Error response (${response.status}):`, errorBody.substring(0, 200));
+      console.error(`[CricbuzzAPI] Error (${response.status}):`, errorBody.substring(0, 200));
       throw new CricbuzzApiError(
         `API request failed: ${response.statusText}`,
         response.status,
@@ -97,9 +95,16 @@ async function fetchFromApi<T>(endpoint: string, retryCount = 0): Promise<T> {
       );
     }
 
-    const data = await response.json();
-    console.log(`[CricbuzzAPI] ✅ Success for ${endpoint.split('/').pop()}`);
-    return data as T;
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      throw new CricbuzzApiError('Empty response from API', response.status);
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new CricbuzzApiError(`Invalid JSON response: ${text.substring(0, 100)}`, response.status);
+    }
   } catch (error) {
     if (error instanceof CricbuzzApiError) {
       throw error;
@@ -205,34 +210,32 @@ export async function fetchSquadPlayers(
 export async function fetchAllTournamentPlayers(
   seriesId: number
 ): Promise<Array<{ team: TournamentSquad; players: TournamentPlayer[] }>> {
-  // First, fetch all squads
   const squads = await fetchSeriesSquads(seriesId);
-  console.log(`[CricbuzzAPI] 📋 Found ${squads.length} squads, fetching players sequentially...`);
-  
-  // Fetch players for each squad SEQUENTIALLY with delay to avoid rate limiting
-  // RapidAPI BASIC plan has ~5 requests/second limit
+  console.log(`[CricbuzzAPI] Fetching ${squads.length} squads...`);
+
   const results: Array<{ team: TournamentSquad; players: TournamentPlayer[] }> = [];
-  
+  let totalPlayers = 0;
+
   for (let i = 0; i < squads.length; i++) {
     const squad = squads[i];
-    console.log(`[CricbuzzAPI] 📥 Fetching squad ${i + 1}/${squads.length}: ${squad.teamName}`);
-    
+
     try {
       const players = await fetchSquadPlayers(seriesId, squad.squadId);
       results.push({ team: squad, players });
-      console.log(`[CricbuzzAPI] ✅ ${squad.teamName}: ${players.length} players`);
+      totalPlayers += players.length;
+      console.log(`[CricbuzzAPI] [${i + 1}/${squads.length}] ${squad.teamName}: ${players.length} players`);
     } catch (error) {
-      console.error(`[CricbuzzAPI] ❌ Failed to fetch ${squad.teamName}:`, error);
-      // Continue with other squads even if one fails
+      console.error(`[CricbuzzAPI] Failed to fetch ${squad.teamName}:`, error);
       results.push({ team: squad, players: [] });
     }
-    
-    // Add 300ms delay between requests to stay under rate limit (~3 req/sec)
+
+    // Add 300ms delay between requests to stay under rate limit
     if (i < squads.length - 1) {
       await sleepMs(300);
     }
   }
-  
+
+  console.log(`[CricbuzzAPI] Fetched ${totalPlayers} players from ${squads.length} teams`);
   return results;
 }
 

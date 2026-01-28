@@ -395,12 +395,9 @@ export const useSeedDatabase = () => {
    * Falls back to hardcoded IPL data if API fails
    */
   const seedFromTournament = useCallback(async (leagueId: string, tournamentId: number): Promise<boolean> => {
-    const seedStartTime = performance.now();
-    console.log(`[useSeedDatabase] 🏆 seedFromTournament started for league: ${leagueId}, tournament: ${tournamentId}`);
-
     setSeeding(true);
     try {
-      // Check if players already exist for this league
+      // Check if players already exist
       const { data: existingPlayers } = await (supabase
         .from("players")
         .select("id")
@@ -408,39 +405,35 @@ export const useSeedDatabase = () => {
         .limit(1) as any);
 
       if ((existingPlayers?.length ?? 0) > 0) {
-        console.log(`[useSeedDatabase] ✅ League ${leagueId} already has players (skipping)`);
+        console.log("[Seed] League already has players, skipping");
         return true;
       }
 
       // Check if API is configured
       if (!isApiConfigured()) {
-        console.warn("[useSeedDatabase] ⚠️ API not configured (VITE_RAPIDAPI_KEY missing), falling back to hardcoded data");
+        console.warn("[Seed] API not configured, using hardcoded data");
         return await seedDatabase(leagueId);
       }
 
       const tournament = getTournamentById(tournamentId);
       const isInternationalTournament = tournament?.type === 'international';
 
-      console.log(`[useSeedDatabase] 📡 Fetching players from API for ${tournament?.name || tournamentId}...`);
-      console.log(`[useSeedDatabase] 🔑 API configured: true, Tournament type: ${tournament?.type}`);
-      const fetchStartTime = performance.now();
+      console.log(`[Seed] Fetching from ${tournament?.shortName || tournamentId}...`);
 
-      // Fetch all teams and players from the tournament (with 60 second timeout)
+      // Fetch all teams and players (with 60 second timeout)
       let teamsWithPlayers;
       try {
         teamsWithPlayers = await withTimeout(
           fetchAllTournamentPlayers(tournamentId),
-          60000, // 60 second timeout for API calls
+          60000,
           `API timeout: Failed to fetch tournament data within 60 seconds`
         );
       } catch (apiError: any) {
-        console.error(`[useSeedDatabase] ❌ API fetch failed:`, apiError?.message || apiError);
-        console.error(`[useSeedDatabase] Full error:`, apiError);
-        throw apiError; // Re-throw to trigger fallback
+        console.error("[Seed] API fetch failed:", apiError?.message || apiError);
+        throw apiError;
       }
-      
-      const fetchDuration = performance.now() - fetchStartTime;
-      console.log(`[useSeedDatabase] ✅ Fetched ${teamsWithPlayers.length} teams in ${fetchDuration.toFixed(2)}ms`);
+
+      console.log(`[Seed] Fetched ${teamsWithPlayers.length} teams`);
 
       // Check if we got any data
       if (!teamsWithPlayers || teamsWithPlayers.length === 0) {
@@ -563,8 +556,7 @@ export const useSeedDatabase = () => {
         }
       }
 
-      const totalDuration = performance.now() - seedStartTime;
-      console.log(`[useSeedDatabase] 🎉 Tournament seeding completed in ${totalDuration.toFixed(2)}ms (${playersToInsert.length} players from ${tournament?.shortName || tournamentId})`);
+      console.log(`[Seed] Completed - ${playersToInsert.length} players from ${tournament?.shortName || tournamentId}`);
       return true;
 
     } catch (error: any) {
@@ -583,60 +575,67 @@ export const useSeedDatabase = () => {
    * This clears existing players and fetches fresh data from the API
    */
   const reseedFromTournament = useCallback(async (leagueId: string, tournamentId: number): Promise<boolean> => {
-    console.log(`[useSeedDatabase] 🔄 reseedFromTournament started for league: ${leagueId}, tournament: ${tournamentId}`);
-    
+    console.log(`[Reseed] Starting for tournament ${tournamentId}...`);
+
     setSeeding(true);
     try {
-      // First, clear all manager rosters for this league
+      // Clear all manager rosters
       const { error: clearRostersError } = await (supabase
         .from("managers")
         .update({ roster: [], bench: [] })
         .eq("league_id", leagueId) as any);
 
       if (clearRostersError) {
-        console.error("[useSeedDatabase] Error clearing rosters:", clearRostersError);
+        console.error("[Reseed] Error clearing rosters:", clearRostersError);
         throw clearRostersError;
       }
 
-      // Get existing player IDs for this league (to delete extended data)
+      // Get existing player IDs to delete extended data
       const { data: existingPlayers } = await (supabase
         .from("players")
         .select("id")
         .eq("league_id", leagueId) as any);
-      
-      // Delete extended player data first (due to FK constraint)
+
       if (existingPlayers && existingPlayers.length > 0) {
         const playerIds = existingPlayers.map((p: any) => p.id);
-        const { error: deleteExtendedError } = await (supabase as any)
+        await (supabase as any)
           .from("extended_players")
           .delete()
           .in("player_id", playerIds);
-        
-        if (deleteExtendedError) {
-          console.warn("[useSeedDatabase] Warning deleting extended players:", deleteExtendedError);
-          // Continue anyway - extended data might not exist
-        } else {
-          console.log(`[useSeedDatabase] ✅ Deleted extended data for ${playerIds.length} players`);
-        }
       }
 
-      // Delete all existing players for this league
+      // Delete all existing players
       const { error: deleteError } = await (supabase
         .from("players")
         .delete()
         .eq("league_id", leagueId) as any);
 
       if (deleteError) {
-        console.error("[useSeedDatabase] Error deleting players:", deleteError);
+        console.error("[Reseed] Error deleting players:", deleteError);
         throw deleteError;
       }
 
-      console.log("[useSeedDatabase] ✅ Cleared existing players, now seeding from tournament...");
-      
-      // Now seed from tournament (this will not skip since we deleted the players)
-      return await seedFromTournament(leagueId, tournamentId);
+      // Seed from tournament
+      const result = await seedFromTournament(leagueId, tournamentId);
+
+      if (result) {
+        // Update the league's tournament_id in the database
+        const { error: updateError } = await (supabase
+          .from("leagues")
+          .update({ tournament_id: tournamentId })
+          .eq("id", leagueId) as any);
+
+        if (updateError) {
+          console.warn("[Reseed] Warning: Failed to update tournament_id:", updateError);
+        } else {
+          console.log(`[Reseed] Updated league tournament_id to ${tournamentId}`);
+        }
+      }
+
+      console.log(`[Reseed] Completed - Success: ${result}`);
+      return result;
     } catch (error) {
-      console.error("[useSeedDatabase] ❌ Error reseeding from tournament:", error);
+      console.error("[Reseed] Failed:", error);
       return false;
     } finally {
       setSeeding(false);

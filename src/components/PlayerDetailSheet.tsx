@@ -288,14 +288,8 @@ export function PlayerDetailSheet({
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : (playerInfo?.bio || extendedData?.bio) ? (
+              ) : playerInfo ? (
                 <div className="space-y-4 pr-4">
-                  {/* Bio */}
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">About</h3>
-                    <p className="text-sm leading-relaxed">{playerInfo?.bio || extendedData?.bio}</p>
-                  </div>
-
                   {/* Additional Info */}
                   {(playerInfo?.birthPlace || extendedData?.birthPlace || playerInfo?.dateOfBirth || extendedData?.dob || playerInfo?.height || extendedData?.height) && (
                     <div>
