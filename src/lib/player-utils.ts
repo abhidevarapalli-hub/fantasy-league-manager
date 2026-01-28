@@ -228,7 +228,11 @@ export function getCricbuzzImageUrl(
   if (!imageId) return null;
   // Cricbuzz image URL format: /img/v1/i1/c{imageId}/i.jpg
   // The 'c' prefix is required for the imageId
-  return `https://cricbuzz-cricket.p.rapidapi.com/img/v1/i1/c${imageId}/i.jpg?p=${size}&d=${quality}`;
+  // Use proxy in development to handle auth headers for images
+  const baseUrl = import.meta.env.DEV
+    ? '/api/cricbuzz'
+    : 'https://cricbuzz-cricket.p.rapidapi.com';
+  return `${baseUrl}/img/v1/i1/c${imageId}/i.jpg?p=${size}&d=${quality}`;
 }
 
 /**

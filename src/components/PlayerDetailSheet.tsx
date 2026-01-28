@@ -137,7 +137,7 @@ export function PlayerDetailSheet({
   // Fetch extended player info from Cricbuzz when we have the ID
   // This also provides the national team (intlTeam) for overseas players
   const { data: playerInfo, isLoading: isLoadingInfo } = usePlayerInfo(cricbuzzId);
-  
+
   // Check if player's team looks like a national team (e.g., "IND", "AUS", "ENG")
   // vs a franchise team (e.g., "MI", "CSK", "RCB")
   const isNationalTeam = useMemo(() => {
@@ -288,8 +288,29 @@ export function PlayerDetailSheet({
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : playerInfo ? (
+              ) : (playerInfo || extendedData) ? (
                 <div className="space-y-4 pr-4">
+                  {/* Playing Style */}
+                  {(playerInfo?.battingStyle || extendedData?.battingStyle || playerInfo?.bowlingStyle || extendedData?.bowlingStyle) && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Playing Style</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(playerInfo?.battingStyle || extendedData?.battingStyle) && (
+                          <div className="bg-muted/50 rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground">Batting</div>
+                            <div className="text-sm font-medium">{playerInfo?.battingStyle || extendedData?.battingStyle}</div>
+                          </div>
+                        )}
+                        {(playerInfo?.bowlingStyle || extendedData?.bowlingStyle) && (
+                          <div className="bg-muted/50 rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground">Bowling</div>
+                            <div className="text-sm font-medium">{playerInfo?.bowlingStyle || extendedData?.bowlingStyle}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Additional Info */}
                   {(playerInfo?.birthPlace || extendedData?.birthPlace || playerInfo?.dateOfBirth || extendedData?.dob || playerInfo?.height || extendedData?.height) && (
                     <div>
@@ -318,7 +339,11 @@ export function PlayerDetailSheet({
                   )}
 
                   {/* Rankings if available */}
-                  {playerInfo.rankings && (
+                  {playerInfo?.rankings && (
+                    playerInfo.rankings.batting?.length ||
+                    playerInfo.rankings.bowling?.length ||
+                    playerInfo.rankings.allRounder?.length
+                  ) && (
                     <div>
                       <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Rankings</h3>
                       <div className="space-y-2">
@@ -331,6 +356,12 @@ export function PlayerDetailSheet({
                         {Array.isArray(playerInfo.rankings.bowling) && playerInfo.rankings.bowling.map((r, i) => (
                           <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
                             <span className="text-sm">{r.type} Bowling</span>
+                            <span className="text-sm font-medium">#{r.rank}</span>
+                          </div>
+                        ))}
+                        {Array.isArray(playerInfo.rankings.allRounder) && playerInfo.rankings.allRounder.map((r, i) => (
+                          <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
+                            <span className="text-sm">{r.type} All-Rounder</span>
                             <span className="text-sm font-medium">#{r.rank}</span>
                           </div>
                         ))}

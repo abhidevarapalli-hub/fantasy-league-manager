@@ -19,6 +19,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { TournamentPlayer } from '@/lib/cricket-types';
 
 /**
+ * Ranking entry for a specific format
+ */
+interface RankingEntry {
+  type: string;
+  rank: number;
+  best?: number;
+}
+
+/**
  * Extended player details combining API data
  */
 export interface PlayerDetails {
@@ -35,10 +44,39 @@ export interface PlayerDetails {
   imageId?: number;
   bio?: string;
   rankings?: {
-    batting?: { type: string; rank: number; best?: number }[];
-    bowling?: { type: string; rank: number; best?: number }[];
-    allRounder?: { type: string; rank: number; best?: number }[];
+    batting?: RankingEntry[];
+    bowling?: RankingEntry[];
+    allRounder?: RankingEntry[];
   };
+}
+
+/**
+ * Transform API rankings object to array format
+ */
+function transformRankings(apiRankings: Record<string, string> | undefined): RankingEntry[] {
+  if (!apiRankings || Object.keys(apiRankings).length === 0) return [];
+
+  const entries: RankingEntry[] = [];
+
+  // Map API fields to display format
+  const formats = [
+    { key: 'testRank', bestKey: 'testBestRank', type: 'Test' },
+    { key: 't20Rank', bestKey: 't20BestRank', type: 'T20I' },
+    { key: 'odiRank', bestKey: 'odiBestRank', type: 'ODI' },
+  ];
+
+  for (const format of formats) {
+    const rank = apiRankings[format.key];
+    if (rank && rank !== '-') {
+      entries.push({
+        type: format.type,
+        rank: parseInt(rank, 10),
+        best: apiRankings[format.bestKey] ? parseInt(apiRankings[format.bestKey], 10) : undefined,
+      });
+    }
+  }
+
+  return entries;
 }
 
 /**
@@ -74,9 +112,9 @@ function transformPlayerInfo(response: PlayerInfoResponse): PlayerDetails {
     imageId: response.faceImageId || response.imageId,
     bio: response.bio,
     rankings: response.rankings ? {
-      batting: response.rankings.bat,
-      bowling: response.rankings.bowl,
-      allRounder: response.rankings.all,
+      batting: transformRankings(response.rankings.bat),
+      bowling: transformRankings(response.rankings.bowl),
+      allRounder: transformRankings(response.rankings.all),
     } : undefined,
   };
 }
