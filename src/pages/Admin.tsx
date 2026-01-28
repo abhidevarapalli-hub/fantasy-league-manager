@@ -37,7 +37,7 @@ const Admin = () => {
   const addNewPlayer = useGameStore(state => state.addNewPlayer);
   const dropPlayerOnly = useGameStore(state => state.dropPlayerOnly);
   const leagueOwnerId = useGameStore(state => state.leagueOwnerId);
-  const leagueId = useGameStore(state => state.leagueId);
+  const leagueId = useGameStore(state => state.currentLeagueId);
   const loadGameData = useGameStore(state => state.loadGameData);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const [removingMember, setRemovingMember] = useState<string | null>(null);
@@ -780,7 +780,14 @@ const Admin = () => {
                   </Button>
                   <Button
                     onClick={async () => {
-                      if (!leagueId || !reseedTournamentId) return;
+                      if (!leagueId) {
+                        toast.error('No league selected. Please select a league first.');
+                        return;
+                      }
+                      if (!reseedTournamentId) {
+                        toast.error('Please select a tournament to reseed from.');
+                        return;
+                      }
                       const tournament = getTournamentById(Number(reseedTournamentId));
                       toast.info(`Reseeding players from ${tournament?.shortName}...`);
                       const success = await reseedFromTournament(leagueId, Number(reseedTournamentId));

@@ -21,6 +21,10 @@ const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
 const RAPIDAPI_HOST = import.meta.env.VITE_RAPIDAPI_HOST || 'cricbuzz-cricket.p.rapidapi.com';
 const BASE_URL = `https://${RAPIDAPI_HOST}`;
 
+// TODO: Fix CORS issue - RapidAPI returns multiple Access-Control-Allow-Origin values which browsers reject.
+// Solution: Add a Vite proxy in vite.config.ts to forward /api/cricbuzz/* requests to RapidAPI,
+// then update BASE_URL to use '/api/cricbuzz' in development mode (import.meta.env.DEV).
+
 // Common headers for all requests
 const getHeaders = () => ({
   'x-rapidapi-key': RAPIDAPI_KEY,
@@ -231,4 +235,346 @@ export async function fetchAllTournamentPlayers(
   }
   
   return results;
+}
+
+// ============================================
+// Player Detail API Functions
+// ============================================
+
+/**
+ * Player info response from Cricbuzz API
+ */
+export interface PlayerInfoResponse {
+  id: string;
+  name: string;
+  nickName?: string;
+  role?: string;
+  intlTeam?: string;
+  bat?: string; // Batting style
+  bowl?: string; // Bowling style
+  birthPlace?: string;
+  DoB?: string; // Date of birth
+  height?: string;
+  teams?: string;
+  imageId?: number;
+  bio?: string;
+  rankings?: {
+    bat?: Array<{ type: string; rank: number; best?: number }>;
+    bowl?: Array<{ type: string; rank: number; best?: number }>;
+    all?: Array<{ type: string; rank: number; best?: number }>;
+  };
+  DoBFormat?: string;
+  faceImageId?: number;
+  appIndex?: unknown;
+}
+
+/**
+ * Fetch detailed player information from Cricbuzz
+ * @param playerId - The Cricbuzz player ID
+ */
+export async function fetchPlayerInfo(playerId: string | number): Promise<PlayerInfoResponse> {
+  return fetchFromApi<PlayerInfoResponse>(`/stats/v1/player/${playerId}`);
+}
+
+/**
+ * Player batting stats from Cricbuzz API
+ */
+export interface PlayerBattingStatsResponse {
+  headers: string[];
+  values: Array<{
+    values: string[];
+  }>;
+}
+
+/**
+ * Fetch player's batting statistics
+ * @param playerId - The Cricbuzz player ID
+ */
+export async function fetchPlayerBattingStats(playerId: string | number): Promise<PlayerBattingStatsResponse> {
+  return fetchFromApi<PlayerBattingStatsResponse>(`/stats/v1/player/${playerId}/batting`);
+}
+
+/**
+ * Player bowling stats from Cricbuzz API
+ */
+export interface PlayerBowlingStatsResponse {
+  headers: string[];
+  values: Array<{
+    values: string[];
+  }>;
+}
+
+/**
+ * Fetch player's bowling statistics
+ * @param playerId - The Cricbuzz player ID
+ */
+export async function fetchPlayerBowlingStats(playerId: string | number): Promise<PlayerBowlingStatsResponse> {
+  return fetchFromApi<PlayerBowlingStatsResponse>(`/stats/v1/player/${playerId}/bowling`);
+}
+
+// ============================================
+// Match Scorecard Types and Functions
+// ============================================
+
+/**
+ * Batsman scorecard entry
+ */
+export interface BatsmanScore {
+  batId: number;
+  batName: string;
+  batShortName?: string;
+  isCaptain?: boolean;
+  isKeeper?: boolean;
+  runs: number;
+  balls: number;
+  fours: number;
+  sixes: number;
+  strikeRate: number;
+  outDesc?: string; // Dismissal description
+  isNotOut?: boolean;
+  batOrder?: number;
+}
+
+/**
+ * Bowler scorecard entry
+ */
+export interface BowlerScore {
+  bowlerId: number;
+  bowlName: string;
+  bowlShortName?: string;
+  overs: number;
+  maidens: number;
+  runs: number;
+  wickets: number;
+  economy: number;
+  noBalls?: number;
+  wides?: number;
+  dots?: number;
+}
+
+/**
+ * Fielder stats (catches, stumpings, run outs)
+ */
+export interface FielderStats {
+  fielderId: number;
+  fielderName: string;
+  catches?: number;
+  stumpings?: number;
+  runOuts?: number;
+}
+
+/**
+ * Innings scorecard
+ */
+export interface InningsScorecard {
+  inningsId: number;
+  batTeamId: number;
+  batTeamName: string;
+  batTeamShortName?: string;
+  score: number;
+  wickets: number;
+  overs: number;
+  isDeclared?: boolean;
+  isFollowOn?: boolean;
+  batsmanData?: Record<string, BatsmanScore>;
+  bowlersData?: Record<string, BowlerScore>;
+  extrasData?: {
+    byes?: number;
+    legByes?: number;
+    wides?: number;
+    noBalls?: number;
+    penalty?: number;
+    total?: number;
+  };
+  partnershipsData?: unknown;
+  wicketsData?: unknown;
+}
+
+/**
+ * Match scorecard response
+ */
+export interface ScorecardResponse {
+  scoreCard: InningsScorecard[];
+  matchHeader: {
+    matchId: number;
+    matchDescription: string;
+    matchFormat: string;
+    matchType: string;
+    complete: boolean;
+    domestic: boolean;
+    matchStartTimestamp: number;
+    matchCompleteTimestamp?: number;
+    state: string;
+    status: string;
+    team1: {
+      id: number;
+      name: string;
+      shortName: string;
+      imageId?: number;
+    };
+    team2: {
+      id: number;
+      name: string;
+      shortName: string;
+      imageId?: number;
+    };
+    seriesId: number;
+    seriesName: string;
+    result?: {
+      resultType: string;
+      winningTeam?: string;
+      winningTeamId?: number;
+      winByRuns?: number;
+      winByInnings?: number;
+    };
+    tossResults?: {
+      tossWinnerId: number;
+      tossWinnerName: string;
+      decision: string;
+    };
+    playersOfTheMatch?: Array<{
+      id: number;
+      name: string;
+      fullName?: string;
+      teamId: number;
+    }>;
+  };
+  isMatchComplete?: boolean;
+  status?: string;
+  venueInfo?: {
+    ground: string;
+    city: string;
+    timezone: string;
+  };
+}
+
+/**
+ * Fetch complete match scorecard
+ * @param matchId - The Cricbuzz match ID
+ */
+export async function fetchScorecardDetails(matchId: number): Promise<ScorecardResponse> {
+  return fetchFromApi<ScorecardResponse>(`/mcenter/v1/${matchId}/scard`);
+}
+
+// ============================================
+// Series/Tournament Match Functions
+// ============================================
+
+/**
+ * Series match info from the matches list
+ */
+export interface SeriesMatchInfo {
+  matchId: number;
+  matchDesc: string;
+  matchFormat: string;
+  startDate: string;
+  endDate: string;
+  state: string;
+  status: string;
+  team1: {
+    teamId: number;
+    teamName: string;
+    teamSName: string;
+    imageId?: number;
+  };
+  team2: {
+    teamId: number;
+    teamName: string;
+    teamSName: string;
+    imageId?: number;
+  };
+  venueInfo: {
+    ground: string;
+    city: string;
+    timezone: string;
+  };
+  seriesStartDt?: string;
+  seriesEndDt?: string;
+}
+
+/**
+ * Series matches response
+ */
+export interface SeriesMatchesResponse {
+  matchDetails?: Array<{
+    matchDetailsMap?: {
+      key: string;
+      match: Array<{
+        matchInfo: SeriesMatchInfo;
+        matchScore?: {
+          team1Score?: {
+            inngs1?: { runs: number; wickets: number; overs: number };
+            inngs2?: { runs: number; wickets: number; overs: number };
+          };
+          team2Score?: {
+            inngs1?: { runs: number; wickets: number; overs: number };
+            inngs2?: { runs: number; wickets: number; overs: number };
+          };
+        };
+      }>;
+    };
+  }>;
+  appIndex?: unknown;
+}
+
+/**
+ * Fetch all matches for a series/tournament
+ * @param seriesId - The Cricbuzz series ID
+ */
+export async function fetchSeriesMatches(seriesId: number): Promise<SeriesMatchesResponse> {
+  return fetchFromApi<SeriesMatchesResponse>(`/series/v1/${seriesId}`);
+}
+
+/**
+ * Extract flat list of matches from series response
+ */
+export function extractSeriesMatches(response: SeriesMatchesResponse): Array<{
+  matchInfo: SeriesMatchInfo;
+  matchScore?: {
+    team1Score?: string;
+    team2Score?: string;
+  };
+}> {
+  const matches: Array<{
+    matchInfo: SeriesMatchInfo;
+    matchScore?: {
+      team1Score?: string;
+      team2Score?: string;
+    };
+  }> = [];
+
+  for (const detail of response.matchDetails || []) {
+    if (detail.matchDetailsMap?.match) {
+      for (const match of detail.matchDetailsMap.match) {
+        const scoreData = match.matchScore;
+        let team1Score: string | undefined;
+        let team2Score: string | undefined;
+
+        if (scoreData?.team1Score?.inngs1) {
+          const inngs = scoreData.team1Score.inngs1;
+          team1Score = `${inngs.runs}/${inngs.wickets}`;
+          if (scoreData.team1Score.inngs2) {
+            const inngs2 = scoreData.team1Score.inngs2;
+            team1Score += ` & ${inngs2.runs}/${inngs2.wickets}`;
+          }
+        }
+
+        if (scoreData?.team2Score?.inngs1) {
+          const inngs = scoreData.team2Score.inngs1;
+          team2Score = `${inngs.runs}/${inngs.wickets}`;
+          if (scoreData.team2Score.inngs2) {
+            const inngs2 = scoreData.team2Score.inngs2;
+            team2Score += ` & ${inngs2.runs}/${inngs2.wickets}`;
+          }
+        }
+
+        matches.push({
+          matchInfo: match.matchInfo,
+          matchScore: team1Score || team2Score ? { team1Score, team2Score } : undefined,
+        });
+      }
+    }
+  }
+
+  return matches;
 }

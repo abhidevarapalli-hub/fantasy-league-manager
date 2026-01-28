@@ -5,6 +5,16 @@ import { fetchAllTournamentPlayers, isApiConfigured } from "@/integrations/cricb
 import { mapApiRole, getTeamCode, isInternationalForT20WC } from "@/lib/player-utils";
 import { getTournamentById } from "@/lib/tournaments";
 
+// Timeout wrapper for async operations
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    )
+  ]);
+}
+
 // Initial data
 const PLAYERS_DATA = [
   // Mumbai Indians
@@ -415,10 +425,14 @@ export const useSeedDatabase = () => {
       console.log(`[useSeedDatabase] 🔑 API configured: true, Tournament type: ${tournament?.type}`);
       const fetchStartTime = performance.now();
 
-      // Fetch all teams and players from the tournament
+      // Fetch all teams and players from the tournament (with 60 second timeout)
       let teamsWithPlayers;
       try {
-        teamsWithPlayers = await fetchAllTournamentPlayers(tournamentId);
+        teamsWithPlayers = await withTimeout(
+          fetchAllTournamentPlayers(tournamentId),
+          60000, // 60 second timeout for API calls
+          `API timeout: Failed to fetch tournament data within 60 seconds`
+        );
       } catch (apiError: any) {
         console.error(`[useSeedDatabase] ❌ API fetch failed:`, apiError?.message || apiError);
         console.error(`[useSeedDatabase] Full error:`, apiError);
@@ -435,6 +449,7 @@ export const useSeedDatabase = () => {
       }
 
       // Transform API data to database format
+      // We need to track the Cricbuzz IDs and image IDs for extended_players table
       const playersToInsert: Array<{
         name: string;
         team: string;
@@ -442,6 +457,9 @@ export const useSeedDatabase = () => {
         is_international: boolean;
         league_id: string;
       }> = [];
+      
+      // Map to store cricbuzz data for each player (keyed by name+team)
+      const cricbuzzDataMap = new Map<string, { cricbuzzId: string; imageId?: number; battingStyle?: string; bowlingStyle?: string }>();
 
       for (const { team, players } of teamsWithPlayers) {
         const teamCode = getTeamCode(team.teamName);
@@ -465,6 +483,15 @@ export const useSeedDatabase = () => {
             is_international: isIntl,
             league_id: leagueId,
           });
+          
+          // Store Cricbuzz data for later linking
+          const playerKey = `${player.name}|${teamCode}`;
+          cricbuzzDataMap.set(playerKey, {
+            cricbuzzId: player.id,
+            imageId: player.imageId,
+            battingStyle: player.battingStyle,
+            bowlingStyle: player.bowlingStyle,
+          });
         }
       }
 
@@ -477,9 +504,11 @@ export const useSeedDatabase = () => {
       console.log(`[useSeedDatabase] 📥 Inserting ${playersToInsert.length} players from ${teamsWithPlayers.length} teams...`);
       const insertStartTime = performance.now();
 
-      const { error: insertError } = await (supabase
+      // Insert players and get back their IDs
+      const { data: insertedPlayers, error: insertError } = await (supabase
         .from("players")
-        .insert(playersToInsert) as any);
+        .insert(playersToInsert)
+        .select("id, name, team") as any);
 
       const insertDuration = performance.now() - insertStartTime;
 
@@ -488,6 +517,50 @@ export const useSeedDatabase = () => {
         // Fall back to hardcoded data
         console.log("[useSeedDatabase] 🔄 Falling back to hardcoded IPL data...");
         return await seedDatabase(leagueId);
+      }
+
+      // Now insert extended player data (Cricbuzz ID and image ID)
+      if (insertedPlayers && insertedPlayers.length > 0) {
+        console.log(`[useSeedDatabase] 📸 Linking ${insertedPlayers.length} players to Cricbuzz data...`);
+        const extendedStartTime = performance.now();
+        
+        const extendedPlayersToInsert: Array<{
+          player_id: string;
+          cricbuzz_id: string;
+          image_id: number | null;
+          batting_style: string | null;
+          bowling_style: string | null;
+        }> = [];
+        
+        for (const player of insertedPlayers) {
+          const playerKey = `${player.name}|${player.team}`;
+          const cricbuzzData = cricbuzzDataMap.get(playerKey);
+          
+          if (cricbuzzData && cricbuzzData.cricbuzzId) {
+            extendedPlayersToInsert.push({
+              player_id: player.id,
+              cricbuzz_id: cricbuzzData.cricbuzzId,
+              image_id: cricbuzzData.imageId || null,
+              batting_style: cricbuzzData.battingStyle || null,
+              bowling_style: cricbuzzData.bowlingStyle || null,
+            });
+          }
+        }
+        
+        if (extendedPlayersToInsert.length > 0) {
+          const { error: extendedError } = await (supabase as any)
+            .from("extended_players")
+            .insert(extendedPlayersToInsert);
+          
+          const extendedDuration = performance.now() - extendedStartTime;
+          
+          if (extendedError) {
+            console.warn(`[useSeedDatabase] ⚠️ Error inserting extended player data (${extendedDuration.toFixed(2)}ms):`, extendedError);
+            // Don't fail the whole operation, extended data is optional
+          } else {
+            console.log(`[useSeedDatabase] ✅ Extended player data inserted for ${extendedPlayersToInsert.length} players in ${extendedDuration.toFixed(2)}ms`);
+          }
+        }
       }
 
       const totalDuration = performance.now() - seedStartTime;
@@ -523,6 +596,28 @@ export const useSeedDatabase = () => {
       if (clearRostersError) {
         console.error("[useSeedDatabase] Error clearing rosters:", clearRostersError);
         throw clearRostersError;
+      }
+
+      // Get existing player IDs for this league (to delete extended data)
+      const { data: existingPlayers } = await (supabase
+        .from("players")
+        .select("id")
+        .eq("league_id", leagueId) as any);
+      
+      // Delete extended player data first (due to FK constraint)
+      if (existingPlayers && existingPlayers.length > 0) {
+        const playerIds = existingPlayers.map((p: any) => p.id);
+        const { error: deleteExtendedError } = await (supabase as any)
+          .from("extended_players")
+          .delete()
+          .in("player_id", playerIds);
+        
+        if (deleteExtendedError) {
+          console.warn("[useSeedDatabase] Warning deleting extended players:", deleteExtendedError);
+          // Continue anyway - extended data might not exist
+        } else {
+          console.log(`[useSeedDatabase] ✅ Deleted extended data for ${playerIds.length} players`);
+        }
       }
 
       // Delete all existing players for this league

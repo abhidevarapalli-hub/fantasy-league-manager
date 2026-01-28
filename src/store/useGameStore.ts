@@ -66,6 +66,7 @@ interface GameState {
     scoringRules: ScoringRules;
     leagueName: string;
     leagueOwnerId: string | null;
+    tournamentId: number | null; // Cricbuzz series ID for the tournament
     currentWeek: number;
     currentManagerId: string;
     loading: boolean;
@@ -85,6 +86,7 @@ interface GameState {
     setScoringRules: (rules: ScoringRules) => void;
     setLeagueName: (name: string) => void;
     setLeagueOwnerId: (id: string | null) => void;
+    setTournamentId: (id: number | null) => void;
     setLoading: (loading: boolean) => void;
     setCurrentManagerId: (id: string) => void;
     setCurrentLeagueId: (id: string | null) => void;
@@ -144,6 +146,7 @@ export const useGameStore = create<GameState>()(
             scoringRules: DEFAULT_SCORING_RULES,
             leagueName: 'IPL Fantasy',
             leagueOwnerId: null,
+            tournamentId: null,
             currentWeek: 1,
             currentManagerId: '',
             loading: true,
@@ -163,6 +166,7 @@ export const useGameStore = create<GameState>()(
             setScoringRules: (scoringRules) => set({ scoringRules }),
             setLeagueName: (leagueName) => set({ leagueName }),
             setLeagueOwnerId: (leagueOwnerId) => set({ leagueOwnerId }),
+            setTournamentId: (tournamentId) => set({ tournamentId }),
             setLoading: (loading) => set({ loading }),
             setCurrentManagerId: (currentManagerId) => set({ currentManagerId }),
             setCurrentLeagueId: (currentLeagueId) => set({ currentLeagueId }),
@@ -491,6 +495,7 @@ export const useGameStore = create<GameState>()(
                         set({
                             leagueName: leagueData.name,
                             leagueOwnerId: leagueData.league_manager_id,
+                            tournamentId: leagueData.tournament_id || null,
                             config: {
                                 managerCount: leagueData.manager_count,
                                 activeSize: leagueData.active_size,

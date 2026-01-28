@@ -50,6 +50,7 @@ interface PlayerCardProps {
   onMoveDown?: () => void;
   onSwap?: () => void;
   onTrade?: () => void;
+  onClick?: () => void;
   isOwned?: boolean;
   showActions?: boolean;
   variant?: 'compact' | 'full';
@@ -111,16 +112,37 @@ export const PlayerCard = ({
   onMoveDown,
   onSwap,
   onTrade,
+  onClick,
   isOwned = false,
   showActions = true,
   variant = 'full'
 }: PlayerCardProps) => {
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger if clicking on action buttons
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    onClick?.();
+  };
+
   return (
-    <div className={cn(
-      "flex items-center gap-3 p-3 rounded-xl border transition-all",
-      teamCardColors[player.team] || "bg-card border-border hover:border-primary/30",
-      variant === 'compact' && "p-2"
-    )}>
+    <div 
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-xl border transition-all",
+        teamCardColors[player.team] || "bg-card border-border hover:border-primary/30",
+        variant === 'compact' && "p-2",
+        onClick && "cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+      )}
+      onClick={handleCardClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      } : undefined}
+    >
       {/* Role Icon */}
       <div className={cn(
         "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",

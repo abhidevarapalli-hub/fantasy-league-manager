@@ -20,6 +20,11 @@ export function StoreInitializer() {
     const setIsInitializing = useGameStore(state => state.setIsInitializing);
     const setInitializedLeagueId = useGameStore(state => state.setInitializedLeagueId);
     const { seedDatabase } = useSeedDatabase();
+    
+    // Auth store for manager profile
+    const user = useAuthStore(state => state.user);
+    const managerProfile = useAuthStore(state => state.managerProfile);
+    const fetchManagerProfile = useAuthStore(state => state.fetchManagerProfile);
 
     // Initialize game data when leagueId changes
     useEffect(() => {
@@ -93,6 +98,17 @@ export function StoreInitializer() {
             }
         };
     }, [leagueId]); // Only depend on leagueId
+
+    // Fetch manager profile for this league when user or league changes
+    useEffect(() => {
+        if (!leagueId || !user) return;
+        
+        // Only fetch if we don't have a manager profile or it's for a different league
+        if (!managerProfile || managerProfile.league_id !== leagueId) {
+            console.log(`[StoreInitializer] 👤 Fetching manager profile for league: ${leagueId}`);
+            fetchManagerProfile(undefined, leagueId);
+        }
+    }, [leagueId, user, managerProfile?.league_id, fetchManagerProfile]);
 
     return null; // This component doesn't render anything
 }

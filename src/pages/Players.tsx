@@ -5,6 +5,7 @@ import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTrades } from '@/hooks/useTrades';
 import { PlayerCard } from '@/components/PlayerCard';
+import { PlayerDetailSheet } from '@/components/PlayerDetailSheet';
 import { AppLayout } from '@/components/AppLayout';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,7 @@ const Players = () => {
   // Zustand selectors - ONLY re-render when these specific pieces change
   const players = useGameStore(state => state.players);
   const managers = useGameStore(state => state.managers);
+  const tournamentId = useGameStore(state => state.tournamentId);
   const managerProfile = useAuthStore(state => state.managerProfile);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
@@ -66,6 +68,9 @@ const Players = () => {
   const [tradeDialogOpen, setTradeDialogOpen] = useState(false);
   const [tradeTargetPlayer, setTradeTargetPlayer] = useState<Player | null>(null);
   const [tradeTargetManager, setTradeTargetManager] = useState<Manager | null>(null);
+  // Player detail sheet state
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
 
   // Find the current user's manager ID
   const currentUserManagerId = managerProfile?.id;
@@ -138,6 +143,11 @@ const Players = () => {
   const handleTradeSubmit = async (proposerPlayers: string[], targetPlayers: string[]) => {
     if (!currentManager || !tradeTargetManager) return;
     await proposeTrade(currentManager.id, tradeTargetManager.id, proposerPlayers, targetPlayers);
+  };
+
+  const handlePlayerClick = (player: Player) => {
+    setDetailPlayer(player);
+    setDetailSheetOpen(true);
   };
 
   return (
@@ -267,6 +277,7 @@ const Players = () => {
                       showActions={(!rosteredBy && (isLeagueManager || !!currentUserManagerId)) || canTrade}
                       onAdd={!rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
                       onTrade={canTrade ? () => handleTradePlayer(player.id) : undefined}
+                      onClick={() => handlePlayerClick(player)}
                     />
                   </div>
                   {rosteredBy && (
@@ -305,6 +316,13 @@ const Players = () => {
         initialTargetPlayer={tradeTargetPlayer || undefined}
         onSubmit={handleTradeSubmit}
         mode="propose"
+      />
+
+      <PlayerDetailSheet
+        open={detailSheetOpen}
+        onOpenChange={setDetailSheetOpen}
+        player={detailPlayer}
+        seriesId={tournamentId}
       />
     </AppLayout>
   );
