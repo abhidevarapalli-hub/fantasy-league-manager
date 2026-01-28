@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trophy, Users, Shield, Layout, Save, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Shield, Layout, Save, ChevronRight, Globe, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useSeedDatabase } from '@/hooks/useSeedDatabase';
+import { SUPPORTED_TOURNAMENTS, type Tournament } from '@/lib/tournaments';
 
 import { toast } from 'sonner';
 
@@ -17,6 +19,7 @@ const CreateLeague = () => {
     const user = useAuthStore(state => state.user);
     const userProfile = useAuthStore(state => state.userProfile);
     const selectManager = useAuthStore(state => state.selectManager);
+    const { seedFromTournament, seedDatabase } = useSeedDatabase();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
 
@@ -25,6 +28,11 @@ const CreateLeague = () => {
     const [managerCount, setManagerCount] = useState(8);
     const [activeSize, setActiveSize] = useState(11);
     const [benchSize, setBenchSize] = useState(3);
+
+    // Tournament Selection (default to IPL)
+    const [selectedTournament, setSelectedTournament] = useState<Tournament>(
+        SUPPORTED_TOURNAMENTS.find(t => t.type === 'league') || SUPPORTED_TOURNAMENTS[0]
+    );
 
     // Creator Manager Settings
     const [teamName, setTeamName] = useState('');
@@ -48,23 +56,50 @@ const CreateLeague = () => {
             console.log('[CreateLeague] 📝 Step 1: Creating league record...');
             const step1Start = performance.now();
 
-            const { data: league, error: leagueError } = await (supabase
+            // Try to create league with tournament fields first
+            // Fall back to without them if the migration hasn't been applied yet
+            let league: any;
+            let leagueError: any;
+
+            const baseLeagueData = {
+                name: leagueName,
+                league_manager_id: user.id,
+                manager_count: managerCount,
+                active_size: activeSize,
+                bench_size: benchSize,
+                min_batsmen: 1,
+                max_batsmen: 6,
+                min_bowlers: 3,
+                min_wks: 1,
+                min_all_rounders: 1,
+                max_international: selectedTournament.type === 'international' ? 11 : 4, // Allow all international for T20 WC
+            };
+
+            // First try with tournament fields
+            const resultWithTournament = await (supabase
                 .from('leagues' as any)
                 .insert({
-                    name: leagueName,
-                    league_manager_id: user.id,
-                    manager_count: managerCount,
-                    active_size: activeSize,
-                    bench_size: benchSize,
-                    min_batsmen: 1,
-                    max_batsmen: 6,
-                    min_bowlers: 3,
-                    min_wks: 1,
-                    min_all_rounders: 1,
-                    max_international: 4
+                    ...baseLeagueData,
+                    tournament_id: selectedTournament.id,
+                    tournament_name: selectedTournament.name
                 })
                 .select()
                 .single() as any);
+
+            if (resultWithTournament.error?.message?.includes('tournament_id')) {
+                // Migration not applied yet, try without tournament fields
+                console.warn('[CreateLeague] ⚠️ Tournament columns not found, creating without them');
+                const resultWithoutTournament = await (supabase
+                    .from('leagues' as any)
+                    .insert(baseLeagueData)
+                    .select()
+                    .single() as any);
+                league = resultWithoutTournament.data;
+                leagueError = resultWithoutTournament.error;
+            } else {
+                league = resultWithTournament.data;
+                leagueError = resultWithTournament.error;
+            }
 
             const step1Duration = performance.now() - step1Start;
             console.log(`[CreateLeague] ✅ Step 1 completed in ${step1Duration.toFixed(2)}ms`);
@@ -232,18 +267,30 @@ const CreateLeague = () => {
                 console.error("[CreateLeague] ⚠️  Error creating schedule:", scheduleError);
             }
 
-            // 6. Mark in AuthContext that this is the selected manager
-            console.log('[CreateLeague] 🎯 Step 6: Selecting manager...');
+            // 6. Seed players from tournament
+            console.log(`[CreateLeague] 🏏 Step 6: Seeding players from ${selectedTournament.shortName}...`);
             const step6Start = performance.now();
 
-            await selectManager(displayName, league.id);
+            const seedSuccess = await seedFromTournament(league.id, selectedTournament.id);
+            if (!seedSuccess) {
+                console.warn('[CreateLeague] ⚠️ Tournament seeding failed, using fallback');
+            }
 
             const step6Duration = performance.now() - step6Start;
             console.log(`[CreateLeague] ✅ Step 6 completed in ${step6Duration.toFixed(2)}ms`);
 
+            // 7. Mark in AuthContext that this is the selected manager
+            console.log('[CreateLeague] 🎯 Step 7: Selecting manager...');
+            const step7Start = performance.now();
+
+            await selectManager(displayName, league.id);
+
+            const step7Duration = performance.now() - step7Start;
+            console.log(`[CreateLeague] ✅ Step 7 completed in ${step7Duration.toFixed(2)}ms`);
+
             const totalDuration = performance.now() - overallStartTime;
             console.log(`[CreateLeague] 🎉 League creation completed in ${totalDuration.toFixed(2)}ms`);
-            console.log(`[CreateLeague] 📊 Breakdown: League:${step1Duration.toFixed(0)}ms, Manager:${step2Duration.toFixed(0)}ms, Placeholders:${step3Duration.toFixed(0)}ms, Schedule:${step4Duration.toFixed(0)}ms, Insert:${step5Duration.toFixed(0)}ms, Select:${step6Duration.toFixed(0)}ms`);
+            console.log(`[CreateLeague] 📊 Breakdown: League:${step1Duration.toFixed(0)}ms, Manager:${step2Duration.toFixed(0)}ms, Placeholders:${step3Duration.toFixed(0)}ms, Schedule:${step4Duration.toFixed(0)}ms, Insert:${step5Duration.toFixed(0)}ms, Players:${step6Duration.toFixed(0)}ms, Select:${step7Duration.toFixed(0)}ms`);
 
             toast.success("League created successfully!");
             navigate(`/${league.id}`);
@@ -299,6 +346,51 @@ const CreateLeague = () => {
                                             onChange={(e) => setLeagueName(e.target.value)}
                                             className="h-12 text-lg bg-background/50 border-primary/20 focus:border-primary"
                                         />
+                                    </div>
+
+                                    {/* Tournament Selection */}
+                                    <div className="space-y-4">
+                                        <Label className="text-base font-semibold">Tournament</Label>
+                                        <RadioGroup
+                                            value={String(selectedTournament.id)}
+                                            onValueChange={(value) => {
+                                                const tournament = SUPPORTED_TOURNAMENTS.find(t => t.id === Number(value));
+                                                if (tournament) setSelectedTournament(tournament);
+                                            }}
+                                            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                                        >
+                                            {SUPPORTED_TOURNAMENTS.map((tournament) => (
+                                                <Label
+                                                    key={tournament.id}
+                                                    htmlFor={`tournament-${tournament.id}`}
+                                                    className={`
+                                                        flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all
+                                                        ${selectedTournament.id === tournament.id 
+                                                            ? 'border-primary bg-primary/5' 
+                                                            : 'border-border hover:border-primary/50 hover:bg-primary/5'}
+                                                    `}
+                                                >
+                                                    <RadioGroupItem
+                                                        value={String(tournament.id)}
+                                                        id={`tournament-${tournament.id}`}
+                                                        className="mt-1"
+                                                    />
+                                                    <div className="flex-1 space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            {tournament.type === 'international' ? (
+                                                                <Globe className="w-4 h-4 text-blue-500" />
+                                                            ) : (
+                                                                <Zap className="w-4 h-4 text-yellow-500" />
+                                                            )}
+                                                            <span className="font-semibold">{tournament.shortName}</span>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {tournament.description}
+                                                        </p>
+                                                    </div>
+                                                </Label>
+                                            ))}
+                                        </RadioGroup>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
