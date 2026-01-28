@@ -8,6 +8,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/api/cricbuzz': {
+        target: 'https://cricbuzz-cricket.p.rapidapi.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/cricbuzz/, ''),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

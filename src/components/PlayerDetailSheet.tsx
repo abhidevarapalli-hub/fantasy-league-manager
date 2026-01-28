@@ -328,13 +328,13 @@ export function PlayerDetailSheet({
                     <div>
                       <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Rankings</h3>
                       <div className="space-y-2">
-                        {playerInfo.rankings.batting?.map((r, i) => (
+                        {Array.isArray(playerInfo.rankings.batting) && playerInfo.rankings.batting.map((r, i) => (
                           <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
                             <span className="text-sm">{r.type} Batting</span>
                             <span className="text-sm font-medium">#{r.rank}</span>
                           </div>
                         ))}
-                        {playerInfo.rankings.bowling?.map((r, i) => (
+                        {Array.isArray(playerInfo.rankings.bowling) && playerInfo.rankings.bowling.map((r, i) => (
                           <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
                             <span className="text-sm">{r.type} Bowling</span>
                             <span className="text-sm font-medium">#{r.rank}</span>

@@ -197,7 +197,7 @@ const Leagues = () => {
                     {/* List existing leagues */}
                     <div className="flex flex-col space-y-6">
                         <div className="flex items-center justify-between px-2">
-                            <h2 className="text-2xl font-bold tracking-tight">Your Competition</h2>
+                            <h2 className="text-2xl font-bold tracking-tight">Your Competitions</h2>
                             <div className="h-0.5 flex-1 mx-4 bg-muted" />
                         </div>
 

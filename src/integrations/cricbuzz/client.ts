@@ -19,11 +19,10 @@ import {
 // API Configuration
 const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
 const RAPIDAPI_HOST = import.meta.env.VITE_RAPIDAPI_HOST || 'cricbuzz-cricket.p.rapidapi.com';
-const BASE_URL = `https://${RAPIDAPI_HOST}`;
 
-// TODO: Fix CORS issue - RapidAPI returns multiple Access-Control-Allow-Origin values which browsers reject.
-// Solution: Add a Vite proxy in vite.config.ts to forward /api/cricbuzz/* requests to RapidAPI,
-// then update BASE_URL to use '/api/cricbuzz' in development mode (import.meta.env.DEV).
+// Use Vite proxy in development to avoid CORS issues
+// In production, calls go directly to RapidAPI (requires server-side proxy or CORS-enabled endpoint)
+const BASE_URL = import.meta.env.DEV ? '/api/cricbuzz' : `https://${RAPIDAPI_HOST}`;
 
 // Common headers for all requests
 const getHeaders = () => ({
