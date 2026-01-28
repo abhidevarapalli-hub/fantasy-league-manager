@@ -197,7 +197,7 @@ const Leagues = () => {
                     {/* List existing leagues */}
                     <div className="flex flex-col space-y-6">
                         <div className="flex items-center justify-between px-2">
-                            <h2 className="text-2xl font-bold tracking-tight">Your Competition</h2>
+                            <h2 className="text-2xl font-bold tracking-tight">Your Competitions</h2>
                             <div className="h-0.5 flex-1 mx-4 bg-muted" />
                         </div>
 
@@ -209,31 +209,28 @@ const Leagues = () => {
                             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                                 {leagues.map((league) => (
 
-                                    <div key={league.id} className="relative group">
-                                        <Button
-                                            variant="outline"
-                                            className="w-full h-24 justify-between px-8 border-2 border-muted hover:border-primary/50 hover:bg-primary/5 transition-all text-left shadow-lg group"
-                                            onClick={() => navigate(`/${league.id}`)}
-                                        >
-                                            <div className="flex flex-col gap-1">
-                                                <span className="font-extrabold text-2xl tracking-tight text-foreground group-hover:text-primary transition-colors">{league.name}</span>
-                                                <span className="text-xs text-muted-foreground font-semibold">{league.manager_count} Managers • Customized Rules</span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                {user?.id === league.league_manager_id && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={(e) => handleDeleteLeague(e, league.id)}
-                                                    >
-                                                        <Trash2 className="w-5 h-5" />
-                                                    </Button>
-                                                )}
-                                                <ChevronRight className="w-8 h-8 opacity-0 group-hover:opacity-100 transition-all text-primary" />
-
-                                            </div>
-                                        </Button>
+                                    <div
+                                        key={league.id}
+                                        className="relative group w-full h-24 flex items-center justify-between px-8 border-2 border-muted hover:border-primary/50 hover:bg-primary/5 transition-all text-left shadow-lg rounded-md bg-background cursor-pointer"
+                                        onClick={() => navigate(`/${league.id}`)}
+                                    >
+                                        <div className="flex flex-col gap-1">
+                                            <span className="font-extrabold text-2xl tracking-tight text-foreground group-hover:text-primary transition-colors">{league.name}</span>
+                                            <span className="text-xs text-muted-foreground font-semibold">{league.manager_count} Managers • Customized Rules</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            {user?.id === league.league_manager_id && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={(e) => handleDeleteLeague(e, league.id)}
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </Button>
+                                            )}
+                                            <ChevronRight className="w-8 h-8 opacity-0 group-hover:opacity-100 transition-all text-primary" />
+                                        </div>
                                     </div>
                                 ))}
 

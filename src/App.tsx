@@ -29,7 +29,6 @@ import ScoringRules from "@/pages/ScoringRules";
 
 
 import NotFound from "./pages/NotFound";
-import { useParams } from "react-router-dom";
 
 
 
@@ -49,19 +48,7 @@ const AuthInitializer = () => {
 const AppRoutes = () => {
   const user = useAuthStore(state => state.user);
   const userProfile = useAuthStore(state => state.userProfile);
-  const managerProfile = useAuthStore(state => state.managerProfile);
-  const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const isLoading = useAuthStore(state => state.isLoading);
-  const fetchManagerProfile = useAuthStore(state => state.fetchManagerProfile);
-
-  // Auto-fetch manager profile when league changing
-  const { leagueId } = useParams<{ leagueId: string }>();
-  useEffect(() => {
-    if (user && leagueId && (!managerProfile || managerProfile.league_id !== leagueId)) {
-      fetchManagerProfile(undefined, leagueId);
-    }
-  }, [leagueId, user, managerProfile, fetchManagerProfile]);
-
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center p-4">Loading...</div>;

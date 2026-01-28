@@ -37,8 +37,8 @@ const Admin = () => {
   const addNewPlayer = useGameStore(state => state.addNewPlayer);
   const dropPlayerOnly = useGameStore(state => state.dropPlayerOnly);
   const leagueOwnerId = useGameStore(state => state.leagueOwnerId);
-  const leagueId = useGameStore(state => state.leagueId);
-  const loadGameData = useGameStore(state => state.loadGameData);
+  const leagueId = useGameStore(state => state.currentLeagueId);
+  const fetchAllData = useGameStore(state => state.fetchAllData);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const [removingMember, setRemovingMember] = useState<string | null>(null);
 
@@ -780,19 +780,31 @@ const Admin = () => {
                   </Button>
                   <Button
                     onClick={async () => {
-                      if (!leagueId || !reseedTournamentId) return;
-                      const tournament = getTournamentById(Number(reseedTournamentId));
-                      toast.info(`Reseeding players from ${tournament?.shortName}...`);
-                      const success = await reseedFromTournament(leagueId, Number(reseedTournamentId));
-                      if (success) {
-                        toast.success(`Players reseeded from ${tournament?.shortName}`);
-                        // Reload game data to refresh players
-                        await loadGameData(leagueId);
-                      } else {
-                        toast.error('Failed to reseed players. Check console for details.');
+                      if (!leagueId) {
+                        toast.error('No league selected. Please select a league first.');
+                        return;
                       }
-                      setShowReseedConfirm(false);
-                      setReseedTournamentId('');
+                      if (!reseedTournamentId) {
+                        toast.error('Please select a tournament to reseed from.');
+                        return;
+                      }
+                      try {
+                        const tournament = getTournamentById(Number(reseedTournamentId));
+                        toast.info(`Reseeding players from ${tournament?.shortName}...`);
+                        const success = await reseedFromTournament(leagueId, Number(reseedTournamentId));
+                        if (success) {
+                          toast.success(`Players reseeded from ${tournament?.shortName}`);
+                          await fetchAllData(leagueId);
+                        } else {
+                          toast.error('Failed to reseed players. Check console for details.');
+                        }
+                      } catch (error) {
+                        console.error('[Admin] Error reseeding players:', error);
+                        toast.error('An error occurred while reseeding. Check console for details.');
+                      } finally {
+                        setShowReseedConfirm(false);
+                        setReseedTournamentId('');
+                      }
                     }}
                     disabled={!reseedTournamentId || isReseeding}
                     className="flex-1"

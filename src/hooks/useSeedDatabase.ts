@@ -5,6 +5,16 @@ import { fetchAllTournamentPlayers, isApiConfigured } from "@/integrations/cricb
 import { mapApiRole, getTeamCode, isInternationalForT20WC } from "@/lib/player-utils";
 import { getTournamentById } from "@/lib/tournaments";
 
+// Timeout wrapper for async operations
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    )
+  ]);
+}
+
 // Initial data
 const PLAYERS_DATA = [
   // Mumbai Indians
@@ -385,12 +395,9 @@ export const useSeedDatabase = () => {
    * Falls back to hardcoded IPL data if API fails
    */
   const seedFromTournament = useCallback(async (leagueId: string, tournamentId: number): Promise<boolean> => {
-    const seedStartTime = performance.now();
-    console.log(`[useSeedDatabase] 🏆 seedFromTournament started for league: ${leagueId}, tournament: ${tournamentId}`);
-
     setSeeding(true);
     try {
-      // Check if players already exist for this league
+      // Check if players already exist
       const { data: existingPlayers } = await (supabase
         .from("players")
         .select("id")
@@ -398,35 +405,35 @@ export const useSeedDatabase = () => {
         .limit(1) as any);
 
       if ((existingPlayers?.length ?? 0) > 0) {
-        console.log(`[useSeedDatabase] ✅ League ${leagueId} already has players (skipping)`);
+        console.log("[Seed] League already has players, skipping");
         return true;
       }
 
       // Check if API is configured
       if (!isApiConfigured()) {
-        console.warn("[useSeedDatabase] ⚠️ API not configured (VITE_RAPIDAPI_KEY missing), falling back to hardcoded data");
+        console.warn("[Seed] API not configured, using hardcoded data");
         return await seedDatabase(leagueId);
       }
 
       const tournament = getTournamentById(tournamentId);
       const isInternationalTournament = tournament?.type === 'international';
 
-      console.log(`[useSeedDatabase] 📡 Fetching players from API for ${tournament?.name || tournamentId}...`);
-      console.log(`[useSeedDatabase] 🔑 API configured: true, Tournament type: ${tournament?.type}`);
-      const fetchStartTime = performance.now();
+      console.log(`[Seed] Fetching from ${tournament?.shortName || tournamentId}...`);
 
-      // Fetch all teams and players from the tournament
+      // Fetch all teams and players (with 60 second timeout)
       let teamsWithPlayers;
       try {
-        teamsWithPlayers = await fetchAllTournamentPlayers(tournamentId);
+        teamsWithPlayers = await withTimeout(
+          fetchAllTournamentPlayers(tournamentId),
+          60000,
+          `API timeout: Failed to fetch tournament data within 60 seconds`
+        );
       } catch (apiError: any) {
-        console.error(`[useSeedDatabase] ❌ API fetch failed:`, apiError?.message || apiError);
-        console.error(`[useSeedDatabase] Full error:`, apiError);
-        throw apiError; // Re-throw to trigger fallback
+        console.error("[Seed] API fetch failed:", apiError?.message || apiError);
+        throw apiError;
       }
-      
-      const fetchDuration = performance.now() - fetchStartTime;
-      console.log(`[useSeedDatabase] ✅ Fetched ${teamsWithPlayers.length} teams in ${fetchDuration.toFixed(2)}ms`);
+
+      console.log(`[Seed] Fetched ${teamsWithPlayers.length} teams`);
 
       // Check if we got any data
       if (!teamsWithPlayers || teamsWithPlayers.length === 0) {
@@ -435,6 +442,7 @@ export const useSeedDatabase = () => {
       }
 
       // Transform API data to database format
+      // We need to track the Cricbuzz IDs and image IDs for extended_players table
       const playersToInsert: Array<{
         name: string;
         team: string;
@@ -442,6 +450,9 @@ export const useSeedDatabase = () => {
         is_international: boolean;
         league_id: string;
       }> = [];
+      
+      // Map to store cricbuzz data for each player (keyed by name+team)
+      const cricbuzzDataMap = new Map<string, { cricbuzzId: string; imageId?: number; battingStyle?: string; bowlingStyle?: string }>();
 
       for (const { team, players } of teamsWithPlayers) {
         const teamCode = getTeamCode(team.teamName);
@@ -465,6 +476,15 @@ export const useSeedDatabase = () => {
             is_international: isIntl,
             league_id: leagueId,
           });
+          
+          // Store Cricbuzz data for later linking
+          const playerKey = `${player.name}|${teamCode}`;
+          cricbuzzDataMap.set(playerKey, {
+            cricbuzzId: player.id,
+            imageId: player.imageId,
+            battingStyle: player.battingStyle,
+            bowlingStyle: player.bowlingStyle,
+          });
         }
       }
 
@@ -477,9 +497,11 @@ export const useSeedDatabase = () => {
       console.log(`[useSeedDatabase] 📥 Inserting ${playersToInsert.length} players from ${teamsWithPlayers.length} teams...`);
       const insertStartTime = performance.now();
 
-      const { error: insertError } = await (supabase
+      // Insert players and get back their IDs
+      const { data: insertedPlayers, error: insertError } = await (supabase
         .from("players")
-        .insert(playersToInsert) as any);
+        .insert(playersToInsert)
+        .select("id, name, team") as any);
 
       const insertDuration = performance.now() - insertStartTime;
 
@@ -490,8 +512,51 @@ export const useSeedDatabase = () => {
         return await seedDatabase(leagueId);
       }
 
-      const totalDuration = performance.now() - seedStartTime;
-      console.log(`[useSeedDatabase] 🎉 Tournament seeding completed in ${totalDuration.toFixed(2)}ms (${playersToInsert.length} players from ${tournament?.shortName || tournamentId})`);
+      // Now insert extended player data (Cricbuzz ID and image ID)
+      if (insertedPlayers && insertedPlayers.length > 0) {
+        console.log(`[useSeedDatabase] 📸 Linking ${insertedPlayers.length} players to Cricbuzz data...`);
+        const extendedStartTime = performance.now();
+        
+        const extendedPlayersToInsert: Array<{
+          player_id: string;
+          cricbuzz_id: string;
+          image_id: number | null;
+          batting_style: string | null;
+          bowling_style: string | null;
+        }> = [];
+        
+        for (const player of insertedPlayers) {
+          const playerKey = `${player.name}|${player.team}`;
+          const cricbuzzData = cricbuzzDataMap.get(playerKey);
+          
+          if (cricbuzzData && cricbuzzData.cricbuzzId) {
+            extendedPlayersToInsert.push({
+              player_id: player.id,
+              cricbuzz_id: cricbuzzData.cricbuzzId,
+              image_id: cricbuzzData.imageId || null,
+              batting_style: cricbuzzData.battingStyle || null,
+              bowling_style: cricbuzzData.bowlingStyle || null,
+            });
+          }
+        }
+        
+        if (extendedPlayersToInsert.length > 0) {
+          const { error: extendedError } = await (supabase as any)
+            .from("extended_players")
+            .insert(extendedPlayersToInsert);
+          
+          const extendedDuration = performance.now() - extendedStartTime;
+          
+          if (extendedError) {
+            console.warn(`[useSeedDatabase] ⚠️ Error inserting extended player data (${extendedDuration.toFixed(2)}ms):`, extendedError);
+            // Don't fail the whole operation, extended data is optional
+          } else {
+            console.log(`[useSeedDatabase] ✅ Extended player data inserted for ${extendedPlayersToInsert.length} players in ${extendedDuration.toFixed(2)}ms`);
+          }
+        }
+      }
+
+      console.log(`[Seed] Completed - ${playersToInsert.length} players from ${tournament?.shortName || tournamentId}`);
       return true;
 
     } catch (error: any) {
@@ -510,38 +575,67 @@ export const useSeedDatabase = () => {
    * This clears existing players and fetches fresh data from the API
    */
   const reseedFromTournament = useCallback(async (leagueId: string, tournamentId: number): Promise<boolean> => {
-    console.log(`[useSeedDatabase] 🔄 reseedFromTournament started for league: ${leagueId}, tournament: ${tournamentId}`);
-    
+    console.log(`[Reseed] Starting for tournament ${tournamentId}...`);
+
     setSeeding(true);
     try {
-      // First, clear all manager rosters for this league
+      // Clear all manager rosters
       const { error: clearRostersError } = await (supabase
         .from("managers")
         .update({ roster: [], bench: [] })
         .eq("league_id", leagueId) as any);
 
       if (clearRostersError) {
-        console.error("[useSeedDatabase] Error clearing rosters:", clearRostersError);
+        console.error("[Reseed] Error clearing rosters:", clearRostersError);
         throw clearRostersError;
       }
 
-      // Delete all existing players for this league
+      // Get existing player IDs to delete extended data
+      const { data: existingPlayers } = await (supabase
+        .from("players")
+        .select("id")
+        .eq("league_id", leagueId) as any);
+
+      if (existingPlayers && existingPlayers.length > 0) {
+        const playerIds = existingPlayers.map((p: any) => p.id);
+        await (supabase as any)
+          .from("extended_players")
+          .delete()
+          .in("player_id", playerIds);
+      }
+
+      // Delete all existing players
       const { error: deleteError } = await (supabase
         .from("players")
         .delete()
         .eq("league_id", leagueId) as any);
 
       if (deleteError) {
-        console.error("[useSeedDatabase] Error deleting players:", deleteError);
+        console.error("[Reseed] Error deleting players:", deleteError);
         throw deleteError;
       }
 
-      console.log("[useSeedDatabase] ✅ Cleared existing players, now seeding from tournament...");
-      
-      // Now seed from tournament (this will not skip since we deleted the players)
-      return await seedFromTournament(leagueId, tournamentId);
+      // Seed from tournament
+      const result = await seedFromTournament(leagueId, tournamentId);
+
+      if (result) {
+        // Update the league's tournament_id in the database
+        const { error: updateError } = await (supabase
+          .from("leagues")
+          .update({ tournament_id: tournamentId })
+          .eq("id", leagueId) as any);
+
+        if (updateError) {
+          console.warn("[Reseed] Warning: Failed to update tournament_id:", updateError);
+        } else {
+          console.log(`[Reseed] Updated league tournament_id to ${tournamentId}`);
+        }
+      }
+
+      console.log(`[Reseed] Completed - Success: ${result}`);
+      return result;
     } catch (error) {
-      console.error("[useSeedDatabase] ❌ Error reseeding from tournament:", error);
+      console.error("[Reseed] Failed:", error);
       return false;
     } finally {
       setSeeding(false);
