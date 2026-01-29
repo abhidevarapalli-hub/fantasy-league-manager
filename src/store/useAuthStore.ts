@@ -26,6 +26,7 @@ interface AuthState {
     userProfile: UserProfile | null;
     managerProfile: ManagerProfile | null;
     isLoading: boolean;
+    isInitialized: boolean;
 
     // Setters
     setSession: (session: Session | null) => void;
@@ -58,6 +59,7 @@ export const useAuthStore = create<AuthState>()(
             userProfile: null,
             managerProfile: null,
             isLoading: true,
+            isInitialized: false,
 
             // Setters
             setSession: (session) => set({ session, user: session?.user || null }),
@@ -192,11 +194,23 @@ export const useAuthStore = create<AuthState>()(
 
             // Initialize auth state and listeners
             initialize: async () => {
+                if (get().isInitialized) return;
+
                 set({ isLoading: true });
 
                 try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    set({ session, user: session?.user || null });
+                    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                    if (sessionError) {
+                        // Check for AbortError specifically
+                        if (sessionError.name === 'AbortError' || sessionError.message?.includes('aborted')) {
+                            console.warn('Auth session fetch aborted - this is usually expected during rapid navigation');
+                        } else {
+                            throw sessionError;
+                        }
+                    }
+
+                    set({ session, user: session?.user || null, isInitialized: true });
 
                     if (session?.user) {
                         await get().refreshProfile();
@@ -210,7 +224,7 @@ export const useAuthStore = create<AuthState>()(
                             set({ userProfile: null, managerProfile: null });
                         }
                     });
-                } catch (error) {
+                } catch (error: any) {
                     console.error('Error initializing auth:', error);
                 } finally {
                     set({ isLoading: false });
