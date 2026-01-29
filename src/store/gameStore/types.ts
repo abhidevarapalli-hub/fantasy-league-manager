@@ -83,6 +83,7 @@ export interface GameState {
   executeTrade: (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => Promise<void>;
   resetLeague: () => Promise<void>;
   updateScoringRules: (rules: ScoringRules) => Promise<ScoringRulesResult>;
+  updateLeagueConfig: (config: Partial<LeagueConfig>) => Promise<{ success: boolean; error?: string }>;
 
   // Data fetching
   fetchAllData: (leagueId: string) => Promise<void>;

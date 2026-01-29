@@ -12,6 +12,7 @@ import {
   TradeHub,
   LeagueMembers,
   DangerZone,
+  RosterConfig,
 } from '@/components/admin';
 
 const Admin = () => {
@@ -43,6 +44,7 @@ const Admin = () => {
     <AppLayout title="League Manager Settings" subtitle="League management tools">
       <div className="px-4 py-4 space-y-6">
         <ScoreInput />
+        <RosterConfig />
         <AddNewPlayer />
         <RemovePlayer />
         <RosterManagement />

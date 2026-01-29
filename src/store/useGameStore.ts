@@ -400,6 +400,87 @@ export const useGameStore = create<GameState>()(
         }
       },
 
+      updateLeagueConfig: async (configUpdate) => {
+        const { currentLeagueId, config } = get();
+        if (!currentLeagueId) {
+          return { success: false, error: 'No league selected' };
+        }
+
+        try {
+          // Build the database update object with snake_case keys
+          const dbUpdate: Record<string, unknown> = {};
+          const changes: string[] = [];
+
+          if (configUpdate.activeSize !== undefined && configUpdate.activeSize !== config.activeSize) {
+            dbUpdate.active_size = configUpdate.activeSize;
+            changes.push(`Active roster size: ${config.activeSize} → ${configUpdate.activeSize}`);
+          }
+          if (configUpdate.benchSize !== undefined && configUpdate.benchSize !== config.benchSize) {
+            dbUpdate.bench_size = configUpdate.benchSize;
+            changes.push(`Bench size: ${config.benchSize} → ${configUpdate.benchSize}`);
+          }
+          if (configUpdate.minBatsmen !== undefined && configUpdate.minBatsmen !== config.minBatsmen) {
+            dbUpdate.min_batsmen = configUpdate.minBatsmen;
+            changes.push(`Min batsmen: ${config.minBatsmen} → ${configUpdate.minBatsmen}`);
+          }
+          if (configUpdate.maxBatsmen !== undefined && configUpdate.maxBatsmen !== config.maxBatsmen) {
+            dbUpdate.max_batsmen = configUpdate.maxBatsmen;
+            changes.push(`Max batsmen: ${config.maxBatsmen} → ${configUpdate.maxBatsmen}`);
+          }
+          if (configUpdate.minBowlers !== undefined && configUpdate.minBowlers !== config.minBowlers) {
+            dbUpdate.min_bowlers = configUpdate.minBowlers;
+            changes.push(`Min bowlers: ${config.minBowlers} → ${configUpdate.minBowlers}`);
+          }
+          if (configUpdate.minWks !== undefined && configUpdate.minWks !== config.minWks) {
+            dbUpdate.min_wks = configUpdate.minWks;
+            changes.push(`Min wicket keepers: ${config.minWks} → ${configUpdate.minWks}`);
+          }
+          if (configUpdate.minAllRounders !== undefined && configUpdate.minAllRounders !== config.minAllRounders) {
+            dbUpdate.min_all_rounders = configUpdate.minAllRounders;
+            changes.push(`Min all-rounders: ${config.minAllRounders} → ${configUpdate.minAllRounders}`);
+          }
+          if (configUpdate.maxInternational !== undefined && configUpdate.maxInternational !== config.maxInternational) {
+            dbUpdate.max_international = configUpdate.maxInternational;
+            changes.push(`Max international: ${config.maxInternational} → ${configUpdate.maxInternational}`);
+          }
+
+          // If no changes, return early
+          if (Object.keys(dbUpdate).length === 0) {
+            return { success: true };
+          }
+
+          // Update the database
+          const { error } = await supabase
+            .from('leagues' as 'leagues')
+            .update(dbUpdate)
+            .eq('id', currentLeagueId);
+
+          if (error) {
+            console.error('Error updating league config:', error);
+            return { success: false, error: error.message };
+          }
+
+          // Log the change to activity
+          await supabase.from("transactions").insert({
+            type: "admin" as const,
+            manager_id: null,
+            manager_team_name: null,
+            description: `Roster configuration updated:\n${changes.join('\n')}`,
+            league_id: currentLeagueId,
+          });
+
+          // Update local state
+          const newConfig = { ...config, ...configUpdate };
+          set({ config: newConfig });
+
+          toast.success('Roster configuration updated');
+          return { success: true };
+        } catch (e) {
+          console.error('Exception updating league config:', e);
+          return { success: false, error: 'Failed to update roster configuration' };
+        }
+      },
+
       // Data fetching
       fetchAllData: async (leagueId) => {
         const fetchStartTime = performance.now();
