@@ -451,6 +451,8 @@ export const useGameStore = create<GameState>()(
                     description: `${manager1.teamName} traded ${player1Names} to ${manager2.teamName} for ${player2Names}`,
                     league_id: currentLeagueId,
                 });
+
+                toast.success(`Trade completed: ${player1Names} ↔ ${player2Names}`);
             },
 
             resetLeague: async () => {
