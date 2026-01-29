@@ -219,7 +219,12 @@ export const useAuthStore = create<AuthState>()(
                     supabase.auth.onAuthStateChange(async (_event, session) => {
                         set({ session, user: session?.user || null });
                         if (session?.user) {
-                            await get().refreshProfile();
+                            // Use setTimeout to avoid blocking the auth event loop (deadlock fix)
+                            setTimeout(() => {
+                                get().refreshProfile().catch(e =>
+                                    console.error('Error refreshing profile in background:', e)
+                                );
+                            }, 0);
                         } else {
                             set({ userProfile: null, managerProfile: null });
                         }

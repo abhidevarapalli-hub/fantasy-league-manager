@@ -32,12 +32,7 @@ const Leagues = () => {
         const fetchStartTime = performance.now();
         console.log('[Leagues] 🏟️  Starting leagues fetch...');
 
-        // Skip if leagues already initialized
-        if (isLeaguesInitialized) {
-            console.log('[Leagues] ✅ Leagues data already initialized, skipping fetch...');
-            setLoading(false);
-            return;
-        }
+
 
         if (!user || !user.id) {
             console.log('[Leagues] ⚠️  No user found, skipping fetch');
