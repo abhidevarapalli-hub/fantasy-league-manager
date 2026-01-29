@@ -5,6 +5,7 @@ import { Tables } from '@/integrations/supabase/types';
 import { Player, Manager, Match, Activity, PlayerTransaction } from '@/lib/supabase-types';
 import { DEFAULT_LEAGUE_CONFIG, LeagueConfig, canAddToActive } from '@/lib/roster-validation';
 import { ScoringRules, DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
+import { toast } from 'sonner';
 
 // Helper mappers from DB types to frontend types
 const mapDbPlayer = (db: Tables<"players">): Player => ({
@@ -238,8 +239,6 @@ export const useGameStore = create<GameState>()(
                 const rosterCount = manager.activeRoster.length + manager.bench.length;
                 if (rosterCount >= ROSTER_CAP && !dropPlayerId) return;
 
-                const droppedFromActive = dropPlayerId && manager.activeRoster.includes(dropPlayerId);
-
                 let newRoster = [...manager.activeRoster];
                 let newBench = [...manager.bench];
 
@@ -248,17 +247,24 @@ export const useGameStore = create<GameState>()(
                     newBench = newBench.filter((id) => id !== dropPlayerId);
                 }
 
-                if (droppedFromActive) {
-                    const currentActivePlayers = newRoster.map(id => players.find(p => p.id === id)).filter(Boolean) as Player[];
-                    const validation = canAddToActive(currentActivePlayers, player, config);
+                // Priority: fill active roster first if not full, otherwise fill bench
+                const activeNotFull = newRoster.length < config.activeSize;
+                const benchNotFull = newBench.length < config.benchSize;
+                let playerAdded = false;
 
-                    if (validation.isValid) {
-                        newRoster = [...newRoster, playerId];
-                    } else {
-                        newBench = [...newBench, playerId];
-                    }
-                } else {
+                if (activeNotFull) {
+                    // Add to active roster if there's space
+                    newRoster = [...newRoster, playerId];
+                    playerAdded = true;
+                } else if (benchNotFull) {
+                    // Active roster is full, add to bench
                     newBench = [...newBench, playerId];
+                    playerAdded = true;
+                }
+
+                if (!playerAdded) {
+                    toast.error(`Cannot add ${player.name} - roster is full`);
+                    return;
                 }
 
                 await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
@@ -281,6 +287,14 @@ export const useGameStore = create<GameState>()(
                     players: playerTransactions as any,
                     league_id: currentLeagueId,
                 });
+
+                // Show toast notification
+                const addedTo = newRoster.includes(playerId) ? 'active roster' : 'bench';
+                if (dropPlayer) {
+                    toast.success(`Dropped ${dropPlayer.name}, added ${player.name} to ${addedTo}`);
+                } else {
+                    toast.success(`Added ${player.name} to ${addedTo}`);
+                }
             },
 
             dropPlayerOnly: async (managerId, playerId) => {
@@ -301,6 +315,8 @@ export const useGameStore = create<GameState>()(
                     players: [{ type: "drop", playerName: player.name, role: player.role, team: player.team }] as any,
                     league_id: currentLeagueId,
                 });
+
+                toast.success(`Dropped ${player.name}`);
             },
 
             moveToActive: async (managerId, playerId) => {

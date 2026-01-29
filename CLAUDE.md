@@ -42,6 +42,7 @@ League Manager Abilities
 - Test critical functions
 - Comment complex logic
 - Use semantic commits
+- Always check the browser console for errors
  
 ## Don't Change
  
