@@ -35,8 +35,8 @@ export function AppSidebar() {
     { title: 'Trades', url: `/${leagueId}/trades`, icon: ArrowLeftRight },
     { title: 'Activity', url: `/${leagueId}/activity`, icon: Activity },
     { title: 'Draft', url: `/${leagueId}/draft`, icon: ClipboardList },
+    { title: 'Scoring', url: `/${leagueId}/scoring`, icon: Target },
     ...(isLeagueManager ? [
-      { title: 'Scoring', url: `/${leagueId}/scoring`, icon: Target },
       { title: 'Admin', url: `/${leagueId}/admin`, icon: Settings },
     ] : []),
   ] : [
