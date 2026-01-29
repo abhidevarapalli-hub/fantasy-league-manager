@@ -124,6 +124,7 @@ interface GameState {
     updateMatchScore: (week: number, matchIndex: number, homeScore: number, awayScore: number) => Promise<void>;
     finalizeWeekScores: (week: number) => Promise<void>;
     addNewPlayer: (name: string, team: string, role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper', isInternational?: boolean) => Promise<void>;
+    removePlayerFromLeague: (playerId: string) => Promise<void>;
     executeTrade: (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => Promise<void>;
     resetLeague: () => Promise<void>;
     updateScoringRules: (rules: ScoringRules) => Promise<ScoringRulesResult>;
@@ -423,6 +424,47 @@ export const useGameStore = create<GameState>()(
                 const { currentLeagueId } = get();
                 if (!currentLeagueId) return;
                 await supabase.from("players").insert({ name, team, role, is_international: isInternational, league_id: currentLeagueId });
+            },
+
+            removePlayerFromLeague: async (playerId) => {
+                const { players, managers, currentLeagueId } = get();
+                if (!currentLeagueId) return;
+
+                const player = players.find((p) => p.id === playerId);
+                if (!player) {
+                    toast.error('Player not found');
+                    return;
+                }
+
+                // Find all managers who have this player and remove from their rosters
+                const managersWithPlayer = managers.filter(
+                    (m) => m.activeRoster.includes(playerId) || m.bench.includes(playerId)
+                );
+
+                // Update each manager's roster to remove the player
+                for (const manager of managersWithPlayer) {
+                    const newRoster = manager.activeRoster.filter((id) => id !== playerId);
+                    const newBench = manager.bench.filter((id) => id !== playerId);
+                    await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", manager.id);
+                }
+
+                // Delete the player from the database
+                const { error } = await supabase.from("players").delete().eq("id", playerId);
+                if (error) {
+                    toast.error(`Failed to remove player: ${error.message}`);
+                    return;
+                }
+
+                // Log the removal
+                await supabase.from("transactions").insert({
+                    type: "admin" as any,
+                    manager_id: null,
+                    manager_team_name: null,
+                    description: `${player.name} (${player.team} - ${player.role}) was removed from the league`,
+                    league_id: currentLeagueId,
+                });
+
+                toast.success(`${player.name} removed from league`);
             },
 
             executeTrade: async (manager1Id, manager2Id, players1, players2) => {
