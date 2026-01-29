@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { useDebounce } from '@/hooks/useDebounce';
 import { Search, X, Filter } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -13,36 +12,15 @@ import { RosterManagementDialog } from '@/components/RosterManagementDialog';
 import { TradeDialog } from '@/components/TradeDialog';
 import { Player, Manager } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
-import { sortPlayersByPriority } from '@/lib/player-order';
+import { usePlayerFilters } from '@/hooks/usePlayerFilters';
+import { getTeamFilterColors, getTeamPillStyles } from '@/lib/team-colors';
 
-const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
-const PLAYER_ROLES = ['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'];
-const NATIONALITY_FILTERS = ['All', 'Domestic', 'International'];
-
-const teamFilterColors: Record<string, string> = {
-  All: 'bg-primary/20 text-primary border-primary/30',
-  SRH: 'bg-[#FF822A]/20 text-[#FF822A] border-[#FF822A]/30',
-  CSK: 'bg-[#FFCB05]/20 text-[#FFCB05] border-[#FFCB05]/30',
-  KKR: 'bg-[#3A225D]/20 text-[#3A225D] border-[#3A225D]/30',
-  RR: 'bg-[#EB71A6]/20 text-[#EB71A6] border-[#EB71A6]/30',
-  RCB: 'bg-[#800000]/20 text-[#800000] border-[#800000]/30',
-  MI: 'bg-[#004B91]/20 text-[#004B91] border-[#004B91]/30',
-  GT: 'bg-[#1B223D]/20 text-[#1B223D] border-[#1B223D]/30',
-  LSG: 'bg-[#2ABFCB]/20 text-[#2ABFCB] border-[#2ABFCB]/30',
-  PBKS: 'bg-[#B71E24]/20 text-[#B71E24] border-[#B71E24]/30',
-  DC: 'bg-[#000080]/20 text-[#000080] border-[#000080]/30',
-};
-
-const roleFilterColors: Record<string, string> = {
+const ROLE_AND_NATIONALITY_FILTERS = {
   All: 'bg-primary/20 text-primary border-primary/30',
   Batsman: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   Bowler: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
   'All Rounder': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
   'Wicket Keeper': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-};
-
-const nationalityFilterColors: Record<string, string> = {
-  All: 'bg-primary/20 text-primary border-primary/30',
   Domestic: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
   International: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
 };
@@ -56,12 +34,21 @@ const Players = () => {
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
   const { proposeTrade } = useTrades();
-  const [searchQuery, setSearchQuery] = useState('');
-  // Debounce search query to prevent re-filtering on every keystroke
-  const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [selectedTeam, setSelectedTeam] = useState('All');
-  const [selectedRole, setSelectedRole] = useState('All');
-  const [selectedNationality, setSelectedNationality] = useState('All');
+
+  // Use centralized filtering hook
+  const {
+    searchQuery,
+    setSearchQuery,
+    selectedTeam,
+    setSelectedTeam,
+    selectedRole,
+    setSelectedRole,
+    selectedNationality,
+    setSelectedNationality,
+    filteredPlayers: baseFilteredPlayers,
+    availableTeams,
+  } = usePlayerFilters({ players });
+
   const [showOnlyFreeAgents, setShowOnlyFreeAgents] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -103,22 +90,14 @@ const Players = () => {
     return map;
   }, [managers]);
 
+  // Apply additional Free Agent filter on top of the centralized filtered players
   const filteredPlayers = useMemo(() => {
-    const filtered = players.filter(player => {
-      const matchesSearch = player.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-        player.team.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
-      const matchesTeam = selectedTeam === 'All' || player.team === selectedTeam;
-      const matchesRole = selectedRole === 'All' || player.role === selectedRole;
-      const matchesNationality = selectedNationality === 'All' ||
-        (selectedNationality === 'International' && player.isInternational) ||
-        (selectedNationality === 'Domestic' && !player.isInternational);
+    return baseFilteredPlayers.filter(player => {
       const isRostered = playerToManagerMap[player.id];
       const matchesFreeAgentFilter = !showOnlyFreeAgents || !isRostered;
-      return matchesSearch && matchesTeam && matchesRole && matchesNationality && matchesFreeAgentFilter;
+      return matchesFreeAgentFilter;
     });
-
-    return sortPlayersByPriority(filtered);
-  }, [players, debouncedSearchQuery, selectedTeam, selectedRole, selectedNationality, playerToManagerMap, showOnlyFreeAgents]);
+  }, [baseFilteredPlayers, playerToManagerMap, showOnlyFreeAgents]);
 
   const handleAddPlayer = (playerId: string) => {
     const player = players.find(p => p.id === playerId);
@@ -194,20 +173,22 @@ const Players = () => {
         <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
           <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Team</p>
           <div className="flex gap-2">
-            {IPL_TEAMS.map((team) => (
-              <button
-                key={team}
-                onClick={() => setSelectedTeam(team)}
-                className={cn(
-                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                  selectedTeam === team
-                    ? teamFilterColors[team]
-                    : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
-                )}
-              >
-                {team}
-              </button>
-            ))}
+            {availableTeams.map((team) => {
+              const styles = getTeamPillStyles(team, selectedTeam === team);
+              return (
+                <button
+                  key={team}
+                  onClick={() => setSelectedTeam(team)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
+                    styles.className
+                  )}
+                  style={styles.style}
+                >
+                  {team}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -218,14 +199,14 @@ const Players = () => {
             <div className="flex-shrink-0">
               <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Position</p>
               <div className="flex gap-2">
-                {PLAYER_ROLES.map((role) => (
+                {['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'].map((role) => (
                   <button
                     key={role}
-                    onClick={() => setSelectedRole(role)}
+                    onClick={() => setSelectedRole(role as any)}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
                       selectedRole === role
-                        ? roleFilterColors[role]
+                        ? ROLE_AND_NATIONALITY_FILTERS[role as keyof typeof ROLE_AND_NATIONALITY_FILTERS]
                         : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                     )}
                   >
@@ -239,14 +220,14 @@ const Players = () => {
             <div className="flex-shrink-0">
               <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Nationality</p>
               <div className="flex gap-2">
-                {NATIONALITY_FILTERS.map((nationality) => (
+                {['All', 'Domestic', 'International'].map((nationality) => (
                   <button
                     key={nationality}
-                    onClick={() => setSelectedNationality(nationality)}
+                    onClick={() => setSelectedNationality(nationality as any)}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
                       selectedNationality === nationality
-                        ? nationalityFilterColors[nationality]
+                        ? ROLE_AND_NATIONALITY_FILTERS[nationality as keyof typeof ROLE_AND_NATIONALITY_FILTERS]
                         : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                     )}
                   >

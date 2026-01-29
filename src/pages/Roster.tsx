@@ -6,35 +6,9 @@ import { cn } from '@/lib/utils';
 import { getActiveRosterSlots, sortPlayersByRole, SlotRequirement } from '@/lib/roster-validation';
 import { Badge } from '@/components/ui/badge';
 import { Player, Manager } from '@/lib/supabase-types';
+import { getTeamColors } from '@/lib/team-colors';
 
-// Team colors based on IPL teams (same as draft page)
-const teamColors: Record<string, string> = {
-  SRH: 'bg-[#FF822A] border-[#FF822A] text-white',
-  CSK: 'bg-[#FFCB05] border-[#FFCB05] text-black',
-  KKR: 'bg-[#3A225D] border-[#3A225D] text-white',
-  RR: 'bg-[#EB71A6] border-[#EB71A6] text-white',
-  RCB: 'bg-[#800000] border-[#800000] text-white',
-  MI: 'bg-[#004B91] border-[#004B91] text-white',
-  GT: 'bg-[#1B223D] border-[#1B223D] text-white',
-  LSG: 'bg-[#2ABFCB] border-[#2ABFCB] text-white',
-  PBKS: 'bg-[#B71E24] border-[#B71E24] text-white',
-  DC: 'bg-[#000080] border-[#000080] text-white',
-};
-
-const defaultCellColor = 'bg-muted/50 border-border text-muted-foreground';
-
-const teamBadgeColors: Record<string, string> = {
-  CSK: 'bg-black/20 text-black',
-  MI: 'bg-white/20 text-white',
-  RCB: 'bg-white/20 text-white',
-  KKR: 'bg-white/20 text-white',
-  DC: 'bg-white/20 text-white',
-  RR: 'bg-white/20 text-white',
-  PBKS: 'bg-white/20 text-white',
-  SRH: 'bg-white/20 text-white',
-  GT: 'bg-white/20 text-white',
-  LSG: 'bg-white/20 text-white',
-};
+// Role to abbreviation mapping
 
 const roleAbbreviations: Record<string, string> = {
   'Bowler': 'BOWL',
@@ -61,15 +35,18 @@ interface RosterCellProps {
 
 const RosterCell = ({ slot, isBench }: RosterCellProps) => {
   const player = slot.player || null;
-  const colorClass = player ? (teamColors[player.team] || defaultCellColor) : defaultCellColor;
+  const colors = player ? getTeamColors(player.team) : null;
 
   return (
     <div
       className={cn(
-        "relative min-h-[80px] p-2 border rounded-lg",
-        colorClass,
-        !player && "border-dashed"
+        "relative min-h-[80px] p-2 border rounded-lg transition-all",
+        !player && "bg-muted/50 border-border text-muted-foreground border-dashed"
       )}
+      style={player && colors ? {
+        backgroundColor: colors.raw,
+        borderColor: colors.raw,
+      } : {}}
     >
       {/* Slot indicator for bench */}
       {isBench && (
@@ -87,17 +64,28 @@ const RosterCell = ({ slot, isBench }: RosterCellProps) => {
 
       {player ? (
         <div className="pt-3 flex flex-col items-center justify-center text-center">
-          <p className="font-medium text-xs truncate leading-tight w-full">
+          <p className={cn(
+            "font-medium text-xs truncate leading-tight w-full",
+            colors?.text
+          )}>
             {player.name.split(' ')[0]}
           </p>
-          <p className="font-bold text-sm truncate leading-tight w-full">
+          <p className={cn(
+            "font-bold text-sm truncate leading-tight w-full",
+            colors?.text
+          )}>
             {player.name.split(' ').slice(1).join(' ')}
           </p>
           <Badge
+            variant="outline"
             className={cn(
-              "text-[8px] px-1 py-0 mt-1 font-semibold",
-              teamBadgeColors[player.team] || 'bg-muted text-muted-foreground'
+              "text-[8px] px-1 py-0 mt-1 font-semibold border"
             )}
+            style={{
+              backgroundColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+              borderColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
+              color: colors?.text === 'text-white' ? 'white' : 'black'
+            }}
           >
             {roleAbbreviations[player.role] || player.role}
           </Badge>

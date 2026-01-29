@@ -7,37 +7,28 @@ import { useGameStore } from '@/store/useGameStore';
 import { sortPlayersByPriority } from '@/lib/player-order';
 import { cn } from '@/lib/utils';
 
-// Filter options
-const IPL_TEAMS = ['CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
-const PLAYER_ROLES = ['Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'];
-const NATIONALITY_FILTERS = ['All', 'Domestic', 'International'];
+import { usePlayerFilters } from '@/hooks/usePlayerFilters';
+import { getTeamFilterColors, getTeamPillStyles } from '@/lib/team-colors';
 
-// Filter colors
-const teamFilterColors: Record<string, string> = {
-  CSK: 'bg-[#FFCB05] text-black border-[#FFCB05]',
-  MI: 'bg-[#004B91] text-white border-[#004B91]',
-  RCB: 'bg-[#800000] text-white border-[#800000]',
-  KKR: 'bg-[#3A225D] text-white border-[#3A225D]',
-  DC: 'bg-[#000080] text-white border-[#000080]',
-  RR: 'bg-[#EB71A6] text-white border-[#EB71A6]',
-  PBKS: 'bg-[#B71E24] text-white border-[#B71E24]',
-  SRH: 'bg-[#FF822A] text-white border-[#FF822A]',
-  GT: 'bg-[#1B223D] text-white border-[#1B223D]',
-  LSG: 'bg-[#2ABFCB] text-white border-[#2ABFCB]',
+const ROLE_AND_NATIONALITY_COLORS = {
+  Batsman: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  Bowler: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+  'All Rounder': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  'Wicket Keeper': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  Domestic: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+  International: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
+  All: 'bg-primary/20 text-primary border-primary/30',
 };
 
-const roleFilterColors: Record<string, string> = {
-  'Batsman': 'bg-primary text-primary-foreground border-primary',
-  'Bowler': 'bg-destructive text-destructive-foreground border-destructive',
-  'All Rounder': 'bg-accent text-accent-foreground border-accent',
-  'Wicket Keeper': 'bg-secondary text-secondary-foreground border-secondary',
+const roleAbbreviations: Record<string, string> = {
+  'Bowler': 'BOWL',
+  'Batsman': 'BAT',
+  'Wicket Keeper': 'WK',
+  'All Rounder': 'AR',
+  'All': 'All',
 };
 
-const nationalityFilterColors: Record<string, string> = {
-  'All': 'bg-muted text-foreground border-border',
-  'Domestic': 'bg-emerald-600 text-white border-emerald-600',
-  'International': 'bg-blue-600 text-white border-blue-600',
-};
+// Role and nationality filter colors are now defined in constants above
 
 interface AvailablePlayersDrawerProps {
   draftedPlayerIds: string[];
@@ -47,49 +38,22 @@ interface AvailablePlayersDrawerProps {
 export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: AvailablePlayersDrawerProps) => {
   const players = useGameStore(state => state.players);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [selectedNationality, setSelectedNationality] = useState<string>('All');
-
-  // Filter available players
-  const availablePlayers = useMemo(() => {
-    let filtered = players.filter(p => !draftedPlayerIds.includes(p.id));
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(p => p.name.toLowerCase().includes(query));
-    }
-
-    // Team filter
-    if (selectedTeam) {
-      filtered = filtered.filter(p => p.team === selectedTeam);
-    }
-
-    // Role filter
-    if (selectedRole) {
-      filtered = filtered.filter(p => p.role === selectedRole);
-    }
-
-    // Nationality filter
-    if (selectedNationality === 'Domestic') {
-      filtered = filtered.filter(p => !p.isInternational);
-    } else if (selectedNationality === 'International') {
-      filtered = filtered.filter(p => p.isInternational);
-    }
-
-    return sortPlayersByPriority(filtered);
-  }, [players, draftedPlayerIds, searchQuery, selectedTeam, selectedRole, selectedNationality]);
-
-  const activeFiltersCount = [selectedTeam, selectedRole, selectedNationality !== 'All' ? selectedNationality : null].filter(Boolean).length;
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setSelectedTeam(null);
-    setSelectedRole(null);
-    setSelectedNationality('All');
-  };
+  const {
+    searchQuery,
+    setSearchQuery,
+    selectedTeam,
+    setSelectedTeam,
+    selectedRole,
+    setSelectedRole,
+    selectedNationality,
+    setSelectedNationality,
+    filteredPlayers,
+    availableTeams,
+    activeFiltersCount,
+    clearFilters
+  } = usePlayerFilters({
+    players: useMemo(() => players.filter(p => !draftedPlayerIds.includes(p.id)), [players, draftedPlayerIds])
+  });
 
   return (
     <div
@@ -106,7 +70,7 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
         <div className="flex items-center gap-3">
           <span className="font-semibold text-sm">Available Players</span>
           <span className="text-xs text-muted-foreground bg-primary/10 px-2 py-0.5 rounded-full">
-            {availablePlayers.length} remaining
+            {filteredPlayers.length} remaining
           </span>
           {activeFiltersCount > 0 && (
             <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
@@ -152,20 +116,22 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
             <div className="flex flex-wrap gap-2">
               {/* Team Pills */}
               <div className="flex flex-wrap gap-1">
-                {IPL_TEAMS.map(team => (
-                  <button
-                    key={team}
-                    onClick={() => setSelectedTeam(selectedTeam === team ? null : team)}
-                    className={cn(
-                      "px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all",
-                      selectedTeam === team
-                        ? teamFilterColors[team]
-                        : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
-                    )}
-                  >
-                    {team}
-                  </button>
-                ))}
+                {availableTeams.map(team => {
+                  const styles = getTeamPillStyles(team, selectedTeam === team);
+                  return (
+                    <button
+                      key={team}
+                      onClick={() => setSelectedTeam(selectedTeam === team ? 'All' : team)}
+                      className={cn(
+                        "px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all",
+                        styles.className
+                      )}
+                      style={styles.style}
+                    >
+                      {team}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -173,32 +139,32 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
             <div className="flex flex-wrap gap-2">
               {/* Role Pills */}
               <div className="flex flex-wrap gap-1">
-                {PLAYER_ROLES.map(role => (
+                {['Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'].map(role => (
                   <button
                     key={role}
-                    onClick={() => setSelectedRole(selectedRole === role ? null : role)}
+                    onClick={() => setSelectedRole(selectedRole === role ? 'All' : role as any)}
                     className={cn(
                       "px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all",
                       selectedRole === role
-                        ? roleFilterColors[role]
+                        ? ROLE_AND_NATIONALITY_COLORS[role as keyof typeof ROLE_AND_NATIONALITY_COLORS]
                         : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
                     )}
                   >
-                    {role === 'All Rounder' ? 'AR' : role === 'Wicket Keeper' ? 'WK' : role === 'Batsman' ? 'BAT' : 'BOWL'}
+                    {roleAbbreviations[role] || role}
                   </button>
                 ))}
               </div>
 
               {/* Nationality Pills */}
               <div className="flex gap-1 ml-2">
-                {NATIONALITY_FILTERS.map(nat => (
+                {['All', 'Domestic', 'International'].map(nat => (
                   <button
                     key={nat}
-                    onClick={() => setSelectedNationality(nat)}
+                    onClick={() => setSelectedNationality(nat as any)}
                     className={cn(
                       "px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all",
                       selectedNationality === nat
-                        ? nationalityFilterColors[nat]
+                        ? ROLE_AND_NATIONALITY_COLORS[nat as keyof typeof ROLE_AND_NATIONALITY_COLORS]
                         : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
                     )}
                   >
@@ -211,13 +177,13 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
 
           {/* Players Grid */}
           <div className="flex-1 overflow-y-auto p-4">
-            {availablePlayers.length === 0 ? (
+            {filteredPlayers.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
                 No players match your filters
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
-                {availablePlayers.map(player => (
+                {filteredPlayers.map(player => (
                   <div
                     key={player.id}
                     onClick={() => onSelectPlayer?.(player.id)}

@@ -30,6 +30,7 @@ import { TournamentPlayer } from '@/lib/cricket-types';
 import { TournamentType, getTournamentById, SUPPORTED_TOURNAMENTS } from '@/lib/tournaments';
 import { usePlayerInfo, usePlayerSchedule, useExtendedPlayer, PlayerMatchPerformance } from '@/hooks/usePlayerDetails';
 import { getPlayerAvatarUrl, getPlayerInitials, getPlayerTeamForTournament, TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
+import { getTeamColors, getTeamPillStyles } from '@/lib/team-colors';
 
 // Cricket role icons (copied from PlayerCard for consistency)
 const CricketBatIcon = ({ className }: { className?: string }) => (
@@ -67,26 +68,16 @@ const AllRounderIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Team card colors (from PlayerCard)
-const teamCardColors: Record<string, string> = {
-  SRH: 'from-[#FF822A]/80 to-[#FF822A]/40',
-  CSK: 'from-[#FFCB05]/80 to-[#FFCB05]/40',
-  KKR: 'from-[#3A225D]/80 to-[#3A225D]/40',
-  RR: 'from-[#EB71A6]/80 to-[#EB71A6]/40',
-  RCB: 'from-[#800000]/80 to-[#800000]/40',
-  MI: 'from-[#004B91]/80 to-[#004B91]/40',
-  GT: 'from-[#1B223D]/80 to-[#1B223D]/40',
-  LSG: 'from-[#2ABFCB]/80 to-[#2ABFCB]/40',
-  PBKS: 'from-[#B71E24]/80 to-[#B71E24]/40',
-  DC: 'from-[#000080]/80 to-[#000080]/40',
+// Role colors for consistency with Players pool
+const ROLE_COLORS: Record<string, string> = {
+  Batsman: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  Bowler: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+  'All Rounder': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  'Wicket Keeper': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
 };
 
-const roleStyles: Record<string, string> = {
-  'Batsman': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'Bowler': 'bg-green-500/20 text-green-400 border-green-500/30',
-  'All Rounder': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  'Wicket Keeper': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-};
+// Role icons and styles will now use centralized definitions where possible
+// But we'll keep the SVG icons here as they are component-specific.
 
 const getRoleIcon = (role: string) => {
   switch (role) {
@@ -124,16 +115,16 @@ export function PlayerDetailSheet({
   matchStats = [],
 }: PlayerDetailSheetProps) {
   const [selectedTab, setSelectedTab] = useState('stats');
-  
+
   // First, try to get extended player data from our database
   // This has the cricbuzz_id and image_id we need
   const { data: extendedData, isLoading: isLoadingExtended } = useExtendedPlayer(player?.id || null);
-  
+
   // Get the Cricbuzz ID from either:
   // 1. tournamentPlayer prop (if provided)
   // 2. Extended player data from database
   const cricbuzzId = tournamentPlayer?.id || extendedData?.cricbuzzId || null;
-  
+
   // Fetch extended player info from Cricbuzz when we have the ID
   // This also provides the national team (intlTeam) for overseas players
   const { data: playerInfo, isLoading: isLoadingInfo } = usePlayerInfo(cricbuzzId);
@@ -145,12 +136,12 @@ export function PlayerDetailSheet({
     // If the team is in our national teams mapping, it's an international tournament
     return player.team in TEAM_SHORT_TO_COUNTRY;
   }, [player]);
-  
+
   // Infer series ID if not provided, based on whether this looks like an international tournament
   const effectiveSeriesId = useMemo(() => {
     // If we have a seriesId, use it
     if (seriesId) return seriesId;
-    
+
     // Otherwise, try to infer from player's team
     if (isNationalTeam) {
       // Find the international tournament
@@ -162,24 +153,24 @@ export function PlayerDetailSheet({
       return leagueTournament?.id || null;
     }
   }, [seriesId, isNationalTeam]);
-  
+
   // Determine tournament type from effective seriesId
   const tournamentType: TournamentType = useMemo(() => {
     if (!effectiveSeriesId) return 'league';
     const tournament = getTournamentById(effectiveSeriesId);
     return tournament?.type || 'league';
   }, [effectiveSeriesId]);
-  
+
   // Compute the correct team short code based on tournament type
   // For international tournaments: domestic players -> IND, overseas -> their national team
   // For league tournaments: use the franchise team
   const playerTeamShort = useMemo(() => {
     if (!player) return null;
-    
+
     // Get the national team from player info (for overseas players)
     // playerInfo.team contains the international team name (e.g., "South Africa")
     const nationalTeam = playerInfo?.team;
-    
+
     return getPlayerTeamForTournament(
       player.team,           // Franchise team (e.g., "MI")
       player.isInternational, // Whether player is overseas
@@ -187,7 +178,7 @@ export function PlayerDetailSheet({
       nationalTeam           // National team from API (for overseas players)
     );
   }, [player, tournamentType, playerInfo?.team]);
-  
+
   // Fetch player's schedule from series matches
   const { data: playerSchedule, isLoading: isLoadingSchedule } = usePlayerSchedule(
     effectiveSeriesId,
@@ -196,34 +187,38 @@ export function PlayerDetailSheet({
 
   if (!player) return null;
 
-  const isDarkText = ['KKR', 'RCB', 'MI', 'GT', 'PBKS', 'DC'].includes(player.team);
-  const headerGradient = teamCardColors[player.team] || 'from-primary/80 to-primary/40';
+  const teamColors = getTeamColors(player.team);
 
   // Use imageId from (in order of priority):
   // 1. tournamentPlayer prop (if provided)
   // 2. Extended player data from database
   // 3. Cricbuzz API response
   const imageId = tournamentPlayer?.imageId || extendedData?.imageId || playerInfo?.imageId;
-  
+
   // Combined loading state
   const isLoadingPlayerData = isLoadingExtended || (cricbuzzId && isLoadingInfo);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent 
-        side="right" 
+      <SheetContent
+        side="right"
         className="w-full sm:max-w-md p-0 flex flex-col"
       >
-        {/* Header with gradient background */}
-        <div className={cn(
-          "relative bg-gradient-to-b p-6 pb-8",
-          headerGradient
-        )}>
-            <SheetHeader className="flex-row items-start gap-4 space-y-0">
+        {/* Header with team background */}
+        <div
+          className={cn(
+            "relative p-6 pb-8 transition-colors duration-500",
+            teamColors.bg === 'bg-muted' ? "bg-muted/30" : ""
+          )}
+          style={teamColors.bg !== 'bg-muted' ? {
+            backgroundColor: teamColors.raw,
+          } : {}}
+        >
+          <SheetHeader className="flex-row items-start gap-4 space-y-0">
             {/* Player Avatar */}
             <Avatar className="h-20 w-20 border-4 border-white/30 shadow-lg">
-              <AvatarImage 
-                src={getPlayerAvatarUrl(imageId, 'de')} 
+              <AvatarImage
+                src={getPlayerAvatarUrl(imageId, 'de')}
                 alt={player.name}
               />
               <AvatarFallback className="text-xl bg-muted text-muted-foreground">
@@ -235,38 +230,40 @@ export function PlayerDetailSheet({
               <div className="flex items-center gap-2">
                 <SheetTitle className={cn(
                   "text-xl font-bold",
-                  isDarkText ? "text-white" : "text-black"
+                  teamColors.text
                 )}>
                   {player.name}
                 </SheetTitle>
                 {player.isInternational && (
                   <Plane className={cn(
                     "w-4 h-4",
-                    isDarkText ? "text-white/80" : "text-black/80"
+                    teamColors.text === 'text-white' ? 'text-white/80' : 'text-black/80'
                   )} />
                 )}
               </div>
 
               {/* Role and Team */}
               <div className="flex items-center gap-2 mt-2">
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className={cn(
                     "font-medium border",
-                    roleStyles[player.role] || 'bg-muted/50'
+                    ROLE_COLORS[player.role] || 'bg-muted/50'
                   )}
                 >
                   {getRoleIcon(player.role)}
                   <span className="ml-1">{player.role}</span>
                 </Badge>
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className={cn(
-                    "font-medium",
-                    isDarkText 
-                      ? "bg-white/20 text-white border-white/30" 
-                      : "bg-black/10 text-black border-black/20"
+                    "font-medium border",
+                    teamColors.text
                   )}
+                  style={teamColors.bg !== 'bg-muted' ? {
+                    backgroundColor: `${teamColors.raw}33`,
+                    borderColor: `${teamColors.raw}4D`
+                  } : {}}
                 >
                   {player.team}
                 </Badge>
@@ -344,30 +341,30 @@ export function PlayerDetailSheet({
                     playerInfo.rankings.bowling?.length ||
                     playerInfo.rankings.allRounder?.length
                   ) && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Rankings</h3>
-                      <div className="space-y-2">
-                        {Array.isArray(playerInfo.rankings.batting) && playerInfo.rankings.batting.map((r, i) => (
-                          <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
-                            <span className="text-sm">{r.type} Batting</span>
-                            <span className="text-sm font-medium">#{r.rank}</span>
-                          </div>
-                        ))}
-                        {Array.isArray(playerInfo.rankings.bowling) && playerInfo.rankings.bowling.map((r, i) => (
-                          <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
-                            <span className="text-sm">{r.type} Bowling</span>
-                            <span className="text-sm font-medium">#{r.rank}</span>
-                          </div>
-                        ))}
-                        {Array.isArray(playerInfo.rankings.allRounder) && playerInfo.rankings.allRounder.map((r, i) => (
-                          <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
-                            <span className="text-sm">{r.type} All-Rounder</span>
-                            <span className="text-sm font-medium">#{r.rank}</span>
-                          </div>
-                        ))}
+                      <div>
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Rankings</h3>
+                        <div className="space-y-2">
+                          {Array.isArray(playerInfo.rankings.batting) && playerInfo.rankings.batting.map((r, i) => (
+                            <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
+                              <span className="text-sm">{r.type} Batting</span>
+                              <span className="text-sm font-medium">#{r.rank}</span>
+                            </div>
+                          ))}
+                          {Array.isArray(playerInfo.rankings.bowling) && playerInfo.rankings.bowling.map((r, i) => (
+                            <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
+                              <span className="text-sm">{r.type} Bowling</span>
+                              <span className="text-sm font-medium">#{r.rank}</span>
+                            </div>
+                          ))}
+                          {Array.isArray(playerInfo.rankings.allRounder) && playerInfo.rankings.allRounder.map((r, i) => (
+                            <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
+                              <span className="text-sm">{r.type} All-Rounder</span>
+                              <span className="text-sm font-medium">#{r.rank}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -465,12 +462,12 @@ export function PlayerDetailSheet({
                       </h3>
                       <div className="space-y-2">
                         {playerSchedule.map((match, index) => (
-                          <div 
+                          <div
                             key={match.matchId || index}
                             className={cn(
                               "rounded-lg border p-3 transition-all",
-                              match.isUpcoming 
-                                ? "bg-muted/30 border-dashed border-muted-foreground/30" 
+                              match.isUpcoming
+                                ? "bg-muted/30 border-dashed border-muted-foreground/30"
                                 : "bg-card border-border"
                             )}
                           >
@@ -495,14 +492,14 @@ export function PlayerDetailSheet({
                                 )}
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                {match.matchDate.toLocaleDateString('en-US', { 
+                                {match.matchDate.toLocaleDateString('en-US', {
                                   weekday: 'short',
-                                  month: 'short', 
-                                  day: 'numeric' 
+                                  month: 'short',
+                                  day: 'numeric'
                                 })}
                               </div>
                             </div>
-                            
+
                             {/* Venue */}
                             {match.venue && (
                               <div className="text-[10px] text-muted-foreground mt-1">

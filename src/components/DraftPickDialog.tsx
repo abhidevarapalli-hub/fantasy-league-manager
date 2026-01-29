@@ -10,6 +10,18 @@ import { Input } from '@/components/ui/input';
 import { PlayerCard } from '@/components/PlayerCard';
 import { cn } from '@/lib/utils';
 import { sortPlayersByPriority } from '@/lib/player-order';
+import { usePlayerFilters } from '@/hooks/usePlayerFilters';
+import { getTeamFilterColors, getTeamColors, getTeamPillStyles } from '@/lib/team-colors';
+
+const ROLE_AND_NATIONALITY_COLORS = {
+  Batsman: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  Bowler: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+  'All Rounder': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  'Wicket Keeper': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  Domestic: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+  International: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
+  All: 'bg-primary/20 text-primary border-primary/30',
+};
 
 interface DraftPickDialogProps {
   open: boolean;
@@ -23,37 +35,7 @@ interface DraftPickDialogProps {
   isMockDraft?: boolean;
 }
 
-const IPL_TEAMS = ['All', 'CSK', 'MI', 'RCB', 'KKR', 'DC', 'RR', 'PBKS', 'SRH', 'GT', 'LSG'];
-const PLAYER_ROLES = ['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'];
-const NATIONALITY_FILTERS = ['All', 'Domestic', 'International'];
-
-const teamFilterColors: Record<string, string> = {
-  All: 'bg-primary/20 text-primary border-primary/30',
-  SRH: 'bg-[#FF822A]/20 text-[#FF822A] border-[#FF822A]/30',
-  CSK: 'bg-[#FFCB05]/20 text-[#FFCB05] border-[#FFCB05]/30',
-  KKR: 'bg-[#3A225D]/20 text-[#3A225D] border-[#3A225D]/30',
-  RR: 'bg-[#EB71A6]/20 text-[#EB71A6] border-[#EB71A6]/30',
-  RCB: 'bg-[#800000]/20 text-[#800000] border-[#800000]/30',
-  MI: 'bg-[#004B91]/20 text-[#004B91] border-[#004B91]/30',
-  GT: 'bg-[#1B223D]/20 text-[#1B223D] border-[#1B223D]/30',
-  LSG: 'bg-[#2ABFCB]/20 text-[#2ABFCB] border-[#2ABFCB]/30',
-  PBKS: 'bg-[#B71E24]/20 text-[#B71E24] border-[#B71E24]/30',
-  DC: 'bg-[#000080]/20 text-[#000080] border-[#000080]/30',
-};
-
-const roleFilterColors: Record<string, string> = {
-  All: 'bg-primary/20 text-primary border-primary/30',
-  Batsman: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  Bowler: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
-  'All Rounder': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
-  'Wicket Keeper': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-};
-
-const nationalityFilterColors: Record<string, string> = {
-  All: 'bg-primary/20 text-primary border-primary/30',
-  Domestic: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-  International: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
-};
+// Filter constants now using centralized team colors
 
 const roleAbbreviations: Record<string, string> = {
   'Bowler': 'BOWL',
@@ -75,10 +57,21 @@ export const DraftPickDialog = ({
 }: DraftPickDialogProps) => {
   const players = useGameStore(state => state.players);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTeam, setSelectedTeam] = useState('All');
-  const [selectedRole, setSelectedRole] = useState('All');
-  const [selectedNationality, setSelectedNationality] = useState('All');
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    selectedTeam,
+    setSelectedTeam,
+    selectedRole,
+    setSelectedRole,
+    selectedNationality,
+    setSelectedNationality,
+    filteredPlayers,
+    availableTeams,
+  } = usePlayerFilters({
+    players: useMemo(() => players.filter(p => p.id === currentPlayerId || !draftedPlayerIds.includes(p.id)), [players, draftedPlayerIds, currentPlayerId])
+  });
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -90,37 +83,6 @@ export const DraftPickDialog = ({
       setSelectedNationality('All');
     }
   }, [open, currentPlayerId]);
-
-  // Get available players (not drafted) with filters applied, sorted by priority
-  const filteredPlayers = useMemo(() => {
-    const filtered = players.filter(p => {
-      // Include current player if editing
-      const isCurrentPlayer = p.id === currentPlayerId;
-      // Exclude already drafted players (unless it's the current player being edited)
-      const isAvailable = isCurrentPlayer || !draftedPlayerIds.includes(p.id);
-
-      if (!isAvailable) return false;
-
-      // Apply search filter
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.team.toLowerCase().includes(searchQuery.toLowerCase());
-
-      // Apply team filter
-      const matchesTeam = selectedTeam === 'All' || p.team === selectedTeam;
-
-      // Apply role filter
-      const matchesRole = selectedRole === 'All' || p.role === selectedRole;
-
-      // Apply nationality filter
-      const matchesNationality = selectedNationality === 'All' ||
-        (selectedNationality === 'International' && p.isInternational) ||
-        (selectedNationality === 'Domestic' && !p.isInternational);
-
-      return matchesSearch && matchesTeam && matchesRole && matchesNationality;
-    });
-
-    return sortPlayersByPriority(filtered);
-  }, [players, draftedPlayerIds, currentPlayerId, searchQuery, selectedTeam, selectedRole, selectedNationality]);
 
   const selectedPlayer = useMemo(() => {
     return players.find(p => p.id === selectedPlayerId) || null;
@@ -187,20 +149,22 @@ export const DraftPickDialog = ({
           <div className="flex-shrink-0 overflow-x-auto scrollbar-hide">
             <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Team</p>
             <div className="flex gap-1.5">
-              {IPL_TEAMS.map((team) => (
-                <button
-                  key={team}
-                  onClick={() => setSelectedTeam(team)}
-                  className={cn(
-                    "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
-                    selectedTeam === team
-                      ? teamFilterColors[team]
-                      : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
-                  )}
-                >
-                  {team}
-                </button>
-              ))}
+              {availableTeams.map((team) => {
+                const styles = getTeamPillStyles(team, selectedTeam === team);
+                return (
+                  <button
+                    key={team}
+                    onClick={() => setSelectedTeam(team)}
+                    className={cn(
+                      "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
+                      styles.className
+                    )}
+                    style={styles.style}
+                  >
+                    {team}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -211,14 +175,14 @@ export const DraftPickDialog = ({
               <div className="flex-shrink-0">
                 <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Position</p>
                 <div className="flex gap-1.5">
-                  {PLAYER_ROLES.map((role) => (
+                  {['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'].map((role) => (
                     <button
                       key={role}
-                      onClick={() => setSelectedRole(role)}
+                      onClick={() => setSelectedRole(role as any)}
                       className={cn(
                         "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
                         selectedRole === role
-                          ? roleFilterColors[role]
+                          ? ROLE_AND_NATIONALITY_COLORS[role as keyof typeof ROLE_AND_NATIONALITY_COLORS]
                           : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                       )}
                     >
@@ -232,14 +196,14 @@ export const DraftPickDialog = ({
               <div className="flex-shrink-0">
                 <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Nationality</p>
                 <div className="flex gap-1.5">
-                  {NATIONALITY_FILTERS.map((nationality) => (
+                  {['All', 'Domestic', 'International'].map((nationality) => (
                     <button
                       key={nationality}
-                      onClick={() => setSelectedNationality(nationality)}
+                      onClick={() => setSelectedNationality(nationality as any)}
                       className={cn(
                         "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
                         selectedNationality === nationality
-                          ? nationalityFilterColors[nationality]
+                          ? ROLE_AND_NATIONALITY_COLORS[nationality as keyof typeof ROLE_AND_NATIONALITY_COLORS]
                           : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
                       )}
                     >
@@ -298,8 +262,9 @@ export const DraftPickDialog = ({
                       variant="outline"
                       className={cn(
                         "text-[10px] border",
-                        teamFilterColors[selectedPlayer.team] || 'bg-muted text-muted-foreground'
+                        getTeamPillStyles(selectedPlayer.team, true).className
                       )}
+                      style={getTeamPillStyles(selectedPlayer.team, true).style}
                     >
                       {selectedPlayer.team}
                     </Badge>

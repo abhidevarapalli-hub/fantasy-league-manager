@@ -9,23 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
 import { cn } from '@/lib/utils';
+import { getTeamColors } from '@/lib/team-colors';
 
 // Default color for empty cells
 const defaultCellColor = 'bg-muted/50 border-border text-muted-foreground';
-
-// Team colors based on IPL teams (using exact colors from reference)
-const teamColors: Record<string, string> = {
-  SRH: 'bg-[#FF822A] border-[#FF822A] text-white',
-  CSK: 'bg-[#FFCB05] border-[#FFCB05] text-black',
-  KKR: 'bg-[#3A225D] border-[#3A225D] text-white',
-  RR: 'bg-[#EB71A6] border-[#EB71A6] text-white',
-  RCB: 'bg-[#800000] border-[#800000] text-white',
-  MI: 'bg-[#004B91] border-[#004B91] text-white',
-  GT: 'bg-[#1B223D] border-[#1B223D] text-white',
-  LSG: 'bg-[#2ABFCB] border-[#2ABFCB] text-white',
-  PBKS: 'bg-[#B71E24] border-[#B71E24] text-white',
-  DC: 'bg-[#000080] border-[#000080] text-white',
-};
 
 // Role to abbreviation mapping
 const roleAbbreviations: Record<string, string> = {
@@ -35,39 +22,18 @@ const roleAbbreviations: Record<string, string> = {
   'All Rounder': 'AR',
 };
 
-// Helper to get cell color based on player's team
-const getCellColor = (player: Player | null): string => {
-  if (!player) return defaultCellColor;
-  return teamColors[player.team] || defaultCellColor;
-};
-
-const teamBadgeColors: Record<string, string> = {
-  CSK: 'bg-black/20 text-black',
-  MI: 'bg-white/20 text-white',
-  RCB: 'bg-white/20 text-white',
-  KKR: 'bg-white/20 text-white',
-  DC: 'bg-white/20 text-white',
-  RR: 'bg-white/20 text-white',
-  PBKS: 'bg-white/20 text-white',
-  SRH: 'bg-white/20 text-white',
-  GT: 'bg-white/20 text-white',
-  LSG: 'bg-white/20 text-white',
-};
-
 interface DraftCellProps {
   round: number;
   position: number;
   manager: Manager | null;
   player: Player | null;
   pickNumber: string;
-  isFinalized: boolean;
   onCellClick: () => void;
   onClearPick: () => void;
-  colorClass: string;
   readOnly?: boolean;
 }
 
-const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, onCellClick, onClearPick, colorClass, readOnly }: DraftCellProps) => {
+const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, onClearPick, readOnly }: DraftCellProps) => {
   const isEmpty = !player;
 
   const handleClearClick = (e: React.MouseEvent) => {
@@ -77,16 +43,22 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
     }
   };
 
+  const colors = player ? getTeamColors(player.team) : null;
+
   return (
     <div
       onClick={manager && !readOnly ? onCellClick : undefined}
       className={cn(
         "relative min-h-[80px] p-2 border rounded-lg transition-all",
-        colorClass,
+        !player && "bg-muted/50 border-border text-muted-foreground",
         manager && !readOnly ? "cursor-pointer hover:opacity-80" : "cursor-default",
         !manager && "opacity-50",
         isEmpty && manager && !readOnly && "border-dashed"
       )}
+      style={player && colors ? {
+        backgroundColor: colors.raw,
+        borderColor: colors.raw, // Same as bg for solid look
+      } : {}}
     >
       {/* Pick number badge */}
       <div className="absolute top-1 right-1 text-[10px] font-bold opacity-60">
@@ -113,18 +85,29 @@ const DraftCell = ({ round, position, manager, player, pickNumber, isFinalized, 
       {player ? (
         <div className="pt-3 flex flex-col items-center justify-center text-center">
           {/* First name */}
-          <p className="font-medium text-xs truncate leading-tight w-full">
+          <p className={cn(
+            "font-medium text-xs truncate leading-tight w-full",
+            colors?.text
+          )}>
             {player.name.split(' ')[0]}
           </p>
           {/* Last name */}
-          <p className="font-bold text-sm truncate leading-tight w-full">
+          <p className={cn(
+            "font-bold text-sm truncate leading-tight w-full",
+            colors?.text
+          )}>
             {player.name.split(' ').slice(1).join(' ')}
           </p>
           <Badge
+            variant="outline"
             className={cn(
-              "text-[8px] px-1 py-0 mt-1 font-semibold",
-              teamBadgeColors[player.team] || 'bg-muted text-muted-foreground'
+              "text-[8px] px-1 py-0 mt-1 font-semibold border"
             )}
+            style={{
+              backgroundColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+              borderColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
+              color: colors?.text === 'text-white' ? 'white' : 'black'
+            }}
           >
             {roleAbbreviations[player.role] || player.role}
           </Badge>
@@ -280,10 +263,8 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                     manager={manager}
                     player={player}
                     pickNumber={pickNumber}
-                    isFinalized={draftState?.isFinalized || false}
                     onCellClick={() => handleCellClick(round, position)}
                     onClearPick={() => !readOnly && clearPick(round, position)}
-                    colorClass={getCellColor(player)}
                     readOnly={readOnly}
                   />
                 );
