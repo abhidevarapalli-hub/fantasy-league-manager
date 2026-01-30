@@ -1,0 +1,3 @@
+# Disable JWT verification for this function
+# This allows unauthenticated access (the function handles its own API key)
+verify_jwt = false

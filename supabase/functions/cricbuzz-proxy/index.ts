@@ -14,8 +14,16 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const endpoint = url.searchParams.get('endpoint');
+    let endpoint: string | null = null;
+
+    // Support both GET with query param and POST with body
+    if (req.method === 'GET') {
+      const url = new URL(req.url);
+      endpoint = url.searchParams.get('endpoint');
+    } else if (req.method === 'POST') {
+      const body = await req.json();
+      endpoint = body.endpoint;
+    }
 
     if (!endpoint) {
       return new Response(

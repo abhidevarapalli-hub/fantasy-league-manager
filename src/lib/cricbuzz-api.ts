@@ -3,30 +3,28 @@
  * Handles all communication with the Cricbuzz API via Supabase Edge Function proxy
  */
 
-import { supabase } from '@/integrations/supabase/client';
-
-const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cricbuzz-proxy`;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 interface CricbuzzApiOptions {
   endpoint: string;
 }
 
 async function callCricbuzzApi<T>(options: CricbuzzApiOptions): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession();
-
   const response = await fetch(
-    `${EDGE_FUNCTION_URL}?endpoint=${encodeURIComponent(options.endpoint)}`,
+    `${SUPABASE_URL}/functions/v1/cricbuzz-proxy`,
     {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session?.access_token || ''}`,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ endpoint: options.endpoint }),
     }
   );
 
   if (!response.ok) {
-    throw new Error(`Cricbuzz API error: ${response.status}`);
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    console.error('Edge function error:', response.status, errorData);
+    throw new Error(errorData.error || errorData.message || `API error: ${response.status}`);
   }
 
   return response.json();

@@ -217,15 +217,27 @@ export const StatsImport = () => {
     }
   };
 
+  // Extract match ID from URL or raw input
+  const extractMatchId = (input: string): number | null => {
+    // Try to extract from URL like: cricbuzz.com/live-cricket-scores/121417/...
+    const urlMatch = input.match(/\/live-cricket-scores\/(\d+)/);
+    if (urlMatch) {
+      return parseInt(urlMatch[1]);
+    }
+    // Try direct number
+    const num = parseInt(input.trim());
+    return isNaN(num) ? null : num;
+  };
+
   // Add a match by Cricbuzz ID (manual)
   const handleAddMatch = async () => {
     if (!matchIdInput || !currentLeagueId) return;
 
     setIsLoading(true);
     try {
-      const matchId = parseInt(matchIdInput);
-      if (isNaN(matchId)) {
-        toast.error('Invalid match ID');
+      const matchId = extractMatchId(matchIdInput);
+      if (!matchId) {
+        toast.error('Invalid match ID. Enter a number or paste a Cricbuzz URL.');
         return;
       }
 
@@ -416,13 +428,20 @@ export const StatsImport = () => {
       if (result.success) {
         toast.success(`Stats imported for Week ${weekNum}`);
 
+        // Update match in list to show imported status
         setMatches(prev =>
           prev.map(m =>
-            m.id === selectedMatch.id ? { ...m, statsImported: true, week: weekNum } : m
+            m.id === selectedMatch.id
+              ? { ...m, statsImported: true, week: weekNum, isLive: false }
+              : m
           )
         );
+
+        // Clear all preview state
         setSelectedMatch(null);
         setParsedStats([]);
+        setIsMatchLive(false);
+        setLastFetchedAt(null);
       } else {
         toast.error(result.error || 'Failed to save stats');
       }
@@ -499,7 +518,17 @@ export const StatsImport = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="series" className="w-full">
+      <Tabs
+        defaultValue="series"
+        className="w-full"
+        onValueChange={() => {
+          // Clear preview state when switching tabs
+          setSelectedMatch(null);
+          setParsedStats([]);
+          setIsMatchLive(false);
+          setLastFetchedAt(null);
+        }}
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="series">
             <Trophy className="w-4 h-4 mr-2" />
@@ -602,7 +631,7 @@ export const StatsImport = () => {
             <CardContent className="py-2">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Enter Cricbuzz Match ID"
+                  placeholder="Paste Cricbuzz URL or Match ID"
                   value={matchIdInput}
                   onChange={e => setMatchIdInput(e.target.value)}
                   className="flex-1"
@@ -620,8 +649,7 @@ export const StatsImport = () => {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Find match IDs from Cricbuzz URLs (e.g.,
-                cricbuzz.com/live-cricket-scores/138974/...)
+                Paste the full Cricbuzz URL or just the match ID (e.g., 121417)
               </p>
             </CardContent>
           </Card>
