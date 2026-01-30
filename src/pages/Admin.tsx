@@ -6,6 +6,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
 import {
   ScoreInput,
+  StatsImport,
+  PlayerMapping,
   AddNewPlayer,
   RemovePlayer,
   RosterManagement,
@@ -44,6 +46,8 @@ const Admin = () => {
     <AppLayout title="League Manager Settings" subtitle="League management tools">
       <div className="px-4 py-4 space-y-6">
         <ScoreInput />
+        <StatsImport />
+        <PlayerMapping />
         <RosterConfig />
         <AddNewPlayer />
         <RemovePlayer />

@@ -26,7 +26,7 @@ import CreateLeague from "@/pages/CreateLeague";
 import JoinLeague from "@/pages/JoinLeague";
 import LiveScores from "@/pages/LiveScores";
 import ScoringRules from "@/pages/ScoringRules";
-
+import PointsCalculatorTest from "@/pages/PointsCalculatorTest";
 
 import NotFound from "./pages/NotFound";
 
@@ -118,6 +118,7 @@ const AppRoutes = () => {
       <Route path="/scores/live" element={
         <ProtectedRoute requireUsername={false}><LiveScores /></ProtectedRoute>
       } />
+      <Route path="/test/points-calculator" element={<PointsCalculatorTest />} />
 
 
       <Route element={<ProtectedRoute><LeagueLayout /></ProtectedRoute>}>
