@@ -4,7 +4,7 @@ import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTrades } from '@/hooks/useTrades';
 import { PlayerCard } from '@/components/PlayerCard';
-import { PlayerDetailSheet } from '@/components/PlayerDetailSheet';
+import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { AppLayout } from '@/components/AppLayout';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -299,12 +299,14 @@ const Players = () => {
         mode="propose"
       />
 
-      <PlayerDetailSheet
-        open={detailSheetOpen}
-        onOpenChange={setDetailSheetOpen}
-        player={detailPlayer}
-        seriesId={tournamentId}
-      />
+      {detailPlayer && (
+        <PlayerDetailDialog
+          open={detailSheetOpen}
+          onOpenChange={setDetailSheetOpen}
+          player={detailPlayer}
+          seriesId={tournamentId}
+        />
+      )}
     </AppLayout>
   );
 };

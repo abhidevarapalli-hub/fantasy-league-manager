@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useGameStore } from '@/store/useGameStore';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, Loader2, ChevronRight, Trash2, UserCircle, LogOut } from 'lucide-react';
+import { PlusCircle, Loader2, ChevronRight, Trash2, UserCircle, LogOut, Users } from 'lucide-react';
 
 import { toast } from 'sonner';
 
@@ -14,6 +14,9 @@ interface League {
     name: string;
     manager_count: number;
     league_manager_id: string;
+    tournament_name?: string; // Optional since older leagues might not have it
+    active_player_count?: number;
+    lm_name?: string;
 }
 
 const Leagues = () => {
@@ -32,8 +35,6 @@ const Leagues = () => {
         const fetchStartTime = performance.now();
         console.log('[Leagues] 🏟️  Starting leagues fetch...');
 
-
-
         if (!user || !user.id) {
             console.log('[Leagues] ⚠️  No user found, skipping fetch');
             setLoading(false);
@@ -42,7 +43,7 @@ const Leagues = () => {
 
         setLoading(true);
         try {
-            // Step 1: Fetch managers for this user
+            // Step 1: Fetch managers for this user to know which leagues they are in
             const managersStartTime = performance.now();
             console.log('[Leagues] 👥 Fetching managers for user...');
 
@@ -77,23 +78,58 @@ const Leagues = () => {
             const leaguesStartTime = performance.now();
             console.log('[Leagues] 🏆 Fetching league details...');
 
-            const { data, error } = await (supabase
+            const { data: leaguesData, error: leaguesError } = await (supabase
                 .from('leagues' as any)
                 .select('*')
                 .in('id', leagueIds) as any);
 
             const leaguesDuration = performance.now() - leaguesStartTime;
-            console.log(`[Leagues] ✅ Leagues fetch completed in ${leaguesDuration.toFixed(2)}ms (${data?.length || 0} leagues)`);
+            console.log(`[Leagues] ✅ Leagues fetch completed in ${leaguesDuration.toFixed(2)}ms (${leaguesData?.length || 0} leagues)`);
 
-            if (error) {
-                console.error('[Leagues] ❌ Error fetching leagues:', error);
-                throw error;
+            if (leaguesError) {
+                console.error('[Leagues] ❌ Error fetching leagues:', leaguesError);
+                throw leaguesError;
             }
 
-            const totalDuration = performance.now() - fetchStartTime;
-            console.log(`[Leagues] 🎉 Total leagues fetch completed in ${totalDuration.toFixed(2)}ms (Managers: ${managersDuration.toFixed(2)}ms, Leagues: ${leaguesDuration.toFixed(2)}ms)`);
+            // Step 3: Fetch all managers for these leagues to calculate stats
+            // We need to know who the LM is and how many spots are filled
+            const statsStartTime = performance.now();
+            console.log('[Leagues] 📊 Fetching league stats...');
 
-            setLeagues(data || []);
+            const { data: allManagers, error: allManagersError } = await (supabase
+                .from('managers' as any)
+                .select('league_id, name, is_league_manager, user_id')
+                .in('league_id', leagueIds) as any);
+
+            const statsDuration = performance.now() - statsStartTime;
+
+            if (allManagersError) {
+                console.warn('[Leagues] ⚠️ Error fetching stats, displaying basic info:', allManagersError);
+            }
+
+            // Process stats
+            const processedLeagues = (leaguesData || []).map((league: any) => {
+                const leagueManagers = allManagers?.filter((m: any) => m.league_id === league.id) || [];
+
+                // Find LM
+                const lm = leagueManagers.find((m: any) => m.is_league_manager);
+
+                // Count active (non-placeholder) managers
+                // A manager is active if they have a user_id associated
+                const activeCount = leagueManagers.filter((m: any) => m.user_id !== null).length;
+
+                return {
+                    ...league,
+                    lm_name: lm?.name || 'Unknown',
+                    active_player_count: activeCount
+                };
+            });
+
+
+            const totalDuration = performance.now() - fetchStartTime;
+            console.log(`[Leagues] 🎉 Total leagues fetch completed in ${totalDuration.toFixed(2)}ms`);
+
+            setLeagues(processedLeagues);
 
             // Mark as initialized
             setIsLeaguesInitialized(true);
@@ -206,25 +242,43 @@ const Leagues = () => {
 
                                     <div
                                         key={league.id}
-                                        className="relative group w-full h-24 flex items-center justify-between px-8 border-2 border-muted hover:border-primary/50 hover:bg-primary/5 transition-all text-left shadow-lg rounded-md bg-background cursor-pointer"
+                                        className="relative group w-full p-4 border-2 border-muted hover:border-primary/50 hover:bg-primary/5 transition-all text-left shadow-lg rounded-xl bg-background cursor-pointer flex flex-col gap-3"
                                         onClick={() => navigate(`/${league.id}`)}
                                     >
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-extrabold text-2xl tracking-tight text-foreground group-hover:text-primary transition-colors">{league.name}</span>
-                                            <span className="text-xs text-muted-foreground font-semibold">{league.manager_count} Managers • Customized Rules</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            {user?.id === league.league_manager_id && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={(e) => handleDeleteLeague(e, league.id)}
-                                                >
-                                                    <Trash2 className="w-5 h-5" />
-                                                </Button>
-                                            )}
-                                            <ChevronRight className="w-8 h-8 opacity-0 group-hover:opacity-100 transition-all text-primary" />
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-extrabold text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">{league.name}</span>
+                                                    {league.tournament_name && (
+                                                        <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold uppercase tracking-wider border border-blue-500/20">
+                                                            {league.tournament_name}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col gap-1.5 mt-1">
+                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                                                        <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded">
+                                                            <Users className="w-3 h-3" />
+                                                            {league.active_player_count ?? 1} / {league.manager_count} Joined
+                                                        </span>
+                                                        <span>•</span>
+                                                        <span>LM: {league.lm_name}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {user?.id === league.league_manager_id && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={(e) => handleDeleteLeague(e, league.id)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                                <ChevronRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-all text-primary" />
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
