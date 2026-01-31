@@ -9,7 +9,7 @@ import { getTournamentById } from "@/lib/tournaments";
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) => 
+    new Promise<T>((_, reject) =>
       setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
     )
   ]);
@@ -288,7 +288,7 @@ export const useSeedDatabase = () => {
     if (!leagueId) return false;
 
     const seedStartTime = performance.now();
-    console.log(`[useSeedDatabase] 🌱 seedDatabase started for league: ${leagueId}`);
+    // console.log(`[useSeedDatabase] 🌱 seedDatabase started for league: ${leagueId}`);
 
     setSeeding(true);
     try {
@@ -297,13 +297,13 @@ export const useSeedDatabase = () => {
       const { data: existingPlayers } = await (supabase.from("players").select("id").eq("league_id", leagueId).limit(1) as any);
       const { data: existingManagers } = await (supabase.from("managers").select("id").eq("league_id", leagueId).limit(1) as any);
       const checkDuration = performance.now() - checkStartTime;
-      console.log(`[useSeedDatabase] 🔍 Existence check completed in ${checkDuration.toFixed(2)}ms`);
+      // console.log(`[useSeedDatabase] 🔍 Existence check completed in ${checkDuration.toFixed(2)}ms`);
 
       const hasPlayers = (existingPlayers?.length ?? 0) > 0;
       const hasManagers = (existingManagers?.length ?? 0) > 0;
 
       if (hasPlayers && hasManagers) {
-        console.log(`[useSeedDatabase] ✅ League ${leagueId} already seeded (skipping), total time: ${(performance.now() - seedStartTime).toFixed(2)}ms`);
+        // console.log(`[useSeedDatabase] ✅ League ${leagueId} already seeded (skipping), total time: ${(performance.now() - seedStartTime).toFixed(2)}ms`);
         return true;
       }
 
@@ -450,14 +450,14 @@ export const useSeedDatabase = () => {
         is_international: boolean;
         league_id: string;
       }> = [];
-      
+
       // Map to store cricbuzz data for each player (keyed by name+team)
       const cricbuzzDataMap = new Map<string, { cricbuzzId: string; imageId?: number; battingStyle?: string; bowlingStyle?: string }>();
 
       for (const { team, players } of teamsWithPlayers) {
         const teamCode = getTeamCode(team.teamName);
         console.log(`[useSeedDatabase] 📋 Processing team: ${team.teamName} (${teamCode}) with ${players.length} players`);
-        
+
         for (const player of players) {
           // Determine if player is international
           let isIntl: boolean;
@@ -476,7 +476,7 @@ export const useSeedDatabase = () => {
             is_international: isIntl,
             league_id: leagueId,
           });
-          
+
           // Store Cricbuzz data for later linking
           const playerKey = `${player.name}|${teamCode}`;
           cricbuzzDataMap.set(playerKey, {
@@ -516,7 +516,7 @@ export const useSeedDatabase = () => {
       if (insertedPlayers && insertedPlayers.length > 0) {
         console.log(`[useSeedDatabase] 📸 Linking ${insertedPlayers.length} players to Cricbuzz data...`);
         const extendedStartTime = performance.now();
-        
+
         const extendedPlayersToInsert: Array<{
           player_id: string;
           cricbuzz_id: string;
@@ -524,11 +524,11 @@ export const useSeedDatabase = () => {
           batting_style: string | null;
           bowling_style: string | null;
         }> = [];
-        
+
         for (const player of insertedPlayers) {
           const playerKey = `${player.name}|${player.team}`;
           const cricbuzzData = cricbuzzDataMap.get(playerKey);
-          
+
           if (cricbuzzData && cricbuzzData.cricbuzzId) {
             extendedPlayersToInsert.push({
               player_id: player.id,
@@ -539,14 +539,14 @@ export const useSeedDatabase = () => {
             });
           }
         }
-        
+
         if (extendedPlayersToInsert.length > 0) {
           const { error: extendedError } = await (supabase as any)
             .from("extended_players")
             .insert(extendedPlayersToInsert);
-          
+
           const extendedDuration = performance.now() - extendedStartTime;
-          
+
           if (extendedError) {
             console.warn(`[useSeedDatabase] ⚠️ Error inserting extended player data (${extendedDuration.toFixed(2)}ms):`, extendedError);
             // Don't fail the whole operation, extended data is optional

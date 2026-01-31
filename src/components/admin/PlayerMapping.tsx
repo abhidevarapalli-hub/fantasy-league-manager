@@ -51,7 +51,7 @@ export const PlayerMapping = () => {
 
     const loadMappings = async () => {
       const { data: extendedPlayers } = await supabase
-        .from('extended_players')
+        .from('extended_players' as any)
         .select('player_id, cricbuzz_id');
 
       const mappingMap = new Map<string, string>();
@@ -98,7 +98,7 @@ export const PlayerMapping = () => {
   };
 
   // Save mapping
-  const handleSaveMapping = async (cricbuzzId: string, playerName?: string) => {
+  const handleSaveMapping = async (cricbuzzId: string, playerName?: string, imageId?: number) => {
     if (!selectedPlayer) return;
 
     setIsSaving(true);
@@ -110,6 +110,7 @@ export const PlayerMapping = () => {
           {
             player_id: selectedPlayer.id,
             cricbuzz_id: cricbuzzId,
+            image_id: imageId,
           },
           {
             onConflict: 'player_id',
@@ -188,11 +189,10 @@ export const PlayerMapping = () => {
           </Badge>
           <Badge
             variant="outline"
-            className={`cursor-pointer transition-colors ${
-              filterUnmapped
-                ? 'bg-yellow-500 text-yellow-950'
-                : 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20'
-            }`}
+            className={`cursor-pointer transition-colors ${filterUnmapped
+              ? 'bg-yellow-500 text-yellow-950'
+              : 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20'
+              }`}
             onClick={() => setFilterUnmapped(!filterUnmapped)}
           >
             {unmappedCount} Unmapped
@@ -210,11 +210,10 @@ export const PlayerMapping = () => {
           {displayedPlayers.map(player => (
             <div
               key={player.id}
-              className={`p-3 rounded-lg border ${
-                player.cricbuzzId
-                  ? 'border-green-500/30 bg-green-500/5'
-                  : 'border-yellow-500/30 bg-yellow-500/5'
-              }`}
+              className={`p-3 rounded-lg border ${player.cricbuzzId
+                ? 'border-green-500/30 bg-green-500/5'
+                : 'border-yellow-500/30 bg-yellow-500/5'
+                }`}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -308,7 +307,7 @@ export const PlayerMapping = () => {
                                   <div
                                     key={result.id}
                                     className="p-2 rounded border cursor-pointer hover:bg-muted mb-1"
-                                    onClick={() => handleSaveMapping(result.id.toString(), result.name)}
+                                    onClick={() => handleSaveMapping(result.id.toString(), result.name, result.faceImageId)}
                                   >
                                     <div className="flex items-center justify-between">
                                       <div>

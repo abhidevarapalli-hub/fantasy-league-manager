@@ -16,14 +16,14 @@ export const useTrades = () => {
   useEffect(() => {
     // Skip if trades data already initialized
     if (isTradesInitialized) {
-      console.log('[useTrades] ✅ Trades data already initialized, skipping fetch...');
+      // console.log('[useTrades] ✅ Trades data already initialized, skipping fetch...');
       setLoading(false);
       return;
     }
 
     const fetchTrades = async () => {
       const fetchStartTime = performance.now();
-      console.log('[useTrades] 🔄 Starting trades data fetch...');
+      // console.log('[useTrades] 🔄 Starting trades data fetch...');
 
       setLoading(true);
 
@@ -43,8 +43,8 @@ export const useTrades = () => {
         const fetchDuration = performance.now() - fetchStartTime;
 
         if (error) {
-          console.error('[useTrades] ❌ Error fetching trades:', error);
-          console.warn('[useTrades] ⚠️  Trades table may not exist - using empty array');
+          // console.error('[useTrades] ❌ Error fetching trades:', error);
+          // console.warn('[useTrades] ⚠️  Trades table may not exist - using empty array');
           setTrades([]);
           setIsTradesInitialized(true); // Mark as initialized even on error to prevent retries
         } else if (data) {
@@ -53,16 +53,16 @@ export const useTrades = () => {
           const mappingDuration = performance.now() - mappingStart;
 
           const totalDuration = performance.now() - fetchStartTime;
-          console.log(`[useTrades] 📊 Fetched ${data.length} trades`);
-          console.log(`[useTrades] 🎉 Total fetch completed in ${totalDuration.toFixed(2)}ms (Fetch: ${fetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
+          // console.log(`[useTrades] 📊 Fetched ${data.length} trades`);
+          // console.log(`[useTrades] 🎉 Total fetch completed in ${totalDuration.toFixed(2)}ms (Fetch: ${fetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
 
           // Mark as initialized
           setIsTradesInitialized(true);
         }
       } catch (error: any) {
         const duration = performance.now() - fetchStartTime;
-        console.error(`[useTrades] ❌ Fatal error fetching trades (${duration.toFixed(2)}ms):`, error.message || error);
-        console.warn('[useTrades] ⚠️  Using empty trades array - trades table may not exist in database');
+        // console.error(`[useTrades] ❌ Fatal error fetching trades (${duration.toFixed(2)}ms):`, error.message || error);
+        // console.warn('[useTrades] ⚠️  Using empty trades array - trades table may not exist in database');
         setTrades([]);
         setIsTradesInitialized(true); // Mark as initialized to prevent infinite retries
       } finally {

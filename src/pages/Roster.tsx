@@ -1,112 +1,17 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
 import { AppLayout } from '@/components/AppLayout';
-import { Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getActiveRosterSlots, sortPlayersByRole, SlotRequirement } from '@/lib/roster-validation';
 import { Badge } from '@/components/ui/badge';
-import { Player, Manager } from '@/lib/supabase-types';
-import { getTeamColors } from '@/lib/team-colors';
-
-// Role to abbreviation mapping
-
-const roleAbbreviations: Record<string, string> = {
-  'Bowler': 'BOWL',
-  'Batsman': 'BAT',
-  'Wicket Keeper': 'WK',
-  'All Rounder': 'AR',
-  'WK/BAT': 'WK/BAT',
-  'AR/BWL': 'AR/BWL',
-};
-
-const roleIcons: Record<string, string> = {
-  'Wicket Keeper': '🧤',
-  'Batsman': '🏏',
-  'All Rounder': '⚡',
-  'Bowler': '🎯',
-  'WK/BAT': '🏏',
-  'AR/BWL': '⚡',
-};
-
-interface RosterCellProps {
-  slot: SlotRequirement;
-  isBench?: boolean;
-}
-
-const RosterCell = ({ slot, isBench }: RosterCellProps) => {
-  const player = slot.player || null;
-  const colors = player ? getTeamColors(player.team) : null;
-
-  return (
-    <div
-      className={cn(
-        "relative min-h-[80px] p-2 border rounded-lg transition-all",
-        !player && "bg-muted/50 border-border text-muted-foreground border-dashed"
-      )}
-      style={player && colors ? {
-        backgroundColor: colors.raw,
-        borderColor: colors.raw,
-      } : {}}
-    >
-      {/* Slot indicator for bench */}
-      {isBench && (
-        <div className="absolute top-1 right-1 text-[10px] font-bold opacity-60">
-          B
-        </div>
-      )}
-
-      {/* International player icon */}
-      {player?.isInternational && (
-        <div className="absolute top-1 left-1">
-          <Plane className="w-3 h-3 opacity-80" />
-        </div>
-      )}
-
-      {player ? (
-        <div className="pt-3 flex flex-col items-center justify-center text-center">
-          <p className={cn(
-            "font-medium text-xs truncate leading-tight w-full",
-            colors?.text
-          )}>
-            {player.name.split(' ')[0]}
-          </p>
-          <p className={cn(
-            "font-bold text-sm truncate leading-tight w-full",
-            colors?.text
-          )}>
-            {player.name.split(' ').slice(1).join(' ')}
-          </p>
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-[8px] px-1 py-0 mt-1 font-semibold border"
-            )}
-            style={{
-              backgroundColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
-              borderColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-              color: colors?.text === 'text-white' ? 'white' : 'black'
-            }}
-          >
-            {roleAbbreviations[player.role] || player.role}
-          </Badge>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center h-full pt-2">
-          <div className="text-lg opacity-50">
-            {roleIcons[slot.role] || '👤'}
-          </div>
-          <span className="text-[9px] opacity-50 mt-1 text-center leading-tight">
-            {slot.label}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
+import { Player } from '@/lib/supabase-types';
+import { useState } from 'react';
+import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
+import { RosterGrid } from '@/components/RosterGrid';
 
 const Roster = () => {
   const navigate = useNavigate();
   const { leagueId } = useParams<{ leagueId: string }>();
+  const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
 
   // Zustand selectors
   const managers = useGameStore(state => state.managers);
@@ -114,129 +19,51 @@ const Roster = () => {
   const config = useGameStore(state => state.config);
   const currentManagerId = useGameStore(state => state.currentManagerId);
 
-  // Get roster slots for a manager
-  const getRosterSlots = (manager: Manager): { activeSlots: SlotRequirement[]; benchSlots: SlotRequirement[] } => {
-    const rosterIds = manager.activeRoster || [];
-    const benchIds = manager.bench || [];
-
-    const activePlayers = rosterIds
-      .map(id => players.find(p => p.id === id))
-      .filter((p): p is Player => p !== undefined);
-
-    const benchPlayers = benchIds
-      .map(id => players.find(p => p.id === id))
-      .filter((p): p is Player => p !== undefined);
-
-    const activeSlots = getActiveRosterSlots(activePlayers, config);
-
-    const sortedBench = sortPlayersByRole(benchPlayers);
-    const benchSlots: SlotRequirement[] = sortedBench.map(player => ({
-      role: player.role,
-      label: player.role,
-      filled: true,
-      player,
-    }));
-
-    for (let i = benchPlayers.length; i < config.benchSize; i++) {
-      benchSlots.push({
-        role: 'WK/BAT',
-        label: 'Reserve',
-        filled: false,
-      });
-    }
-
-    return { activeSlots, benchSlots };
-  };
+  const activeManager = managers.find(m => m.id === currentManagerId) || managers[0];
 
   return (
     <AppLayout title="Team Rosters" subtitle="Click on a team name to manage roster">
-      <div className="px-4 py-4">
-        <div className="overflow-x-auto">
-          {/* Header Row */}
-          <div className="grid gap-2 min-w-[640px]" style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}>
-            {managers.map(manager => (
-              <button
-                key={manager.id}
-                onClick={() => navigate(`/${leagueId}/team/${manager.id}`)}
-                className={cn(
-                  "text-center py-2 px-1 rounded-lg border transition-colors",
-                  manager.id === currentManagerId
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
-                )}
-              >
-                <span className="text-xs font-bold truncate block">
-                  {manager.teamName}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Active Grid */}
-          <div className="mt-2 space-y-1">
-            {Array.from({ length: config.activeSize }, (_, rowIdx) => (
-              <div
-                key={rowIdx}
-                className="grid gap-2 min-w-[640px]"
-                style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}
-              >
-                {managers.map(manager => {
-                  const { activeSlots } = getRosterSlots(manager);
-                  const slot = activeSlots[rowIdx];
-                  if (!slot) return null;
-                  return (
-                    <RosterCell
-                      key={`${manager.id}-${rowIdx}`}
-                      slot={slot}
-                      isBench={false}
-                    />
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-
-          {/* Bench Section */}
-          <div className="mt-6 pt-4 border-t border-border/50">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
-              Bench
-            </p>
-            <div className="space-y-1">
-              {Array.from({ length: config.benchSize }, (_, benchIdx) => (
-                <div
-                  key={benchIdx}
-                  className="grid gap-2 min-w-[640px]"
-                  style={{ gridTemplateColumns: `repeat(${managers.length}, minmax(80px, 1fr))` }}
+      <div className="flex-1 overflow-x-auto w-full">
+        {/* Horizontal scrollable row for all teams */}
+        <div className="flex flex-row gap-0 min-w-max pb-20">
+          {managers.map(manager => (
+            <div key={manager.id} className="w-[320px] md:w-[380px] flex-shrink-0 space-y-4 bg-card/20 border-r border-border/50 p-4 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                <button
+                  onClick={() => navigate(`/${leagueId}/team/${manager.id}`)}
+                  className="group text-left"
                 >
-                  {managers.map(manager => {
-                    const { benchSlots } = getRosterSlots(manager);
-                    const slot = benchSlots[benchIdx];
-                    if (!slot) return null;
-                    return (
-                      <RosterCell
-                        key={`${manager.id}-bench-${benchIdx}`}
-                        slot={slot}
-                        isBench={true}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
+                  <h2 className="text-lg font-bold flex items-center gap-2 group-hover:text-primary transition-colors">
+                    {manager.teamName}
+                    <Badge variant="outline" className="text-[10px] font-normal py-0">
+                      {(manager.activeRoster?.length || 0) + (manager.bench?.length || 0)} / {config.activeSize + config.benchSize}
+                    </Badge>
+                  </h2>
+                </button>
+              </div>
 
-          <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Plane className="w-3 h-3" />
-              <span>International</span>
+              <RosterGrid
+                manager={manager}
+                config={config}
+                players={players}
+                onPlayerClick={setDetailPlayer}
+              />
             </div>
-            <div className="flex items-center gap-1">
-              <span className="font-bold">B</span>
-              <span>Bench Player</span>
-            </div>
-          </div>
+          ))}
         </div>
+
+        {managers.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground bg-card/20 rounded-xl border border-dashed">
+            No teams found in this league.
+          </div>
+        )}
       </div>
+
+      <PlayerDetailDialog
+        player={detailPlayer}
+        open={!!detailPlayer}
+        onOpenChange={(open) => !open && setDetailPlayer(null)}
+      />
     </AppLayout>
   );
 };

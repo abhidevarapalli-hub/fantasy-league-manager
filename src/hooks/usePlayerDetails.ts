@@ -53,30 +53,15 @@ export interface PlayerDetails {
 /**
  * Transform API rankings object to array format
  */
-function transformRankings(apiRankings: Record<string, string> | undefined): RankingEntry[] {
-  if (!apiRankings || Object.keys(apiRankings).length === 0) return [];
-
-  const entries: RankingEntry[] = [];
-
-  // Map API fields to display format
-  const formats = [
-    { key: 'testRank', bestKey: 'testBestRank', type: 'Test' },
-    { key: 't20Rank', bestKey: 't20BestRank', type: 'T20I' },
-    { key: 'odiRank', bestKey: 'odiBestRank', type: 'ODI' },
-  ];
-
-  for (const format of formats) {
-    const rank = apiRankings[format.key];
-    if (rank && rank !== '-') {
-      entries.push({
-        type: format.type,
-        rank: parseInt(rank, 10),
-        best: apiRankings[format.bestKey] ? parseInt(apiRankings[format.bestKey], 10) : undefined,
-      });
-    }
+/**
+ * Transform API rankings object to array format
+ * Note: New API response structure already returns array, so we just pass it through or return empty
+ */
+function transformRankings(apiRankings: any): RankingEntry[] {
+  if (Array.isArray(apiRankings)) {
+    return apiRankings as RankingEntry[];
   }
-
-  return entries;
+  return [];
 }
 
 /**
@@ -145,12 +130,12 @@ export function useExtendedPlayer(playerId: string | null) {
         console.warn('[useExtendedPlayerData] Error fetching extended data:', error.message);
         return null;
       }
-      
+
       if (!data) return null;
-      
+
       // Cast to any to access fields not in generated types
       const row = data as any;
-      
+
       return {
         playerId: row.player_id,
         cricbuzzId: row.cricbuzz_id,
@@ -171,18 +156,112 @@ export function useExtendedPlayer(playerId: string | null) {
 
 /**
  * Fetch detailed player information
+ * Strategy: Database Cache First -> API Fallback -> Cache Update
  * @param cricbuzzPlayerId - The Cricbuzz player ID (from TournamentPlayer.id)
  */
 export function usePlayerInfo(cricbuzzPlayerId: string | null) {
   return useQuery({
     queryKey: ['player', 'info', cricbuzzPlayerId],
     queryFn: async () => {
+      console.log(`[TRACE] 1. 🏁 usePlayerInfo Query STARTED for ID: ${cricbuzzPlayerId}`);
       if (!cricbuzzPlayerId) throw new Error('Player ID required');
-      const response = await fetchPlayerInfo(cricbuzzPlayerId);
-      return transformPlayerInfo(response);
+
+      const startDb = performance.now();
+      console.log(`[TRACE] 2. 🔍 Checking Supabase 'extended_players' for cached data...`);
+
+      // 1. Try to fetch from Database Cache
+      const { data: dbData, error: dbError } = await supabase
+        .from('extended_players' as any)
+        .select(`
+          *,
+          player:players (
+            name,
+            team,
+            role
+          )
+        `)
+        .eq('cricbuzz_id', cricbuzzPlayerId)
+        .maybeSingle();
+
+      const endDb = performance.now();
+
+      if (dbError) console.error('[TRACE] ❌ DB Error:', dbError);
+
+      // 2. Check if Cache Hit (Must have Bio and DOB to be considered valid cache for details)
+      const cached = dbData as any;
+      if (cached && cached.bio && cached.dob) {
+        console.log(`[TRACE] 3. ✅ Supabase CACHE HIT! Returning DB data. (Latency: ${(endDb - startDb).toFixed(2)}ms)`);
+
+        // Map cached data to PlayerDetails
+        const row = dbData as any;
+        const player = row.player || {}; // Joined player data
+
+        return {
+          id: cricbuzzPlayerId,
+          name: player.name || '', // Fallback empty if not linked, UI usually has name from props
+          role: player.role,
+          team: player.team,
+          // Map DB columns to PlayerDetails keys
+          battingStyle: row.batting_style,
+          bowlingStyle: row.bowling_style,
+          birthPlace: row.birth_place,
+          dateOfBirth: row.dob,
+          height: row.height,
+          imageId: row.image_id,
+          bio: row.bio,
+          // Rankings are not cached in DB, ensuring we don't show stale info or just omitted
+          rankings: undefined,
+        } as PlayerDetails;
+      }
+
+      console.log(`[TRACE] 3. ⚠️ Supabase CACHE MISS or INCOMPLETE. (Bio/Born missing). Fetching from Cricbuzz API...`);
+
+      // 3. Cache Miss or Incomplete Data -> Fetch from API
+      try {
+        const startApi = performance.now();
+        const response = await fetchPlayerInfo(cricbuzzPlayerId);
+        const endApi = performance.now();
+
+        console.log(`[TRACE] 4. 🌐 Cricbuzz API SUCCESS. (Latency: ${(endApi - startApi).toFixed(2)}ms)`);
+
+        const transformed = transformPlayerInfo(response);
+
+        // 4. Update Cache (Fire and Forget - don't block return)
+        if (dbData) {
+          console.log(`[TRACE] 5. 💾 Updating Supabase cache with new data...`);
+          const updatePayload: any = {
+            bio: transformed.bio,
+            dob: transformed.dateOfBirth,
+            birth_place: transformed.birthPlace,
+            height: transformed.height,
+            batting_style: transformed.battingStyle,
+            bowling_style: transformed.bowlingStyle,
+            image_id: transformed.imageId,
+            updated_at: new Date().toISOString(),
+          };
+
+          // Don't await this, let it happen in background
+          supabase
+            .from('extended_players' as any)
+            .update(updatePayload)
+            .eq('cricbuzz_id', cricbuzzPlayerId)
+            .then(({ error }: any) => {
+              if (error) console.error('[TRACE] ❌ Failed to update cache:', error);
+              else console.log('[TRACE] ✅ Supabase cache updated successfully');
+            });
+        } else {
+          console.log(`[TRACE] 5. ⚠️ No 'extended_players' record found to update. Sync might be needed.`);
+        }
+
+        return transformed;
+      } catch (error) {
+        console.error('[TRACE] ❌ Cricbuzz API Fetch Failed:', error);
+        throw error;
+      }
     },
     enabled: !!cricbuzzPlayerId && isApiConfigured(),
-    staleTime: 10 * 60 * 1000, // 10 minutes - player info doesn't change often
+    staleTime: 0,
+    gcTime: 0, // Disable caching completely to allow debugging every click
     retry: 2,
   });
 }
@@ -340,7 +419,7 @@ export function extractPlayerPerformance(
 ): PlayerMatchPerformance | null {
   const playerId = parseInt(cricbuzzPlayerId, 10);
   const header = scorecard.matchHeader;
-  
+
   // Determine opponent based on player's team
   const isTeam1 = playerTeamShort === header.team1.shortName;
   const opponent = isTeam1 ? header.team2.name : header.team1.name;

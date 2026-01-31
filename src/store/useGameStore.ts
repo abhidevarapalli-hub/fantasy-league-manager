@@ -383,7 +383,7 @@ export const useGameStore = create<GameState>()(
 
         try {
           const { error } = await supabase
-            .from('leagues' as 'leagues')
+            .from('leagues' as any)
             .update({ scoring_rules: rules } as Record<string, unknown>)
             .eq('id', currentLeagueId);
 
@@ -484,7 +484,7 @@ export const useGameStore = create<GameState>()(
       // Data fetching
       fetchAllData: async (leagueId) => {
         const fetchStartTime = performance.now();
-        console.log(`[useGameStore] 📊 fetchAllData started for league: ${leagueId}`);
+        // console.log(`[useGameStore] 📊 fetchAllData started for league: ${leagueId}`);
 
         set({ loading: true, currentLeagueId: leagueId });
 
@@ -493,7 +493,7 @@ export const useGameStore = create<GameState>()(
           const { data: leagueDataRaw } = await supabase.from("leagues" as 'leagues').select("*").eq("id", leagueId).single();
           const leagueData = leagueDataRaw as Record<string, unknown> | null;
           const leagueConfigDuration = performance.now() - leagueConfigStart;
-          console.log(`[useGameStore] ⚙️  League config fetched in ${leagueConfigDuration.toFixed(2)}ms`);
+          // console.log(`[useGameStore] ⚙️  League config fetched in ${leagueConfigDuration.toFixed(2)}ms`);
 
           if (leagueData) {
             set({
@@ -516,17 +516,18 @@ export const useGameStore = create<GameState>()(
           }
 
           const parallelFetchStart = performance.now();
-          console.log(`[useGameStore] 🔄 Starting parallel fetch of players, managers, schedule, transactions...`);
+          // console.log(`[useGameStore] 🔄 Starting parallel fetch of players, managers, schedule, transactions...`);
 
           const [playersRes, managersRes, scheduleRes, transactionsRes] = await Promise.all([
-            supabase.from("players" as 'players').select("*").eq("league_id", leagueId).order("name"),
+            // @ts-ignore - extended_players relationship is not fully typed in generated types yet
+            supabase.from("players").select("*, extended_players(image_id)").eq("league_id", leagueId).order("name"),
             supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
             supabase.from("schedule" as 'schedule').select("*").eq("league_id", leagueId).order("week").order("created_at"),
             supabase.from("transactions" as 'transactions').select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
           ]);
 
           const parallelFetchDuration = performance.now() - parallelFetchStart;
-          console.log(`[useGameStore] ✅ Parallel fetch completed in ${parallelFetchDuration.toFixed(2)}ms`);
+          // console.log(`[useGameStore] ✅ Parallel fetch completed in ${parallelFetchDuration.toFixed(2)}ms`);
 
           const mappingStart = performance.now();
           const players = (playersRes.data as Tables<"players">[] | null)?.map(mapDbPlayer) || [];
@@ -535,8 +536,8 @@ export const useGameStore = create<GameState>()(
           const activities = (transactionsRes.data as Tables<"transactions">[] | null)?.map(mapDbTransaction) || [];
           const mappingDuration = performance.now() - mappingStart;
 
-          console.log(`[useGameStore] 🗂️  Data mapping completed in ${mappingDuration.toFixed(2)}ms`);
-          console.log(`[useGameStore] 📊 Fetched ${players.length} players, ${managers.length} managers, ${schedule.length} matches, ${activities.length} activities`);
+          // console.log(`[useGameStore] 🗂️  Data mapping completed in ${mappingDuration.toFixed(2)}ms`);
+          // console.log(`[useGameStore] 📊 Fetched ${players.length} players, ${managers.length} managers, ${schedule.length} matches, ${activities.length} activities`);
 
           set({
             players,
@@ -546,7 +547,7 @@ export const useGameStore = create<GameState>()(
           });
 
           const totalFetchDuration = performance.now() - fetchStartTime;
-          console.log(`[useGameStore] 🎉 fetchAllData completed in ${totalFetchDuration.toFixed(2)}ms (Config: ${leagueConfigDuration.toFixed(2)}ms, Fetch: ${parallelFetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
+          // console.log(`[useGameStore] 🎉 fetchAllData completed in ${totalFetchDuration.toFixed(2)}ms (Config: ${leagueConfigDuration.toFixed(2)}ms, Fetch: ${parallelFetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
         } catch (error) {
           console.error('[useGameStore] ❌ Error in fetchAllData:', error);
           throw error;

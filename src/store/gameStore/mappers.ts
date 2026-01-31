@@ -7,6 +7,7 @@ export const mapDbPlayer = (db: Tables<"players">): Player => ({
   team: db.team,
   role: db.role as Player["role"],
   isInternational: db.is_international ?? false,
+  imageId: (db as any).extended_players?.image_id ?? ((db as any).extended_players?.[0]?.image_id) ?? undefined,
 });
 
 export const mapDbManager = (db: Tables<"managers">): Manager => ({

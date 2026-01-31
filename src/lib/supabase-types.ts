@@ -56,6 +56,7 @@ export interface Player {
   team: string;
   role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper';
   isInternational: boolean;
+  imageId?: number;
 }
 
 export interface Manager {

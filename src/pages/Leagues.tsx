@@ -32,11 +32,11 @@ const Leagues = () => {
     const [loading, setLoading] = useState(true);
 
     const fetchLeagues = useCallback(async () => {
-        const fetchStartTime = performance.now();
-        console.log('[Leagues] 🏟️  Starting leagues fetch...');
+        // const fetchStartTime = performance.now();
+        // console.log('[Leagues] 🏟️  Starting leagues fetch...');
 
         if (!user || !user.id) {
-            console.log('[Leagues] ⚠️  No user found, skipping fetch');
+            // console.log('[Leagues] ⚠️  No user found, skipping fetch');
             setLoading(false);
             return;
         }
@@ -44,16 +44,16 @@ const Leagues = () => {
         setLoading(true);
         try {
             // Step 1: Fetch managers for this user to know which leagues they are in
-            const managersStartTime = performance.now();
-            console.log('[Leagues] 👥 Fetching managers for user...');
+            // const managersStartTime = performance.now();
+            // console.log('[Leagues] 👥 Fetching managers for user...');
 
             const { data: managerData, error: managerError } = await (supabase
                 .from('managers' as any)
                 .select('league_id')
                 .eq('user_id', user.id) as any);
 
-            const managersDuration = performance.now() - managersStartTime;
-            console.log(`[Leagues] ✅ Managers fetch completed in ${managersDuration.toFixed(2)}ms (${managerData?.length || 0} managers)`);
+            // const managersDuration = performance.now() - managersStartTime;
+            // console.log(`[Leagues] ✅ Managers fetch completed in ${managersDuration.toFixed(2)}ms (${managerData?.length || 0} managers)`);
 
             if (managerError) {
                 console.error('[Leagues] ❌ Error fetching manager data:', managerError);
@@ -64,27 +64,27 @@ const Leagues = () => {
             const leagueIds = (managerData?.map((m: any) => m.league_id) || [])
                 .filter((id: string | null) => id !== null);
 
-            console.log(`[Leagues] 🎯 Found ${leagueIds.length} unique league IDs`);
+            // console.log(`[Leagues] 🎯 Found ${leagueIds.length} unique league IDs`);
 
             if (leagueIds.length === 0) {
-                const totalDuration = performance.now() - fetchStartTime;
-                console.log(`[Leagues] ℹ️  No leagues found. Total time: ${totalDuration.toFixed(2)}ms`);
+                // const totalDuration = performance.now() - fetchStartTime;
+                // console.log(`[Leagues] ℹ️  No leagues found. Total time: ${totalDuration.toFixed(2)}ms`);
                 setLeagues([]);
                 setLoading(false);
                 return;
             }
 
             // Step 2: Fetch the actual league details
-            const leaguesStartTime = performance.now();
-            console.log('[Leagues] 🏆 Fetching league details...');
+            // const leaguesStartTime = performance.now();
+            // console.log('[Leagues] 🏆 Fetching league details...');
 
             const { data: leaguesData, error: leaguesError } = await (supabase
                 .from('leagues' as any)
                 .select('*')
                 .in('id', leagueIds) as any);
 
-            const leaguesDuration = performance.now() - leaguesStartTime;
-            console.log(`[Leagues] ✅ Leagues fetch completed in ${leaguesDuration.toFixed(2)}ms (${leaguesData?.length || 0} leagues)`);
+            // const leaguesDuration = performance.now() - leaguesStartTime;
+            // console.log(`[Leagues] ✅ Leagues fetch completed in ${leaguesDuration.toFixed(2)}ms (${leaguesData?.length || 0} leagues)`);
 
             if (leaguesError) {
                 console.error('[Leagues] ❌ Error fetching leagues:', leaguesError);
@@ -93,15 +93,15 @@ const Leagues = () => {
 
             // Step 3: Fetch all managers for these leagues to calculate stats
             // We need to know who the LM is and how many spots are filled
-            const statsStartTime = performance.now();
-            console.log('[Leagues] 📊 Fetching league stats...');
+            // const statsStartTime = performance.now();
+            // console.log('[Leagues] 📊 Fetching league stats...');
 
             const { data: allManagers, error: allManagersError } = await (supabase
                 .from('managers' as any)
                 .select('league_id, name, is_league_manager, user_id')
                 .in('league_id', leagueIds) as any);
 
-            const statsDuration = performance.now() - statsStartTime;
+            // const statsDuration = performance.now() - statsStartTime;
 
             if (allManagersError) {
                 console.warn('[Leagues] ⚠️ Error fetching stats, displaying basic info:', allManagersError);
@@ -126,16 +126,17 @@ const Leagues = () => {
             });
 
 
-            const totalDuration = performance.now() - fetchStartTime;
-            console.log(`[Leagues] 🎉 Total leagues fetch completed in ${totalDuration.toFixed(2)}ms`);
+            // const totalDuration = performance.now() - fetchStartTime;
+            // console.log(`[Leagues] 🎉 Total leagues fetch completed in ${totalDuration.toFixed(2)}ms`);
 
             setLeagues(processedLeagues);
 
             // Mark as initialized
             setIsLeaguesInitialized(true);
         } catch (error: any) {
-            const duration = performance.now() - fetchStartTime;
-            console.error(`[Leagues] ❌ Error in fetchLeagues after ${duration.toFixed(2)}ms:`, error.message);
+            // const duration = performance.now() - fetchStartTime;
+            // console.error(`[Leagues] ❌ Error in fetchLeagues after ${duration.toFixed(2)}ms:`, error.message);
+            console.error(`[Leagues] ❌ Error in fetchLeagues:`, error.message);
             toast.error("Failed to load leagues. Please check your database connection.");
         } finally {
             setLoading(false);

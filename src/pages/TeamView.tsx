@@ -7,6 +7,7 @@ import { PlayerCard } from '@/components/PlayerCard';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import {
   getActiveRosterSlots,
   validateActiveRoster,
@@ -50,10 +51,10 @@ const TeamView = () => {
   // Swap states
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [playerToSwap, setPlayerToSwap] = useState<{ player: Player; from: 'active' | 'bench' } | null>(null);
+  const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
 
   const manager = managers.find(m => m.id === teamId);
 
-  // Check if current user can edit this team
   // Check if current user can edit this team
   const canEdit = canEditTeam(teamId || '');
 
@@ -83,7 +84,6 @@ const TeamView = () => {
     .filter((p): p is Player => p !== undefined);
   const totalPlayers = activePlayers.length + benchPlayers.length;
 
-  // Calculate max bench size based on active roster
   // Calculate max bench size based on active roster
   const maxBenchSize = config.benchSize;
   const totalRosterCap = config.activeSize + config.benchSize;
@@ -255,6 +255,7 @@ const TeamView = () => {
                   onSwap={canEdit && benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
                   onMoveDown={canEdit && benchPlayers.length < maxBenchSize ? () => handleMoveToBench(slot.player!.id) : undefined}
                   onDrop={canEdit ? () => dropPlayerOnly(teamId!, slot.player!.id) : undefined}
+                  onClick={() => setDetailPlayer(slot.player!)}
                 />
               ) : (
                 <div
@@ -279,18 +280,18 @@ const TeamView = () => {
 
         {/* Bench */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-3 pt-2">
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
               <UserMinus className="w-4 h-4 text-muted-foreground" />
             </div>
             <div>
               <h2 className="font-semibold text-foreground">Bench</h2>
-              <p className="text-xs text-muted-foreground">Reserve players ({benchPlayers.length}/{maxBenchSize})</p>
+              <p className="text-xs text-muted-foreground">Reserves ({benchPlayers.length}/{config.benchSize})</p>
             </div>
           </div>
 
           <div className="space-y-2">
-            {sortedBench.map(player => (
+            {sortedBench.map((player) => (
               <PlayerCard
                 key={player.id}
                 player={player}
@@ -299,25 +300,20 @@ const TeamView = () => {
                 onMoveUp={canEdit && activePlayers.length < config.activeSize ? () => handleMoveToActive(player.id) : undefined}
 
                 onDrop={canEdit ? () => dropPlayerOnly(teamId!, player.id) : undefined}
+                onClick={() => setDetailPlayer(player)}
               />
             ))}
 
             {/* Empty bench slots */}
-            {Array.from({ length: maxBenchSize - benchPlayers.length }).map((_, index) => (
+            {Array.from({ length: Math.max(0, config.benchSize - benchPlayers.length) }).map((_, i) => (
               <div
-                key={`empty-bench-${index}`}
-                className="p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3"
+                key={`bench-empty-${i}`}
+                className="p-3 rounded-xl border border-dashed border-border bg-muted/10 flex items-center gap-3 opacity-60"
               >
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
                   👤
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Empty Bench Slot</p>
-                  <p className="text-xs text-muted-foreground/70">Any position</p>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  Reserve
-                </Badge>
+                <p className="text-xs font-medium text-muted-foreground">Empty Bench Slot</p>
               </div>
             ))}
           </div>

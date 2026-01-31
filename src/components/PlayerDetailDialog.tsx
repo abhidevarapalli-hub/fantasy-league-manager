@@ -6,6 +6,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -85,12 +86,35 @@ export function PlayerDetailDialog({
 }: PlayerDetailDialogProps) {
     // First, try to get extended player data from our database
     // This has the cricbuzz_id and image_id we need
-    const { data: extendedData, isLoading: isLoadingExtended } = useExtendedPlayer(player.id);
+    const { data: extendedData, isLoading: isLoadingExtended } = useExtendedPlayer(player?.id);
+
+    // Debug Log when component renders or props change
+    React.useEffect(() => {
+        if (open) {
+            console.log(`[TRACE] PlayerDetailDialog OPEN for: ${player.name} (ID: ${player.id})`);
+            console.log('[TRACE] TournamentPlayer prop:', tournamentPlayer);
+        }
+    }, [open, player, tournamentPlayer]);
+
+    React.useEffect(() => {
+        if (open && !isLoadingExtended) {
+            console.log('[TRACE] extendedData from DB:', extendedData);
+        }
+    }, [open, isLoadingExtended, extendedData]);
 
     // Get the Cricbuzz ID from either:
     // 1. tournamentPlayer prop (if provided)
     // 2. Extended player data from database
     const cricbuzzId = tournamentPlayer?.id || extendedData?.cricbuzzId || null;
+
+    if (!player) return null;
+
+    if (open && cricbuzzId) {
+        // This will trigger the usePlayerInfo hook
+        console.log(`[TRACE] Resolved Cricbuzz ID: ${cricbuzzId}. Triggers usePlayerInfo...`);
+    } else if (open && !isLoadingExtended && !cricbuzzId) {
+        console.warn(`[TRACE] ⚠️ Could not resolve Cricbuzz ID for ${player.name}. Hook will SKIP.`);
+    }
 
     const isNationalTeam = useMemo(() => {
         return player.team in TEAM_SHORT_TO_COUNTRY;
@@ -179,9 +203,17 @@ export function PlayerDetailDialog({
         return playerSchedule;
     }, [playerSchedule, matchStats]);
 
+
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden p-0 gap-0 border-none bg-background shadow-2xl flex flex-col">
+            <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none z-[100]">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 bg-[#0f1014] rounded-xl overflow-hidden">
+                    {/* Header Background Gradient */}
+                    <div className={cn("absolute inset-x-0 top-0 h-48 bg-gradient-to-b opacity-20", teamColors.bg)} />
+                </div>
+                <DialogDescription className="sr-only">Player details and statistics for {player.name}</DialogDescription>
                 {/* Header Section */}
                 <div
                     className={cn(

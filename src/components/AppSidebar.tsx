@@ -1,7 +1,8 @@
-import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Target } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Target, Shirt } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useGameStore } from '@/store/useGameStore';
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +15,6 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import { useParams } from 'react-router-dom';
 
 export function AppSidebar() {
   const { state, isMobile } = useSidebar();
@@ -22,14 +22,16 @@ export function AppSidebar() {
   const location = useLocation();
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const { leagueId } = useParams<{ leagueId: string }>();
-
-
+  const currentManagerId = useGameStore(state => state.currentManagerId);
 
   // On mobile, always show labels (no collapse mode)
   const showLabels = isMobile || !collapsed;
 
   const navItems = leagueId ? [
     { title: 'Home', url: `/${leagueId}`, icon: LayoutDashboard },
+    ...(currentManagerId ? [
+      { title: 'My Team', url: `/${leagueId}/team/${currentManagerId}`, icon: Shirt },
+    ] : []),
     { title: 'Rosters', url: `/${leagueId}/roster`, icon: Users },
     { title: 'Players', url: `/${leagueId}/players`, icon: UsersRound },
     { title: 'Trades', url: `/${leagueId}/trades`, icon: ArrowLeftRight },
@@ -43,10 +45,10 @@ export function AppSidebar() {
     { title: 'Leagues', url: '/leagues', icon: LayoutDashboard },
   ];
 
-
   const isActive = (path: string) => {
-    return location.pathname === path || (leagueId && path === `/${leagueId}` && location.pathname.startsWith(`/${leagueId}/team/`));
+    return location.pathname === path || (leagueId && path === `/${leagueId}` && location.pathname.startsWith(`/${leagueId}/team/`) && path !== `/${leagueId}/team/${currentManagerId}`);
   };
+
 
 
   return (

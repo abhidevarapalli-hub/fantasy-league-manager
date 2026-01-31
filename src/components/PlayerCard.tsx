@@ -1,47 +1,12 @@
 import { Plus, Minus, ArrowUp, ArrowDown, Plane, ArrowLeftRight, Repeat } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getPlayerAvatarUrl, getPlayerInitials } from "@/lib/player-utils";
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
 import { getTeamColors } from '@/lib/team-colors';
 
-// Cricket Bat Icon
-const CricketBatIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 20L8 16" />
-    <rect x="7" y="4" width="5" height="14" rx="1" transform="rotate(45 9.5 11)" />
-  </svg>
-);
 
-// Cricket Ball Icon
-const CricketBallIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 3C9 6 9 18 12 21" />
-    <path d="M12 3C15 6 15 18 12 21" />
-  </svg>
-);
-
-// Wicket Keeper Gloves Icon
-const GlovesIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 10V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1" />
-    <path d="M10 6V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
-    <path d="M14 6V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v6" />
-    <path d="M6 10a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V8" />
-    <path d="M6 10V8a2 2 0 0 1 2-2" />
-    <path d="M10 14v4a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2v-4" />
-  </svg>
-);
-
-// All Rounder Icon (bat + ball combined)
-const AllRounderIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="16" cy="8" r="5" />
-    <path d="M16 5v6" />
-    <path d="M4 20l4-4" />
-    <rect x="6" y="10" width="3" height="8" rx="0.5" transform="rotate(45 7.5 14)" />
-  </svg>
-);
 
 interface PlayerCardProps {
   player: Player;
@@ -66,20 +31,7 @@ const roleStyles: Record<string, string> = {
   'Wicket Keeper': 'bg-orange-500/20 text-orange-400',
 };
 
-const getRoleIcon = (role: string) => {
-  switch (role) {
-    case 'Batsman':
-      return <CricketBatIcon className="w-5 h-5" />;
-    case 'Bowler':
-      return <CricketBallIcon className="w-5 h-5" />;
-    case 'All Rounder':
-      return <AllRounderIcon className="w-5 h-5" />;
-    case 'Wicket Keeper':
-      return <GlovesIcon className="w-5 h-5" />;
-    default:
-      return <CricketBatIcon className="w-5 h-5" />;
-  }
-};
+
 
 export const PlayerCard = ({
   player,
@@ -127,12 +79,20 @@ export const PlayerCard = ({
       } : undefined}
     >
       {/* Role Icon */}
-      <div className={cn(
-        "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
-        roleStyles[player.role] || 'bg-muted text-muted-foreground'
-      )}>
-        {getRoleIcon(player.role)}
-      </div>
+      {/* Player Avatar */}
+      <Avatar className="w-10 h-10 border border-border">
+        <AvatarImage
+          src={getPlayerAvatarUrl(player.imageId)}
+          alt={player.name}
+          className="object-cover"
+        />
+        <AvatarFallback className={cn(
+          "font-semibold text-xs",
+          roleStyles[player.role] || 'bg-muted text-muted-foreground'
+        )}>
+          {getPlayerInitials(player.name)}
+        </AvatarFallback>
+      </Avatar>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">

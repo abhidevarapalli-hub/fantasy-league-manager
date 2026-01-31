@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { X, User, Plane } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getPlayerAvatarUrl, getPlayerInitials } from "@/lib/player-utils";
 import { useGameStore } from '@/store/useGameStore';
 import { useDraft } from '@/hooks/useDraft';
 import type { Manager, Player } from '@/lib/supabase-types';
@@ -49,7 +51,7 @@ const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, 
     <div
       onClick={manager && !readOnly ? onCellClick : undefined}
       className={cn(
-        "relative min-h-[80px] p-2 border rounded-lg transition-all",
+        "relative min-h-[80px] p-2 border rounded-lg transition-all overflow-hidden",
         !player && "bg-muted/50 border-border text-muted-foreground",
         manager && !readOnly ? "cursor-pointer hover:opacity-80" : "cursor-default",
         !manager && "opacity-50",
@@ -60,14 +62,19 @@ const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, 
         borderColor: colors.raw, // Same as bg for solid look
       } : {}}
     >
+      {/* Background Gradient for depth */}
+      {player && colors && (
+        <div className={cn("absolute inset-0 bg-gradient-to-br from-black/0 via-black/0 to-black/20 pointer-events-none")} />
+      )}
+
       {/* Pick number badge */}
-      <div className="absolute top-1 right-1 text-[10px] font-bold opacity-60">
+      <div className="absolute top-1 right-1 text-[10px] font-bold opacity-60 z-10">
         {pickNumber}
       </div>
 
       {/* International player icon */}
       {player?.isInternational && (
-        <div className="absolute bottom-1 right-1">
+        <div className="absolute bottom-1 right-1 z-10">
           <Plane className="w-3 h-3 opacity-80" />
         </div>
       )}
@@ -76,24 +83,36 @@ const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, 
       {player && !readOnly && (
         <button
           onClick={handleClearClick}
-          className="absolute top-1 left-1 p-0.5 rounded hover:bg-black/20 transition-colors"
+          className="absolute top-1 left-1 p-0.5 rounded hover:bg-black/20 transition-colors z-20"
         >
           <X className="w-3 h-3 opacity-60 hover:opacity-100" />
         </button>
       )}
 
       {player ? (
-        <div className="pt-3 flex flex-col items-center justify-center text-center">
+        <div className="pt-1 flex flex-col items-center justify-center text-center relative z-0">
+          {/* Avatar */}
+          <Avatar className="h-10 w-10 mb-1 border-2 border-white/20 shadow-sm">
+            <AvatarImage
+              src={getPlayerAvatarUrl(player.imageId, 'thumb')}
+              alt={player.name}
+              className="object-cover"
+            />
+            <AvatarFallback className="text-[10px] font-bold bg-black/20 text-white/80">
+              {getPlayerInitials(player.name)}
+            </AvatarFallback>
+          </Avatar>
+
           {/* First name */}
           <p className={cn(
-            "font-medium text-xs truncate leading-tight w-full",
+            "font-medium text-[10px] truncate leading-tight w-full opacity-90",
             colors?.text
           )}>
             {player.name.split(' ')[0]}
           </p>
           {/* Last name */}
           <p className={cn(
-            "font-bold text-sm truncate leading-tight w-full",
+            "font-bold text-xs truncate leading-tight w-full",
             colors?.text
           )}>
             {player.name.split(' ').slice(1).join(' ')}
