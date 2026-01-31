@@ -115,6 +115,17 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
     players: useMemo(() => players.filter(p => !draftedPlayerIds.includes(p.id)), [players, draftedPlayerIds])
   });
 
+  // Build a map of player ID -> manager team name
+  const playerToManagerMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    managers.forEach(manager => {
+      [...manager.activeRoster, ...manager.bench].forEach(playerId => {
+        map[playerId] = manager.teamName;
+      });
+    });
+    return map;
+  }, [managers]);
+
   return (
     <>
       <div
@@ -333,6 +344,7 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
                           isOwned={false}
                           showActions={false}
                           variant="compact"
+                          managerName={playerToManagerMap[player.id]}
                         />
                       </div>
                     ))}

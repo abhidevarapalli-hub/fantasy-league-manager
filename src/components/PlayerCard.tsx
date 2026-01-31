@@ -44,8 +44,9 @@ export const PlayerCard = ({
   onClick,
   isOwned = false,
   showActions = true,
-  variant = 'full'
-}: PlayerCardProps) => {
+  variant = 'full',
+  managerName
+}: PlayerCardProps & { managerName?: string }) => {
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger if clicking on action buttons
     if ((e.target as HTMLElement).closest('button')) {
@@ -59,14 +60,14 @@ export const PlayerCard = ({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 p-3 rounded-xl border transition-all",
+        "group flex items-center gap-3 p-3 rounded-xl border transition-all relative overflow-hidden",
         teamColors.bg === 'bg-muted' && "bg-card border-border hover:border-primary/30",
-        variant === 'compact' && "p-2",
-        onClick && "cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+        variant === 'compact' && "p-2 gap-2",
+        onClick && "cursor-pointer hover:scale-[1.01] active:scale-[0.99] hover:shadow-lg"
       )}
       style={teamColors.bg !== 'bg-muted' ? {
-        backgroundColor: teamColors.raw, // Now solid for the card background
-        borderColor: teamColors.raw,
+        backgroundColor: teamColors.raw,
+        borderColor: `${teamColors.raw}80`,
       } : {}}
       onClick={handleCardClick}
       role={onClick ? "button" : undefined}
@@ -78,124 +79,139 @@ export const PlayerCard = ({
         }
       } : undefined}
     >
-      {/* Role Icon */}
+      {/* Background grounding gradient for better text legibility */}
+      {teamColors.bg !== 'bg-muted' && (
+        <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/10 pointer-events-none" />
+      )}
+
       {/* Player Avatar */}
-      <Avatar className="w-10 h-10 border border-border">
+      <Avatar className={cn(
+        "w-10 h-10 border-2 shadow-sm shrink-0",
+        teamColors.text === 'text-white' ? "border-white/20" : "border-black/10"
+      )}>
         <AvatarImage
           src={getPlayerAvatarUrl(player.imageId)}
           alt={player.name}
           className="object-cover"
         />
         <AvatarFallback className={cn(
-          "font-semibold text-xs",
-          roleStyles[player.role] || 'bg-muted text-muted-foreground'
+          "font-bold text-xs bg-black/20",
+          teamColors.text
         )}>
           {getPlayerInitials(player.name)}
         </AvatarFallback>
       </Avatar>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
+      <div className="flex-1 min-w-0 z-10">
+        <div className="flex items-center gap-1.5 leading-tight">
           <p className={cn(
-            "font-semibold truncate",
-            variant === 'compact' && "text-sm",
+            "font-medium truncate",
+            variant === 'compact' ? "text-xs" : "text-sm md:text-base",
             teamColors.text
           )}>
             {player.name}
           </p>
           {player.isInternational && (
             <Plane className={cn(
-              "w-3.5 h-3.5 flex-shrink-0",
-              teamColors.text === 'text-white' ? 'text-white/80' : 'text-black/80'
+              "w-3 h-3 flex-shrink-0 opacity-70",
+              teamColors.text
             )} />
           )}
         </div>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-1.5 mt-0.5">
           <span
             className={cn(
-              "px-2 py-0.5 text-xs font-medium rounded-md border",
-              teamColors.text
+              "px-1.5 py-0.5 text-[9px] font-bold rounded border bg-black/40 backdrop-blur-sm shadow-sm",
+              teamColors.text === 'text-white' ? "text-white border-white/10" : "text-white border-black/10"
             )}
-            style={teamColors.bg !== 'bg-muted' ? {
-              backgroundColor: `${teamColors.raw}33`, // Now translucent for the pill
-              borderColor: `${teamColors.raw}4D`
-            } : {}}
           >
             {player.team}
           </span>
           <span className={cn(
-            "text-xs",
-            teamColors.text === 'text-white' ? 'text-white/70' : 'text-black/70'
+            "text-[10px] opacity-70",
+            teamColors.text
           )}>{player.role}</span>
         </div>
       </div>
 
-      {showActions && (
-        <div className="flex items-center gap-1">
-          {onTrade && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-secondary hover:text-secondary hover:bg-secondary/10"
-              onClick={onTrade}
-              title="Propose trade"
-            >
-              <Repeat className="w-4 h-4" />
-            </Button>
-          )}
-          {onSwap && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-secondary hover:bg-secondary/10"
-              onClick={onSwap}
-              title="Swap player"
-            >
-              <ArrowLeftRight className="w-4 h-4" />
-            </Button>
-          )}
-          {onMoveUp && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
-              onClick={onMoveUp}
-            >
-              <ArrowUp className="w-4 h-4" />
-            </Button>
-          )}
-          {onMoveDown && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
-              onClick={onMoveDown}
-            >
-              <ArrowDown className="w-4 h-4" />
-            </Button>
-          )}
-          {!isOwned && onAdd && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
-              onClick={onAdd}
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
-          )}
-          {isOwned && onDrop && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={onDrop}
-            >
-              <Minus className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      )}
+      {/* Ownership / Action Area */}
+      <div className="flex items-center gap-2 z-10">
+        {managerName && (
+          <div className={cn(
+            "px-2 py-0.5 text-[9px] md:text-[10px] font-bold rounded-lg shadow-lg border backdrop-blur-md uppercase tracking-tight",
+            "bg-indigo-600 border-indigo-400 text-white shrink-0"
+          )}>
+            {managerName}
+          </div>
+        )}
+
+        {showActions && (
+          <div className="flex items-center gap-1">
+            {onTrade && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white bg-secondary/20 hover:bg-secondary/40 border border-white/10"
+                onClick={onTrade}
+                title="Propose trade"
+              >
+                <Repeat className="w-4 h-4" />
+              </Button>
+            )}
+            {onSwap && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white bg-black/20 hover:bg-black/40 border border-white/10"
+                onClick={onSwap}
+                title="Swap player"
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+              </Button>
+            )}
+            {onMoveUp && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white bg-black/20 hover:bg-black/40 border border-white/10"
+                onClick={onMoveUp}
+              >
+                <ArrowUp className="w-4 h-4" />
+              </Button>
+            )}
+            {onMoveDown && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white bg-black/20 hover:bg-black/40 border border-white/10"
+                onClick={onMoveDown}
+              >
+                <ArrowDown className="w-4 h-4" />
+              </Button>
+            )}
+            {!isOwned && onAdd && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white bg-emerald-500/40 hover:bg-emerald-500/60 border border-emerald-400/30"
+                onClick={onAdd}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            )}
+            {isOwned && onDrop && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white bg-rose-500/40 hover:bg-rose-500/60 border border-rose-400/30"
+                onClick={onDrop}
+              >
+                <Minus className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

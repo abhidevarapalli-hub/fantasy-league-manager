@@ -19,6 +19,7 @@ import { usePlayerInfo, usePlayerSchedule, useExtendedPlayer, PlayerMatchPerform
 import { getPlayerAvatarUrl, getPlayerTeamForTournament, TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
+import { useGameStore } from '@/store/useGameStore';
 
 interface PlayerDetailDialogProps {
     open: boolean;
@@ -107,20 +108,19 @@ export function PlayerDetailDialog({
     // 2. Extended player data from database
     const cricbuzzId = tournamentPlayer?.id || extendedData?.cricbuzzId || null;
 
-    if (!player) return null;
-
     if (open && cricbuzzId) {
         // This will trigger the usePlayerInfo hook
         console.log(`[TRACE] Resolved Cricbuzz ID: ${cricbuzzId}. Triggers usePlayerInfo...`);
-    } else if (open && !isLoadingExtended && !cricbuzzId) {
+    } else if (open && !isLoadingExtended && !cricbuzzId && player) {
         console.warn(`[TRACE] ⚠️ Could not resolve Cricbuzz ID for ${player.name}. Hook will SKIP.`);
     }
 
     const isNationalTeam = useMemo(() => {
-        return player.team in TEAM_SHORT_TO_COUNTRY;
+        return player ? player.team in TEAM_SHORT_TO_COUNTRY : false;
     }, [player]);
 
     const effectiveSeriesId = useMemo(() => {
+        if (!player) return null;
         if (seriesId) return seriesId;
         if (isNationalTeam) {
             const intlTournament = SUPPORTED_TOURNAMENTS.find(t => t.type === 'international');
@@ -129,7 +129,7 @@ export function PlayerDetailDialog({
             const leagueTournament = SUPPORTED_TOURNAMENTS.find(t => t.type === 'league');
             return leagueTournament?.id || null;
         }
-    }, [seriesId, isNationalTeam]);
+    }, [seriesId, isNationalTeam, player]);
 
     const tournamentType = useMemo(() => {
         if (!effectiveSeriesId) return 'league';
@@ -138,6 +138,7 @@ export function PlayerDetailDialog({
     }, [effectiveSeriesId]);
 
     const playerTeamShort = useMemo(() => {
+        if (!player) return undefined;
         return getPlayerTeamForTournament(
             player.team,
             player.isInternational,
@@ -151,11 +152,18 @@ export function PlayerDetailDialog({
         playerTeamShort
     );
 
-    const teamColors = getTeamColors(player.team);
+    const teamColors = getTeamColors(player?.team || 'OTHER');
     const imageId = tournamentPlayer?.imageId || extendedData?.imageId;
+
+    const { managers } = useGameStore();
+    const owningManager = useMemo(() => {
+        if (!player) return null;
+        return managers.find(m => m.activeRoster.includes(player.id) || m.bench.includes(player.id));
+    }, [managers, player]);
 
     // Define Sections and Columns dynamically based on Role
     const sections = useMemo(() => {
+        if (!player) return [];
         const isWK = player.role === 'Wicket Keeper';
 
         // Define column widths (matches tailwind classes logic)
@@ -195,7 +203,7 @@ export function PlayerDetailDialog({
 
         // Default (Batsman, Wicket Keeper)
         return [battingSection, fieldingSection, bowlingSection];
-    }, [player.role]);
+    }, [player?.role]);
 
     // Combine match stats and schedule
     const unifiedMatches = useMemo(() => {
@@ -203,7 +211,7 @@ export function PlayerDetailDialog({
         return playerSchedule;
     }, [playerSchedule, matchStats]);
 
-
+    if (!player) return null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -217,44 +225,96 @@ export function PlayerDetailDialog({
                 {/* Header Section */}
                 <div
                     className={cn(
-                        "relative p-6 flex-shrink-0 flex flex-col items-center justify-center text-center transition-colors duration-500",
+                        "relative flex flex-row items-stretch h-[200px] md:h-[260px] transition-colors duration-500 overflow-hidden",
                         teamColors.bg === 'bg-muted' ? "bg-muted/30" : ""
                     )}
                     style={teamColors.bg !== 'bg-muted' ? {
                         backgroundColor: teamColors.raw,
                     } : {}}
                 >
-                    {/* Close button is handled by DialogContent default */}
+                    {/* Player Image - Fixed Width, No Crop */}
+                    <div className="relative w-36 md:w-48 flex-shrink-0 flex items-end justify-center overflow-hidden bg-black/10 border-r border-white/5">
+                        {/* Shaded background for depth */}
+                        <div className="absolute inset-0 bg-black/10 z-10" />
+                        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/40 to-transparent z-20" />
 
-                    {/* Avatar and Info */}
-                    <div className="relative mb-6">
-                        <Avatar className="h-20 w-20 md:h-24 md:w-24 border-4 border-white/20 shadow-xl">
-                            <AvatarImage
-                                src={getPlayerAvatarUrl(imageId, 'de')}
-                                alt={player.name}
-                                className="object-cover"
-                            />
-                            <AvatarFallback className="text-xl font-bold bg-muted/20 text-foreground/50">
-                                {player.name.charAt(0)}
-                            </AvatarFallback>
-                        </Avatar>
-                        <Badge
-                            className={cn(
-                                "absolute -bottom-3 left-1/2 -translate-x-1/2 uppercase text-[10px] tracking-wider border-white/20 shadow-sm pointer-events-none whitespace-nowrap z-10",
-                                teamColors.text
-                            )}
-                            variant="secondary"
-                        >
-                            {player.role}
-                        </Badge>
+                        <img
+                            src={getPlayerAvatarUrl(imageId, 'det')}
+                            alt={player.name}
+                            className="relative z-30 h-full w-full object-contain object-bottom drop-shadow-[0_8px_16px_rgba(0,0,0,0.4)]"
+                        />
                     </div>
 
-                    <DialogTitle className={cn("text-xl md:text-2xl font-bold mb-1", teamColors.text)}>
-                        {player.name}
-                    </DialogTitle>
+                    {/* Info and Metadata Grid */}
+                    <div className="flex-1 p-5 md:p-8 flex flex-col justify-center relative bg-gradient-to-l from-black/40 via-black/10 to-transparent">
+                        <div className="mb-4">
+                            <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
+                                <DialogTitle className={cn("text-2xl md:text-3xl md:text-4xl font-semibold drop-shadow-sm", teamColors.text)}>
+                                    {player.name}
+                                </DialogTitle>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge
+                                        className={cn(
+                                            "text-[10px] px-2 py-0.5 font-medium shadow-md pointer-events-none whitespace-nowrap bg-zinc-900/60 backdrop-blur-md border border-white/10 text-white",
+                                        )}
+                                        variant="secondary"
+                                    >
+                                        {player.role}
+                                    </Badge>
+                                    {owningManager && (
+                                        <Badge
+                                            className={cn(
+                                                "uppercase text-[9px] md:text-[10px] px-2 py-0.5 tracking-wider font-semibold shadow-lg pointer-events-none whitespace-nowrap bg-indigo-600 backdrop-blur-md border border-indigo-400/50 text-white",
+                                            )}
+                                            variant="secondary"
+                                        >
+                                            {owningManager.teamName}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
 
-                    <div className={cn("text-xs md:text-sm font-medium opacity-80", teamColors.text)}>
-                        {player.team}
+                            <div className={cn("text-xs md:text-sm font-bold uppercase tracking-[0.2em] opacity-80 flex items-center gap-2", teamColors.text)}>
+                                <span>{player.team}</span>
+                                {player.isInternational && (
+                                    <>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40" />
+                                        <span className="flex items-center gap-1.5">
+                                            <Plane className="w-4 h-4" />
+                                            INTL
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Metadata Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 border-t border-white/10 pt-4">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Born</span>
+                                <span className="text-xs md:text-sm font-semibold text-white truncate">
+                                    {(player as any).dateOfBirth || (extendedData as any)?.dob || 'N/A'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Batting</span>
+                                <span className="text-xs md:text-sm font-semibold text-white">
+                                    {(player as any).battingStyle || (extendedData as any)?.battingStyle || 'N/A'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Bowling</span>
+                                <span className="text-xs md:text-sm font-semibold text-white">
+                                    {(player as any).bowlingStyle || (extendedData as any)?.bowlingStyle || 'N/A'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Height</span>
+                                <span className="text-xs md:text-sm font-semibold text-white">
+                                    {(player as any).height || (extendedData as any)?.height || 'N/A'}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -269,7 +329,7 @@ export function PlayerDetailDialog({
 
                     <ScrollArea className="flex-1 w-full">
                         <div className="p-0">
-                            <div className="min-w-max">
+                            <div className="min-w-[700px] md:min-w-full">
                                 {/* Unified Grid Table */}
                                 <div className="grid text-xs text-center border-b border-border/50">
                                     {/* Header Row 1 - Groups */}

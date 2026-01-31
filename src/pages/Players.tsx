@@ -249,28 +249,16 @@ const Players = () => {
             const canTrade = rosteredBy && !isOwnPlayer && !!currentUserManagerId;
 
             return (
-              <div key={player.id}>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <PlayerCard
-                      player={player}
-                      isOwned={false}
-                      showActions={(!rosteredBy && (isLeagueManager || !!currentUserManagerId)) || canTrade}
-                      onAdd={!rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
-                      onTrade={canTrade ? () => handleTradePlayer(player.id) : undefined}
-                      onClick={() => handlePlayerClick(player)}
-                    />
-                  </div>
-                  {rosteredBy && (
-                    <Badge
-                      variant="outline"
-                      className="bg-muted/80 text-muted-foreground border-border text-[10px] flex-shrink-0"
-                    >
-                      {rosteredBy}
-                    </Badge>
-                  )}
-                </div>
-              </div>
+              <PlayerCard
+                key={player.id}
+                player={player}
+                isOwned={false}
+                showActions={(!rosteredBy && (isLeagueManager || !!currentUserManagerId)) || canTrade}
+                onAdd={!rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
+                onTrade={canTrade ? () => handleTradePlayer(player.id) : undefined}
+                onClick={() => handlePlayerClick(player)}
+                managerName={rosteredBy}
+              />
             );
           })}
 
