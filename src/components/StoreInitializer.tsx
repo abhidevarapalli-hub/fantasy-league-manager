@@ -37,7 +37,6 @@ export function StoreInitializer() {
 
     // Fetch game data
     const fetchAllData = useGameStore(state => state.fetchAllData);
-    const subscribeToRealtime = useGameStore(state => state.subscribeToRealtime);
     const initializedLeagueId = useGameStore(state => state.initializedLeagueId);
 
     useEffect(() => {
@@ -46,19 +45,6 @@ export function StoreInitializer() {
             fetchAllData(leagueId);
         }
     }, [leagueId, initializedLeagueId, fetchAllData]);
-
-    // Set up real-time subscription
-    useEffect(() => {
-        if (!leagueId) return;
-
-        console.log(`[StoreInitializer] 🔌 Setting up real-time subscription for league: ${leagueId}`);
-        const unsubscribe = subscribeToRealtime(leagueId);
-
-        return () => {
-            console.log(`[StoreInitializer] 🔌 Cleaning up real-time subscription for league: ${leagueId}`);
-            unsubscribe();
-        };
-    }, [leagueId, subscribeToRealtime]);
 
     return null; // This component doesn't render anything
 }

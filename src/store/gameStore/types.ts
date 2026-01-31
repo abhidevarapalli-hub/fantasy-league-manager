@@ -1,7 +1,6 @@
 import { Player, Manager, Match, Activity } from '@/lib/supabase-types';
 import { LeagueConfig } from '@/lib/roster-validation';
 import { ScoringRules } from '@/lib/scoring-types';
-import { DraftPick, DraftOrder, DraftState } from '@/lib/draft-types';
 
 export interface RosterMoveResult {
   success: boolean;
@@ -26,15 +25,11 @@ export interface GameState {
   tournamentId: number | null;
   currentWeek: number;
   currentManagerId: string;
-  draftPicks: DraftPick[];
-  draftOrder: DraftOrder[];
-  draftState: DraftState | null;
   loading: boolean;
   currentLeagueId: string | null;
   isInitializing: boolean;
   initializedLeagueId: string | null;
   isDraftInitialized: boolean;
-  initializedDraftLeagueId: string | null;
   isTradesInitialized: boolean;
   isLeaguesInitialized: boolean;
 
@@ -50,14 +45,10 @@ export interface GameState {
   setTournamentId: (id: number | null) => void;
   setLoading: (loading: boolean) => void;
   setCurrentManagerId: (id: string) => void;
-  setDraftPicks: (picks: DraftPick[]) => void;
-  setDraftOrder: (order: DraftOrder[]) => void;
-  setDraftState: (state: DraftState | null) => void;
   setCurrentLeagueId: (id: string | null) => void;
   setIsInitializing: (isInitializing: boolean) => void;
   setInitializedLeagueId: (id: string | null) => void;
   setIsDraftInitialized: (isDraftInitialized: boolean) => void;
-  setInitializedDraftLeagueId: (id: string | null) => void;
   setIsTradesInitialized: (isTradesInitialized: boolean) => void;
   setIsLeaguesInitialized: (isLeaguesInitialized: boolean) => void;
 

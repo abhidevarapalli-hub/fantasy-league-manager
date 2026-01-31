@@ -1,6 +1,5 @@
 import { Tables } from '@/integrations/supabase/types';
 import { Player, Manager, Match, Activity, PlayerTransaction } from '@/lib/supabase-types';
-import { DraftPick, DraftOrder, DraftState, DbDraftPick, DbDraftOrder, DbDraftState } from '@/lib/draft-types';
 
 export const mapDbPlayer = (db: Tables<"players">): Player => ({
   id: db.id,
@@ -40,34 +39,4 @@ export const mapDbTransaction = (db: Tables<"transactions">): Activity => ({
   description: db.description,
   players: (db.players as unknown as PlayerTransaction[] | null) || undefined,
   managerTeamName: db.manager_team_name || undefined,
-});
-
-export const mapDbDraftPick = (db: any): DraftPick => ({
-  id: db.id,
-  leagueId: db.league_id,
-  round: db.round,
-  pickPosition: db.pick_position,
-  managerId: db.manager_id,
-  playerId: db.player_id,
-  isAutoDraft: db.is_auto_draft,
-  createdAt: new Date(db.created_at),
-  updatedAt: new Date(db.updated_at),
-});
-
-export const mapDbDraftOrder = (db: any): DraftOrder => ({
-  id: db.id,
-  leagueId: db.league_id,
-  position: db.position,
-  managerId: db.manager_id,
-  autoDraftEnabled: db.auto_draft_enabled,
-});
-
-export const mapDbDraftState = (db: any): DraftState => ({
-  id: db.id,
-  leagueId: db.league_id,
-  isFinalized: db.is_finalized,
-  finalizedAt: db.finalized_at ? new Date(db.finalized_at) : null,
-  isActive: db.is_active,
-  currentPickStartAt: db.current_pick_start_at ? new Date(db.current_pick_start_at) : null,
-  pausedAt: db.paused_at ? new Date(db.paused_at) : null,
 });
