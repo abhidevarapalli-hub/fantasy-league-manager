@@ -7,7 +7,15 @@ import { DEFAULT_LEAGUE_CONFIG, canAddToActive } from '@/lib/roster-validation';
 import { DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
 import { toast } from 'sonner';
 import { GameState } from './gameStore/types';
-import { mapDbPlayer, mapDbManager, mapDbSchedule, mapDbTransaction } from './gameStore/mappers';
+import {
+  mapDbPlayer,
+  mapDbManager,
+  mapDbSchedule,
+  mapDbTransaction,
+  mapDbDraftPick,
+  mapDbDraftOrder,
+  mapDbDraftState
+} from './gameStore/mappers';
 
 export const useGameStore = create<GameState>()(
   devtools(
@@ -24,11 +32,15 @@ export const useGameStore = create<GameState>()(
       tournamentId: null,
       currentWeek: 1,
       currentManagerId: '',
+      draftPicks: [],
+      draftOrder: [],
+      draftState: null,
       loading: true,
       currentLeagueId: null,
       isInitializing: false,
       initializedLeagueId: null,
       isDraftInitialized: false,
+      initializedDraftLeagueId: null,
       isTradesInitialized: false,
       isLeaguesInitialized: false,
 
@@ -44,10 +56,14 @@ export const useGameStore = create<GameState>()(
       setTournamentId: (tournamentId) => set({ tournamentId }),
       setLoading: (loading) => set({ loading }),
       setCurrentManagerId: (currentManagerId) => set({ currentManagerId }),
+      setDraftPicks: (draftPicks) => set({ draftPicks }),
+      setDraftOrder: (draftOrder) => set({ draftOrder }),
+      setDraftState: (draftState) => set({ draftState }),
       setCurrentLeagueId: (currentLeagueId) => set({ currentLeagueId }),
       setIsInitializing: (isInitializing) => set({ isInitializing }),
       setInitializedLeagueId: (initializedLeagueId) => set({ initializedLeagueId }),
       setIsDraftInitialized: (isDraftInitialized) => set({ isDraftInitialized }),
+      setInitializedDraftLeagueId: (id) => set({ initializedDraftLeagueId: id }),
       setIsTradesInitialized: (isTradesInitialized) => set({ isTradesInitialized }),
       setIsLeaguesInitialized: (isLeaguesInitialized) => set({ isLeaguesInitialized }),
 
@@ -155,7 +171,7 @@ export const useGameStore = create<GameState>()(
           manager_id: managerId,
           manager_team_name: manager.teamName,
           description,
-          players: playerTransactions as unknown as Record<string, unknown>[],
+          players: playerTransactions as any,
           league_id: currentLeagueId,
         });
 
@@ -182,7 +198,7 @@ export const useGameStore = create<GameState>()(
           manager_id: managerId,
           manager_team_name: manager.teamName,
           description: `${manager.teamName} dropped ${player.name}`,
-          players: [{ type: "drop", playerName: player.name, role: player.role, team: player.team }] as unknown as Record<string, unknown>[],
+          players: [{ type: "drop", playerName: player.name, role: player.role, team: player.team }] as any,
           league_id: currentLeagueId,
         });
 
@@ -278,7 +294,7 @@ export const useGameStore = create<GameState>()(
           }
         }
 
-        await (supabase.rpc as (name: string, params: Record<string, unknown>) => Promise<unknown>)('update_league_standings', { league_uuid: currentLeagueId });
+        await supabase.rpc('update_league_standings', { league_uuid: currentLeagueId });
         await supabase.from("transactions").insert({
           type: "score" as const,
           manager_id: null,
@@ -518,12 +534,15 @@ export const useGameStore = create<GameState>()(
           const parallelFetchStart = performance.now();
           // console.log(`[useGameStore] 🔄 Starting parallel fetch of players, managers, schedule, transactions...`);
 
-          const [playersRes, managersRes, scheduleRes, transactionsRes] = await Promise.all([
+          const [playersRes, managersRes, scheduleRes, transactionsRes, draftPicksRes, draftOrderRes, draftStateRes] = await Promise.all([
             // @ts-ignore - extended_players relationship is not fully typed in generated types yet
             supabase.from("players").select("*, extended_players(image_id)").eq("league_id", leagueId).order("name"),
             supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
             supabase.from("schedule" as 'schedule').select("*").eq("league_id", leagueId).order("week").order("created_at"),
             supabase.from("transactions" as 'transactions').select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
+            supabase.from("draft_picks").select("*").eq("league_id", leagueId).order("round").order("pick_position"),
+            supabase.from("draft_order").select("*").eq("league_id", leagueId).order("position"),
+            supabase.from("draft_state").select("*").eq("league_id", leagueId).maybeSingle(),
           ]);
 
           const parallelFetchDuration = performance.now() - parallelFetchStart;
@@ -534,6 +553,11 @@ export const useGameStore = create<GameState>()(
           const managers = (managersRes.data as Tables<"managers">[] | null)?.map(mapDbManager) || [];
           const schedule = (scheduleRes.data as Tables<"schedule">[] | null)?.map(mapDbSchedule) || [];
           const activities = (transactionsRes.data as Tables<"transactions">[] | null)?.map(mapDbTransaction) || [];
+
+          const draftPicks = (draftPicksRes.data || []).map(mapDbDraftPick);
+          const draftOrder = (draftOrderRes.data || []).map(mapDbDraftOrder);
+          const draftState = draftStateRes.data ? mapDbDraftState(draftStateRes.data) : null;
+
           const mappingDuration = performance.now() - mappingStart;
 
           // console.log(`[useGameStore] 🗂️  Data mapping completed in ${mappingDuration.toFixed(2)}ms`);
@@ -544,6 +568,9 @@ export const useGameStore = create<GameState>()(
             managers,
             schedule,
             activities,
+            draftPicks,
+            draftOrder,
+            draftState,
           });
 
           const totalFetchDuration = performance.now() - fetchStartTime;
@@ -601,6 +628,37 @@ export const useGameStore = create<GameState>()(
             }
             else if (payload.eventType === "UPDATE") get().updateActivity(payload.new.id, mapDbTransaction(payload.new as Tables<"transactions">));
             else if (payload.eventType === "DELETE") get().removeActivity(payload.old.id);
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "draft_picks", filter }, (payload) => {
+            if (payload.eventType === "INSERT") {
+              const existing = get().draftPicks.find(p => p.id === payload.new.id);
+              if (!existing) set({ draftPicks: [...get().draftPicks, mapDbDraftPick(payload.new)] });
+            }
+            else if (payload.eventType === "UPDATE") {
+              set({ draftPicks: get().draftPicks.map(p => p.id === payload.new.id ? mapDbDraftPick(payload.new) : p) });
+            }
+            else if (payload.eventType === "DELETE") {
+              set({ draftPicks: get().draftPicks.filter(p => p.id !== payload.old.id) });
+            }
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "draft_order", filter }, (payload) => {
+            if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+              const mapped = mapDbDraftOrder(payload.new);
+              const exists = get().draftOrder.find(o => o.id === payload.new.id);
+              if (exists) {
+                set({ draftOrder: get().draftOrder.map(o => o.id === payload.new.id ? mapped : o) });
+              } else {
+                set({ draftOrder: [...get().draftOrder, mapped].sort((a, b) => a.position - b.position) });
+              }
+            }
+            else if (payload.eventType === "DELETE") {
+              set({ draftOrder: get().draftOrder.filter(o => o.id !== payload.old.id) });
+            }
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "draft_state", filter }, (payload) => {
+            if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+              set({ draftState: mapDbDraftState(payload.new) });
+            }
           })
           .subscribe();
 

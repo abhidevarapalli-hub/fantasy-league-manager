@@ -376,6 +376,12 @@ const TeamView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <PlayerDetailDialog
+        player={detailPlayer as any}
+        open={!!detailPlayer}
+        onOpenChange={(open) => !open && setDetailPlayer(null)}
+      />
     </AppLayout>
   );
 };

@@ -51,12 +51,12 @@ export const PlayerMapping = () => {
 
     const loadMappings = async () => {
       const { data: extendedPlayers } = await supabase
-        .from('extended_players' as any)
+        .from('extended_players')
         .select('player_id, cricbuzz_id');
 
       const mappingMap = new Map<string, string>();
       if (extendedPlayers) {
-        for (const ep of extendedPlayers) {
+        for (const ep of (extendedPlayers as any[])) {
           mappingMap.set(ep.player_id, ep.cricbuzz_id);
         }
       }

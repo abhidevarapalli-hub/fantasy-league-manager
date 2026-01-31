@@ -45,7 +45,10 @@ const AuthInitializer = () => {
   return null;
 };
 
-const AppRoutes = () => {
+// Helper for protected routes
+// - Must be logged in
+// - Must have claimed a profile (unless we are on the login page which handles claiming)
+const ProtectedRoute = ({ children, requireUsername = true }: { children: React.ReactNode; requireUsername?: boolean }) => {
   const user = useAuthStore(state => state.user);
   const userProfile = useAuthStore(state => state.userProfile);
   const isLoading = useAuthStore(state => state.isLoading);
@@ -54,50 +57,47 @@ const AppRoutes = () => {
     return <div className="min-h-screen flex items-center justify-center p-4">Loading...</div>;
   }
 
-  // Helper for protected routes
-  // - Must be logged in
-  // - Must have claimed a profile (unless we are on the login page which handles claiming)
-  const ProtectedRoute = ({ children, requireUsername = true }: { children: React.ReactNode; requireUsername?: boolean }) => {
-    if (!user) {
-
-      // Save the intended destination for join links
-      if (window.location.pathname.startsWith('/join/')) {
-        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
-      }
-
-      return <Navigate to="/login" replace />;
+  if (!user) {
+    // Save the intended destination for join links
+    if (window.location.pathname.startsWith('/join/')) {
+      sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
     }
+    return <Navigate to="/login" replace />;
+  }
 
-    // Wait for userProfile to load before checking username
-    // This prevents false redirects when profile is still loading
-    if (userProfile === null) {
-      return <div className="min-h-screen flex items-center justify-center p-4">Loading profile...</div>;
+  // Wait for userProfile to load before checking username
+  // This prevents false redirects when profile is still loading
+  if (userProfile === null) {
+    return <div className="min-h-screen flex items-center justify-center p-4">Loading profile...</div>;
+  }
+
+  // Only enforce username for routes that require it
+  if (requireUsername && !userProfile?.username && window.location.pathname !== '/leagues/setup') {
+    // Save the intended destination for join links
+    if (window.location.pathname.startsWith('/join/')) {
+      sessionStorage.setItem('redirectAfterSetup', window.location.pathname);
     }
+    return <Navigate to="/leagues/setup" replace />;
+  }
 
-    // Only enforce username for routes that require it
-    if (requireUsername && !userProfile?.username && window.location.pathname !== '/leagues/setup') {
+  return <>{children}</>;
+};
 
-      // Save the intended destination for join links
-      if (window.location.pathname.startsWith('/join/')) {
-        sessionStorage.setItem('redirectAfterSetup', window.location.pathname);
-      }
+const LeagueLayout = () => {
+  return (
+    <>
+      <StoreInitializer />
+      <Outlet />
+    </>
+  );
+};
 
-      return <Navigate to="/leagues/setup" replace />;
-    }
+const AppRoutes = () => {
+  const isLoading = useAuthStore(state => state.isLoading);
 
-    return <>{children}</>;
-  };
-
-
-  const LeagueLayout = () => {
-    return (
-      <>
-        <StoreInitializer />
-        <Outlet />
-      </>
-    );
-  };
-
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center p-4">Loading...</div>;
+  }
 
   return (
     <Routes>
@@ -106,7 +106,6 @@ const AppRoutes = () => {
         <ProtectedRoute><ProfileSetup /></ProtectedRoute>
       } />
       <Route path="/leagues" element={
-
         <ProtectedRoute><Leagues /></ProtectedRoute>
       } />
       <Route path="/leagues/create" element={
@@ -119,7 +118,6 @@ const AppRoutes = () => {
         <ProtectedRoute requireUsername={false}><LiveScores /></ProtectedRoute>
       } />
       <Route path="/test/points-calculator" element={<PointsCalculatorTest />} />
-
 
       <Route element={<ProtectedRoute><LeagueLayout /></ProtectedRoute>}>
         <Route path="/:leagueId" element={<Dashboard />} />
@@ -138,7 +136,6 @@ const AppRoutes = () => {
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
-
 };
 
 const App = () => (
