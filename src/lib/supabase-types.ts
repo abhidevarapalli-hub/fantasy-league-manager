@@ -17,6 +17,7 @@ export interface DbManager {
   points: number;
   roster: string[];
   bench: string[];
+  user_id: string | null;
   created_at: string;
 }
 
@@ -68,6 +69,7 @@ export interface Manager {
   points: number;
   activeRoster: string[];
   bench: string[];
+  userId?: string | null;
 }
 
 export interface Match {
@@ -106,6 +108,7 @@ export const mapDbManager = (db: DbManager): Manager => ({
   wins: db.wins,
   losses: db.losses,
   points: db.points,
+  userId: db.user_id,
   activeRoster: db.roster || [],
   bench: db.bench || [],
 });

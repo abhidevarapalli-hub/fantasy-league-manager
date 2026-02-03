@@ -10,7 +10,7 @@ import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Player } from '@/lib/supabase-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RosterGrid } from '@/components/RosterGrid';
-
+import { getActiveRosterSlots } from '@/lib/roster-validation';
 import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
 import { getTeamFilterColors, getTeamPillStyles } from '@/lib/team-colors';
 
@@ -32,8 +32,6 @@ const roleAbbreviations: Record<string, string> = {
   'All': 'All',
 };
 
-// Role and nationality filter colors are now defined in constants above
-
 interface AvailablePlayersDrawerProps {
   draftedPlayerIds: string[];
   onSelectPlayer?: (playerId: string) => void;
@@ -42,6 +40,7 @@ interface AvailablePlayersDrawerProps {
 export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: AvailablePlayersDrawerProps) => {
   const players = useGameStore(state => state.players);
   const managers = useGameStore(state => state.managers);
+  const draftPicks = useGameStore(state => state.draftPicks);
   const config = useGameStore(state => state.config);
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -125,6 +124,42 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
     });
     return map;
   }, [managers]);
+
+  // Compute live rosters based on draft picks
+  const displayManagers = useMemo(() => {
+    // If no draft picks yet, just return original managers (or empty rosters if new draft)
+    if (draftPicks.length === 0) return managers;
+
+    return managers.map(manager => {
+      const managerPicks = draftPicks.filter(p => p.managerId === manager.id);
+
+      // Map picks to player objects
+      const pickedPlayers = managerPicks
+        .map(p => players.find(player => player.id === p.playerId))
+        .filter((p): p is Player => p !== undefined);
+
+      // Distribute into Active and Bench using the validation logic
+      // getActiveRosterSlots returns the optimal active lineup
+      const activeSlots = getActiveRosterSlots(pickedPlayers, config);
+
+      const activePlayerIds = activeSlots
+        .map(slot => slot.player?.id)
+        .filter((id): id is string => id !== undefined);
+
+      const activePlayerIdsSet = new Set(activePlayerIds);
+
+      // Remaining players go to bench
+      const benchPlayerIds = pickedPlayers
+        .filter(p => !activePlayerIdsSet.has(p.id))
+        .map(p => p.id);
+
+      return {
+        ...manager,
+        activeRoster: activePlayerIds,
+        bench: benchPlayerIds
+      };
+    });
+  }, [managers, draftPicks, players, config]);
 
   return (
     <>
@@ -317,7 +352,6 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
               </div>
 
               {/* Player List */}
-              {/* Player List */}
               <div className="flex-1 overflow-y-auto p-4 pb-20">
                 {filteredPlayers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm">
@@ -355,7 +389,7 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
 
             <TabsContent value="rosters" className="flex-1 overflow-y-auto w-full data-[state=active]:block mt-0 pb-[env(safe-area-inset-bottom)] p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
-                {managers.map(manager => (
+                {displayManagers.map(manager => (
                   <div key={manager.id} className="min-h-[400px] space-y-2 flex flex-col bg-card/30 rounded-xl border border-border/50 p-2">
                     <div className="flex justify-between items-center py-1 border-b px-1">
                       <h3 className="font-bold text-sm truncate max-w-[70%]">{manager.teamName}</h3>
