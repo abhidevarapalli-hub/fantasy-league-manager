@@ -28,7 +28,6 @@ dist-ssr
 .env.local
 .env.*.local
 supabase/.temp/*
-.env
 
 # Claude
 .claude/*
