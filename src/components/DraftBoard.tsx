@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, User, Plane, Timer, Pause, Play, RefreshCw, Shuffle, Bot, CheckCircle, AlertCircle } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getPlayerAvatarUrl, getPlayerInitials } from "@/lib/player-utils";
+import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { useGameStore } from '@/store/useGameStore';
 import { useDraft } from '@/hooks/useDraft';
 import type { Manager, Player } from '@/lib/supabase-types';
@@ -94,17 +93,13 @@ const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, 
 
       {player ? (
         <div className="pt-1 flex flex-col items-center justify-center text-center relative z-0">
-          {/* Avatar */}
-          <Avatar className="h-10 w-10 mb-1 border-2 border-white/20 shadow-sm">
-            <AvatarImage
-              src={getPlayerAvatarUrl(player.imageId, 'thumb')}
-              alt={player.name}
-              className="object-cover"
-            />
-            <AvatarFallback className="text-[10px] font-bold bg-black/20 text-white/80">
-              {getPlayerInitials(player.name)}
-            </AvatarFallback>
-          </Avatar>
+          {/* Avatar - Lazy loaded */}
+          <LazyPlayerAvatar
+            name={player.name}
+            imageId={player.imageId}
+            className="h-10 w-10 mb-1 border-2 border-white/20 shadow-sm"
+            fallbackClassName="text-[10px] font-bold bg-black/20 text-white/80"
+          />
 
           {/* First name */}
           <p className={cn(

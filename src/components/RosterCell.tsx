@@ -2,8 +2,7 @@ import { Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { getTeamColors } from '@/lib/team-colors';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getPlayerAvatarUrl, getPlayerInitials } from "@/lib/player-utils";
+import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { SlotRequirement } from '@/lib/roster-validation';
 
 // Role to abbreviation mapping
@@ -69,17 +68,13 @@ export const RosterCell = ({ slot, isBench, onClick }: RosterCellProps) => {
 
             {player ? (
                 <div className="pt-1 flex flex-col items-center justify-center text-center relative z-0">
-                    {/* Avatar */}
-                    <Avatar className="h-10 w-10 mb-1 border-2 border-white/20 shadow-sm">
-                        <AvatarImage
-                            src={getPlayerAvatarUrl(player.imageId, 'thumb')}
-                            alt={player.name}
-                            className="object-cover"
-                        />
-                        <AvatarFallback className="text-[10px] font-bold bg-black/20 text-white/80">
-                            {getPlayerInitials(player.name)}
-                        </AvatarFallback>
-                    </Avatar>
+                    {/* Avatar - Lazy loaded */}
+                    <LazyPlayerAvatar
+                        name={player.name}
+                        imageId={player.imageId}
+                        className="h-10 w-10 mb-1 border-2 border-white/20 shadow-sm"
+                        fallbackClassName="text-[10px] font-bold bg-black/20 text-white/80"
+                    />
 
                     <p className={cn(
                         "font-medium text-[10px] truncate leading-tight w-full opacity-90",

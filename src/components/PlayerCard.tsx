@@ -1,6 +1,5 @@
 import { Plus, Minus, ArrowUp, ArrowDown, Plane, ArrowLeftRight, Repeat } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getPlayerAvatarUrl, getPlayerInitials } from "@/lib/player-utils";
+import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
@@ -84,23 +83,16 @@ export const PlayerCard = ({
         <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/10 pointer-events-none" />
       )}
 
-      {/* Player Avatar */}
-      <Avatar className={cn(
-        "w-10 h-10 border-2 shadow-sm shrink-0",
-        teamColors.text === 'text-white' ? "border-white/20" : "border-black/10"
-      )}>
-        <AvatarImage
-          src={getPlayerAvatarUrl(player.imageId)}
-          alt={player.name}
-          className="object-cover"
-        />
-        <AvatarFallback className={cn(
-          "font-bold text-xs bg-black/20",
-          teamColors.text
-        )}>
-          {getPlayerInitials(player.name)}
-        </AvatarFallback>
-      </Avatar>
+      {/* Player Avatar - Lazy loaded with initials fallback */}
+      <LazyPlayerAvatar
+        name={player.name}
+        imageId={player.imageId}
+        className={cn(
+          "w-10 h-10 border-2 shadow-sm shrink-0",
+          teamColors.text === 'text-white' ? "border-white/20" : "border-black/10"
+        )}
+        fallbackClassName={cn("bg-black/20", teamColors.text)}
+      />
 
       <div className="flex-1 min-w-0 z-10">
         <div className="flex items-center gap-1.5 leading-tight">
