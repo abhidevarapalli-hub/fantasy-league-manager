@@ -58,6 +58,7 @@ Key characteristics:
 - Always check the browser console for errors
 - Verify frontend changes on the browser
 - Use strict typing whenever possible
+- Use the playwright MCP when asked to verify changes in the browser
  
 ## Don't Change
  

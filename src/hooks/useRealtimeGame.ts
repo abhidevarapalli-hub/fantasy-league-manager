@@ -37,6 +37,7 @@ const mapDbPlayer = (db: Tables<"league_players">): Player => ({
   imageId: db.image_id ?? undefined,
 });
 
+// Rosters are now stored in manager_roster junction table
 const mapDbManager = (db: Tables<"managers">): Manager => ({
   id: db.id,
   name: db.name,
@@ -44,8 +45,8 @@ const mapDbManager = (db: Tables<"managers">): Manager => ({
   wins: db.wins,
   losses: db.losses,
   points: db.points,
-  activeRoster: db.roster || [],
-  bench: db.bench || [],
+  activeRoster: [],
+  bench: [],
 });
 
 const mapDbSchedule = (db: Tables<"schedule">): Match => ({

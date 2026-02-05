@@ -124,8 +124,6 @@ const CreateLeague = () => {
                     wins: 0,
                     losses: 0,
                     points: 0,
-                    roster: [],
-                    bench: []
                 });
 
             const step2Duration = performance.now() - step2Start;
@@ -150,8 +148,6 @@ const CreateLeague = () => {
                     wins: 0,
                     losses: 0,
                     points: 0,
-                    roster: [],
-                    bench: []
                 });
             }
 

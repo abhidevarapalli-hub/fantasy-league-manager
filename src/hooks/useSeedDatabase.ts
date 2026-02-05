@@ -383,10 +383,10 @@ export const useSeedDatabase = () => {
     if (!leagueId) return false;
     setSeeding(true);
     try {
-      // First, clear all manager rosters for this league
+      // First, clear all manager rosters for this league (from junction table)
       const { error: clearRostersError } = await supabase
-        .from("managers")
-        .update({ roster: [], bench: [] })
+        .from("manager_roster" as any)
+        .delete()
         .eq("league_id", leagueId);
 
       if (clearRostersError) {
@@ -655,10 +655,10 @@ export const useSeedDatabase = () => {
 
     setSeeding(true);
     try {
-      // Clear all manager rosters for this league
+      // Clear all manager rosters for this league (from junction table)
       const { error: clearRostersError } = await supabase
-        .from("managers")
-        .update({ roster: [], bench: [] })
+        .from("manager_roster" as any)
+        .delete()
         .eq("league_id", leagueId);
 
       if (clearRostersError) {

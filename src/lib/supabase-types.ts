@@ -15,8 +15,7 @@ export interface DbManager {
   wins: number;
   losses: number;
   points: number;
-  roster: string[];
-  bench: string[];
+  // Note: roster and bench are now stored in manager_roster junction table
   user_id: string | null;
   created_at: string;
 }
@@ -101,6 +100,7 @@ export const mapDbPlayer = (db: DbPlayer): Player => ({
   isInternational: db.is_international,
 });
 
+// Legacy mapper - rosters are now stored in manager_roster junction table
 export const mapDbManager = (db: DbManager): Manager => ({
   id: db.id,
   name: db.name,
@@ -109,8 +109,8 @@ export const mapDbManager = (db: DbManager): Manager => ({
   losses: db.losses,
   points: db.points,
   userId: db.user_id,
-  activeRoster: db.roster || [],
-  bench: db.bench || [],
+  activeRoster: [],
+  bench: [],
 });
 
 export const mapDbSchedule = (db: DbSchedule): Match => ({

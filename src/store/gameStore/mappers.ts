@@ -22,6 +22,8 @@ export const mapDbPlayer = (db: Tables<"league_players">): Player => ({
   imageId: db.image_id ?? undefined,
 });
 
+// Legacy mapper - prefer mapDbManagerWithRoster for proper roster handling
+// This creates empty rosters since the columns were moved to manager_roster junction table
 export const mapDbManager = (db: Tables<"managers">): Manager => ({
   id: db.id,
   name: db.name,
@@ -30,8 +32,8 @@ export const mapDbManager = (db: Tables<"managers">): Manager => ({
   losses: db.losses,
   points: db.points,
   userId: db.user_id,
-  activeRoster: db.roster || [],
-  bench: db.bench || [],
+  activeRoster: [],
+  bench: [],
 });
 
 // Maps manager data with roster entries from junction table
