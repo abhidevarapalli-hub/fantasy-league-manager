@@ -35,6 +35,19 @@ League Manager Abilities
 - Ability to remove players from league
 - Ability to modify draft settings (only before draft is done)
 - Any special settings regarding league waivers, playoffs
+
+## Product Context
+
+The Cricket Fantasy App helps users:
+- Create fantasy teams for cricket matches and tournaments
+- Track player performance and fantasy points
+- Compete in leagues and leaderboards
+- Get projections, stats, and insights in near-real time
+
+Key characteristics:
+- Data-heavy (matches, players, stats, scoring rules)
+- Event-driven (match updates, score changes)
+- Read-heavy with predictable spikes during live games
  
 ## Coding Rules
  
@@ -49,3 +62,12 @@ League Manager Abilities
 ## Don't Change
  
 - Production environment variables
+
+## Living Document
+
+This file should evolve with the app.
+If Claude notices:
+- Repeated patterns
+- Architectural drift
+- Painful workflows
+It should propose updates to this file, not just code changes.
