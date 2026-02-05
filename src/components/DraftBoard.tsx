@@ -342,27 +342,30 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
   const [selectedCell, setSelectedCell] = useState<{ round: number; position: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Draft is read-only if explicitly set OR if draft is finalized
+  const isEffectivelyReadOnly = readOnly || draftState?.isFinalized;
+
   const handleCellClick = (round: number, position: number) => {
-    if (readOnly) return;
+    if (isEffectivelyReadOnly) return;
     setSelectedCell({ round, position });
     setDialogOpen(true);
   };
 
   const handlePickConfirm = async (playerId: string) => {
-    if (!selectedCell || readOnly) return;
+    if (!selectedCell || isEffectivelyReadOnly) return;
     await makePick(selectedCell.round, selectedCell.position, playerId);
   };
 
 
   const handleReset = async () => {
-    if (readOnly) return;
+    if (isEffectivelyReadOnly) return;
     if (window.confirm('Are you sure you want to reset the draft? All picks will be cleared.')) {
       await resetDraft();
     }
   };
 
   const handleFinalize = async () => {
-    if (readOnly || isSubmitting) return;
+    if (isEffectivelyReadOnly || isSubmitting) return;
     if (window.confirm('Are you sure you want to finalize the draft? This will populate all team rosters with their drafted players.')) {
       setIsSubmitting(true);
       try {
@@ -427,7 +430,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
       <TeamConstraints config={config} className="mb-4" />
 
       {/* LM Controls */}
-      {!readOnly && (
+      {!isEffectivelyReadOnly && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -472,7 +475,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                 <div key={position} className="flex flex-col items-center gap-1">
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground font-medium">#{position}</span>
-                    {manager && !readOnly && (
+                    {manager && !isEffectivelyReadOnly && (
                       <button
                         onClick={() => manager && toggleAutoDraft(manager.id, !orderItem?.autoDraftEnabled)}
                         className={cn(
@@ -485,7 +488,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                       </button>
                     )}
                   </div>
-                  {readOnly ? (
+                  {isEffectivelyReadOnly ? (
                     <div className="h-8 text-xs bg-muted border border-border rounded-md w-full flex items-center justify-center px-1">
                       <span className="truncate text-[10px]">{manager?.teamName || 'Empty'}</span>
                     </div>
@@ -542,8 +545,8 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                     player={player}
                     pickNumber={pickNumber}
                     onCellClick={() => handleCellClick(round, position)}
-                    onClearPick={() => !readOnly && clearPick(round, position)}
-                    readOnly={readOnly}
+                    onClearPick={() => !isEffectivelyReadOnly && clearPick(round, position)}
+                    readOnly={isEffectivelyReadOnly}
                     isActive={isActivePick}
                   />
                 );
@@ -566,7 +569,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
             </span>
           )}
         </div>
-        {!readOnly && (
+        {!isEffectivelyReadOnly && (
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleReset}>
               Reset Draft
@@ -587,7 +590,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
       </div>
 
       {/* Draft Pick Dialog - only if not read-only */}
-      {!readOnly && (
+      {!isEffectivelyReadOnly && (
         <DraftPickDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
