@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { UserPlus, Search, X } from 'lucide-react';
+import { UserPlus, Search, X, Star } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { Player, Manager } from '@/lib/supabase-types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,10 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { PlayerCard } from '@/components/PlayerCard';
+import { DraftRosterProgress } from '@/components/DraftRosterProgress';
 import { cn } from '@/lib/utils';
 import { sortPlayersByPriority } from '@/lib/player-order';
 import { usePlayerFilters } from '@/hooks/usePlayerFilters';
 import { getTeamFilterColors, getTeamColors, getTeamPillStyles } from '@/lib/team-colors';
+import { getPlayerRecommendation, PlayerRecommendation } from '@/lib/roster-validation';
 
 const ROLE_AND_NATIONALITY_COLORS = {
   Batsman: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -33,6 +35,7 @@ interface DraftPickDialogProps {
   currentPlayerId: string | null;
   onConfirm: (playerId: string) => void;
   isMockDraft?: boolean;
+  managerDraftPicks?: { managerId: string | null; playerId: string | null }[];
 }
 
 // Filter constants now using centralized team colors
@@ -54,9 +57,12 @@ export const DraftPickDialog = ({
   currentPlayerId,
   onConfirm,
   isMockDraft = false,
+  managerDraftPicks = [],
 }: DraftPickDialogProps) => {
   const players = useGameStore(state => state.players);
+  const config = useGameStore(state => state.config);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
+  const [showRecommendedFirst, setShowRecommendedFirst] = useState(true);
 
   const {
     searchQuery,
@@ -88,6 +94,43 @@ export const DraftPickDialog = ({
     return players.find(p => p.id === selectedPlayerId) || null;
   }, [players, selectedPlayerId]);
 
+  // Get the manager's current picks to calculate recommendations
+  const managerCurrentPicks = useMemo(() => {
+    if (!manager) return [];
+    const pickedPlayerIds = managerDraftPicks
+      .filter((pick) => pick.managerId === manager.id && pick.playerId)
+      .map((pick) => pick.playerId as string);
+    return players.filter((p) => pickedPlayerIds.includes(p.id));
+  }, [manager, managerDraftPicks, players]);
+
+  // Calculate recommendations for each player
+  const playerRecommendations = useMemo(() => {
+    const recommendations = new Map<string, PlayerRecommendation>();
+    for (const player of filteredPlayers) {
+      const rec = getPlayerRecommendation(managerCurrentPicks, player, config);
+      recommendations.set(player.id, rec);
+    }
+    return recommendations;
+  }, [filteredPlayers, managerCurrentPicks, config]);
+
+  // Sort players: recommended first (by priority descending), then others
+  const sortedPlayers = useMemo(() => {
+    if (!showRecommendedFirst) return filteredPlayers;
+
+    return [...filteredPlayers].sort((a, b) => {
+      const recA = playerRecommendations.get(a.id);
+      const recB = playerRecommendations.get(b.id);
+      const priorityA = recA?.isRecommended ? recA.priority : 0;
+      const priorityB = recB?.isRecommended ? recB.priority : 0;
+      return priorityB - priorityA; // Higher priority first
+    });
+  }, [filteredPlayers, playerRecommendations, showRecommendedFirst]);
+
+  // Count recommended players
+  const recommendedCount = useMemo(() => {
+    return Array.from(playerRecommendations.values()).filter(r => r.isRecommended).length;
+  }, [playerRecommendations]);
+
   const handleConfirm = () => {
     if (selectedPlayerId) {
       onConfirm(selectedPlayerId);
@@ -109,18 +152,24 @@ export const DraftPickDialog = ({
         </DialogHeader>
 
         <div className="space-y-3 pt-2 flex-1 overflow-hidden flex flex-col">
-          {/* Manager (read-only) - only show for official draft */}
+          {/* Manager info and Roster Progress - only show for official draft */}
           {manager && !isMockDraft && (
-            <div className="space-y-1.5 flex-shrink-0">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Manager
-              </label>
-              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/50 border border-border">
-                <div className="flex-1">
-                  <p className="font-medium text-foreground text-sm">{manager.teamName}</p>
-                  <p className="text-xs text-muted-foreground">{manager.name}</p>
+            <div className="space-y-2 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 border border-border flex-1">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground text-sm">{manager.teamName}</p>
+                    <p className="text-xs text-muted-foreground">{manager.name}</p>
+                  </div>
                 </div>
               </div>
+              {/* Compact Roster Progress */}
+              <DraftRosterProgress
+                managerId={manager.id}
+                managerName={manager.teamName}
+                draftPicks={managerDraftPicks}
+                variant="compact"
+              />
             </div>
           )}
 
@@ -216,34 +265,54 @@ export const DraftPickDialog = ({
           </div>
           {/* Player Selection - Scrollable List with PlayerCards */}
           <div className="space-y-1.5 flex-1 flex flex-col min-h-0 overflow-hidden">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-shrink-0">
-              Select Player ({filteredPlayers.length} available)
-            </label>
+            <div className="flex items-center justify-between flex-shrink-0">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Select Player ({filteredPlayers.length} available)
+              </label>
+              {recommendedCount > 0 && (
+                <button
+                  onClick={() => setShowRecommendedFirst(!showRecommendedFirst)}
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all",
+                    showRecommendedFirst
+                      ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                      : "bg-muted/50 text-muted-foreground border-border hover:border-amber-500/30"
+                  )}
+                >
+                  <Star className={cn("w-3 h-3", showRecommendedFirst && "fill-amber-400")} />
+                  {recommendedCount} Recommended
+                </button>
+              )}
+            </div>
 
             <div className="flex-1 overflow-y-auto border border-border rounded-lg p-2 space-y-2 min-h-[200px] max-h-[300px]">
-              {filteredPlayers.length === 0 ? (
+              {sortedPlayers.length === 0 ? (
                 <div className="py-8 text-center">
                   <p className="text-sm text-muted-foreground">No players found</p>
                 </div>
               ) : (
-                filteredPlayers.map(player => (
-                  <div
-                    key={player.id}
-                    onClick={() => setSelectedPlayerId(player.id)}
-                    className={cn(
-                      "cursor-pointer rounded-xl transition-all",
-                      selectedPlayerId === player.id
-                        ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                        : "hover:opacity-80"
-                    )}
-                  >
-                    <PlayerCard
-                      player={player}
-                      showActions={false}
-                      variant="compact"
-                    />
-                  </div>
-                ))
+                sortedPlayers.map(player => {
+                  const recommendation = playerRecommendations.get(player.id);
+                  return (
+                    <div
+                      key={player.id}
+                      onClick={() => setSelectedPlayerId(player.id)}
+                      className={cn(
+                        "cursor-pointer rounded-xl transition-all",
+                        selectedPlayerId === player.id
+                          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                          : "hover:opacity-80"
+                      )}
+                    >
+                      <PlayerCard
+                        player={player}
+                        showActions={false}
+                        variant="compact"
+                        recommendation={recommendation}
+                      />
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
