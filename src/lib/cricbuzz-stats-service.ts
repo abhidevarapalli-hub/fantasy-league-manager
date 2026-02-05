@@ -327,20 +327,11 @@ export async function matchStatsToLeaguePlayers(
   leagueId: string,
   scoringRules: ScoringRules
 ): Promise<PlayerStatsWithOwnership[]> {
-  // Fetch league players with their cricbuzz mappings
-  const { data: extendedPlayers } = await supabase
-    .from('extended_players')
-    .select(`
-      player_id,
-      cricbuzz_id,
-      players!inner (
-        id,
-        name,
-        team,
-        league_id
-      )
-    `)
-    .eq('players.league_id', leagueId);
+  // Fetch league players from the league_players view (joins master_players + league_player_pool)
+  const { data: leaguePlayers } = await supabase
+    .from('league_players')
+    .select('id, name, team, cricbuzz_id')
+    .eq('league_id', leagueId);
 
   // Fetch managers with their rosters
   const { data: managers } = await supabase
@@ -348,15 +339,16 @@ export async function matchStatsToLeaguePlayers(
     .select('id, name, team_name, roster, bench')
     .eq('league_id', leagueId);
 
-  // Create lookup maps
+  // Create lookup map from cricbuzz_id to player
   const cricbuzzToPlayer = new Map<string, { playerId: string; playerName: string }>();
-  if (extendedPlayers) {
-    for (const ep of extendedPlayers) {
-      const player = ep.players as unknown as { id: string; name: string };
-      cricbuzzToPlayer.set(ep.cricbuzz_id, {
-        playerId: player.id,
-        playerName: player.name,
-      });
+  if (leaguePlayers) {
+    for (const player of leaguePlayers) {
+      if (player.cricbuzz_id) {
+        cricbuzzToPlayer.set(player.cricbuzz_id, {
+          playerId: player.id!,
+          playerName: player.name!,
+        });
+      }
     }
   }
 

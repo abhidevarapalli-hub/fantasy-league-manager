@@ -2,13 +2,14 @@ import { Tables } from '@/integrations/supabase/types';
 import { Player, Manager, Match, Activity, PlayerTransaction } from '@/lib/supabase-types';
 import { DraftPick, DraftOrder, DraftState, DbDraftPick, DbDraftOrder, DbDraftState } from '@/lib/draft-types';
 
-export const mapDbPlayer = (db: Tables<"players">): Player => ({
-  id: db.id,
-  name: db.name,
-  team: db.team,
+// Maps data from league_players view (which joins master_players + league_player_pool)
+export const mapDbPlayer = (db: Tables<"league_players">): Player => ({
+  id: db.id!,
+  name: db.name!,
+  team: db.team!,
   role: db.role as Player["role"],
   isInternational: db.is_international ?? false,
-  imageId: (db as any).extended_players?.image_id ?? ((db as any).extended_players?.[0]?.image_id) ?? undefined,
+  imageId: db.image_id ?? undefined,
 });
 
 export const mapDbManager = (db: Tables<"managers">): Manager => ({

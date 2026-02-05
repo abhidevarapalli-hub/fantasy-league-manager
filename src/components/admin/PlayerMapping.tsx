@@ -45,19 +45,22 @@ export const PlayerMapping = () => {
   const [manualId, setManualId] = useState('');
   const [filterUnmapped, setFilterUnmapped] = useState(false);
 
-  // Load existing mappings
+  // Load existing mappings from league_players view (includes cricbuzz_id from master_players)
   useEffect(() => {
     if (!currentLeagueId) return;
 
     const loadMappings = async () => {
-      const { data: extendedPlayers } = await supabase
-        .from('extended_players')
-        .select('player_id, cricbuzz_id');
+      const { data: leaguePlayers } = await supabase
+        .from('league_players')
+        .select('id, cricbuzz_id')
+        .eq('league_id', currentLeagueId);
 
-      const mappingMap = new Map<string, string>();
-      if (extendedPlayers) {
-        for (const ep of (extendedPlayers as any[])) {
-          mappingMap.set(ep.player_id, ep.cricbuzz_id);
+      const mappingMap = new Map<string, string | null>();
+      if (leaguePlayers) {
+        for (const lp of leaguePlayers) {
+          if (lp.id) {
+            mappingMap.set(lp.id, lp.cricbuzz_id);
+          }
         }
       }
 
@@ -97,25 +100,20 @@ export const PlayerMapping = () => {
     }
   };
 
-  // Save mapping
+  // Save mapping to master_players table
   const handleSaveMapping = async (cricbuzzId: string, playerName?: string, imageId?: number) => {
     if (!selectedPlayer) return;
 
     setIsSaving(true);
     try {
-      // Upsert the mapping
+      // Update the master_players table directly with cricbuzz_id and image_id
       const { error } = await supabase
-        .from('extended_players')
-        .upsert(
-          {
-            player_id: selectedPlayer.id,
-            cricbuzz_id: cricbuzzId,
-            image_id: imageId,
-          },
-          {
-            onConflict: 'player_id',
-          }
-        );
+        .from('master_players')
+        .update({
+          cricbuzz_id: cricbuzzId,
+          image_id: imageId ?? null,
+        })
+        .eq('id', selectedPlayer.id);
 
       if (error) {
         console.error('Error saving mapping:', error);
@@ -141,14 +139,14 @@ export const PlayerMapping = () => {
     }
   };
 
-  // Remove mapping
+  // Remove mapping from master_players
   const handleRemoveMapping = async (playerId: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
     const { error } = await supabase
-      .from('extended_players')
-      .delete()
-      .eq('player_id', playerId);
+      .from('master_players')
+      .update({ cricbuzz_id: null, image_id: null })
+      .eq('id', playerId);
 
     if (error) {
       toast.error('Failed to remove mapping');

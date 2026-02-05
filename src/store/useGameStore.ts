@@ -308,7 +308,50 @@ export const useGameStore = create<GameState>()(
       addNewPlayer: async (name, team, role, isInternational = false) => {
         const { currentLeagueId } = get();
         if (!currentLeagueId) return;
-        await supabase.from("players").insert({ name, team, role, is_international: isInternational, league_id: currentLeagueId });
+
+        // Check if player already exists in master_players
+        const { data: existingMaster } = await supabase
+          .from("master_players")
+          .select("id")
+          .eq("name", name)
+          .eq("primary_role", role)
+          .maybeSingle();
+
+        let masterId: string;
+        if (existingMaster) {
+          masterId = existingMaster.id;
+        } else {
+          // Insert new master player
+          const { data: newMaster, error: masterError } = await supabase
+            .from("master_players")
+            .insert({
+              name,
+              primary_role: role,
+              is_international: isInternational,
+              teams: [team],
+            })
+            .select("id")
+            .single();
+
+          if (masterError || !newMaster) {
+            toast.error(`Failed to add player: ${masterError?.message}`);
+            return;
+          }
+          masterId = newMaster.id;
+        }
+
+        // Add to league player pool
+        const { error: poolError } = await supabase
+          .from("league_player_pool")
+          .upsert({
+            league_id: currentLeagueId,
+            player_id: masterId,
+            team_override: team,
+          }, { onConflict: 'league_id,player_id' });
+
+        if (poolError) {
+          toast.error(`Failed to add player to league: ${poolError.message}`);
+        }
       },
 
       removePlayerFromLeague: async (playerId) => {
@@ -331,7 +374,13 @@ export const useGameStore = create<GameState>()(
           await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", manager.id);
         }
 
-        const { error } = await supabase.from("players").delete().eq("id", playerId);
+        // Remove from league_player_pool (not master_players - player may be used in other leagues)
+        const { error } = await supabase
+          .from("league_player_pool")
+          .delete()
+          .eq("player_id", playerId)
+          .eq("league_id", currentLeagueId);
+
         if (error) {
           toast.error(`Failed to remove player: ${error.message}`);
           return;
@@ -535,8 +584,8 @@ export const useGameStore = create<GameState>()(
           // console.log(`[useGameStore] 🔄 Starting parallel fetch of players, managers, schedule, transactions...`);
 
           const [playersRes, managersRes, scheduleRes, transactionsRes, draftPicksRes, draftOrderRes, draftStateRes] = await Promise.all([
-            // @ts-ignore - extended_players relationship is not fully typed in generated types yet
-            supabase.from("players").select("*, extended_players(image_id)").eq("league_id", leagueId).order("name"),
+            // Query the league_players view which joins master_players + league_player_pool
+            supabase.from("league_players").select("*").eq("league_id", leagueId).order("name"),
             supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
             supabase.from("schedule" as 'schedule').select("*").eq("league_id", leagueId).order("week").order("created_at"),
             supabase.from("transactions" as 'transactions').select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
@@ -549,7 +598,7 @@ export const useGameStore = create<GameState>()(
           // console.log(`[useGameStore] ✅ Parallel fetch completed in ${parallelFetchDuration.toFixed(2)}ms`);
 
           const mappingStart = performance.now();
-          const players = (playersRes.data as Tables<"players">[] | null)?.map(mapDbPlayer) || [];
+          const players = (playersRes.data as Tables<"league_players">[] | null)?.map(mapDbPlayer) || [];
           const managers = (managersRes.data as Tables<"managers">[] | null)?.map(mapDbManager) || [];
           const schedule = (scheduleRes.data as Tables<"schedule">[] | null)?.map(mapDbSchedule) || [];
           const activities = (transactionsRes.data as Tables<"transactions">[] | null)?.map(mapDbTransaction) || [];
@@ -589,15 +638,16 @@ export const useGameStore = create<GameState>()(
 
         const channel = supabase
           .channel(`game-changes-${leagueId}`)
-          .on("postgres_changes", { event: "*", schema: "public", table: "players", filter }, (payload) => {
-            if (payload.eventType === "INSERT") {
-              const existingPlayer = get().players.find(p => p.id === payload.new.id);
-              if (!existingPlayer) {
-                get().addPlayer(mapDbPlayer(payload.new as Tables<"players">));
+          // Subscribe to league_player_pool changes (can't subscribe to views)
+          // When a player is added/removed from the league pool, refetch all players
+          .on("postgres_changes", { event: "*", schema: "public", table: "league_player_pool", filter }, async (payload) => {
+            if (payload.eventType === "INSERT" || payload.eventType === "DELETE") {
+              // Refetch all players when pool changes
+              const { data } = await supabase.from("league_players").select("*").eq("league_id", leagueId).order("name");
+              if (data) {
+                set({ players: (data as Tables<"league_players">[]).map(mapDbPlayer) });
               }
             }
-            else if (payload.eventType === "UPDATE") get().updatePlayer(payload.new.id, mapDbPlayer(payload.new as Tables<"players">));
-            else if (payload.eventType === "DELETE") get().removePlayer(payload.old.id);
           })
           .on("postgres_changes", { event: "*", schema: "public", table: "managers", filter }, (payload) => {
             if (payload.eventType === "INSERT") {

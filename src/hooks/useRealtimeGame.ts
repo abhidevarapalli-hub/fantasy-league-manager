@@ -26,12 +26,14 @@ interface DbLeague {
 }
 
 // Helper to map DB rows to frontend types
-const mapDbPlayer = (db: Tables<"players">): Player => ({
-  id: db.id,
-  name: db.name,
-  team: db.team,
+// Uses league_players view which joins master_players + league_player_pool
+const mapDbPlayer = (db: Tables<"league_players">): Player => ({
+  id: db.id!,
+  name: db.name!,
+  team: db.team!,
   role: db.role as Player["role"],
   isInternational: db.is_international ?? false,
+  imageId: db.image_id ?? undefined,
 });
 
 const mapDbManager = (db: Tables<"managers">): Manager => ({
@@ -165,20 +167,17 @@ export const useRealtimeGame = (leagueId?: string) => {
 
     const channel = supabase
       .channel(`game-changes-${leagueId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "players", filter }, (payload) => {
-        if (payload.eventType === "INSERT") {
-          // Prevent duplicates: only add if player doesn't already exist
-          setPlayers((prev) => {
-            const existingPlayer = prev.find(p => p.id === payload.new.id);
-            if (existingPlayer) return prev;
-            return [...prev, mapDbPlayer(payload.new as Tables<"players">)];
-          });
-        } else if (payload.eventType === "UPDATE") {
-          setPlayers((prev) =>
-            prev.map((p) => (p.id === payload.new.id ? mapDbPlayer(payload.new as Tables<"players">) : p)),
-          );
-        } else if (payload.eventType === "DELETE") {
-          setPlayers((prev) => prev.filter((p) => p.id !== payload.old.id));
+      // Subscribe to league_player_pool changes (can't subscribe to views directly)
+      .on("postgres_changes", { event: "*", schema: "public", table: "league_player_pool", filter }, async (payload) => {
+        // When league_player_pool changes, refetch the players from the view
+        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE" || payload.eventType === "DELETE") {
+          const { data } = await supabase
+            .from("league_players")
+            .select("*")
+            .eq("league_id", leagueId);
+          if (data) {
+            setPlayers(data.map((p) => mapDbPlayer(p as Tables<"league_players">)));
+          }
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "managers", filter }, (payload) => {
@@ -502,7 +501,46 @@ export const useRealtimeGame = (leagueId?: string) => {
     isInternational: boolean = false,
   ) => {
     if (!leagueId) return;
-    await supabase.from("players").insert({ name, team, role, is_international: isInternational, league_id: leagueId });
+
+    // Check if player already exists in master_players
+    const { data: existingMaster } = await supabase
+      .from("master_players")
+      .select("id")
+      .eq("name", name)
+      .eq("primary_role", role)
+      .maybeSingle();
+
+    let masterId: string;
+    if (existingMaster) {
+      masterId = existingMaster.id;
+    } else {
+      // Insert new master player
+      const { data: newMaster, error: masterError } = await supabase
+        .from("master_players")
+        .insert({
+          name,
+          primary_role: role,
+          is_international: isInternational,
+          teams: [team],
+        })
+        .select("id")
+        .single();
+
+      if (masterError || !newMaster) {
+        console.error("Failed to add player:", masterError);
+        return;
+      }
+      masterId = newMaster.id;
+    }
+
+    // Add to league player pool
+    await supabase
+      .from("league_player_pool")
+      .upsert({
+        league_id: leagueId,
+        player_id: masterId,
+        team_override: team,
+      }, { onConflict: 'league_id,player_id' });
   };
 
   const executeTrade = async (manager1Id: string, manager2Id: string, players1: string[], players2: string[]) => {

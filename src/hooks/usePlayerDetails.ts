@@ -106,8 +106,8 @@ function transformPlayerInfo(response: PlayerInfoResponse): PlayerDetails {
 
 /**
  * Fetch extended player data from the database
- * This includes the Cricbuzz ID and image ID linked to our player records
- * @param playerId - The app's player UUID (from players table)
+ * This includes the Cricbuzz ID and extended info from master_players
+ * @param playerId - The app's player UUID (from master_players table)
  */
 export function useExtendedPlayer(playerId: string | null) {
   return useQuery({
@@ -116,9 +116,9 @@ export function useExtendedPlayer(playerId: string | null) {
       if (!playerId) throw new Error('Player ID required');
 
       const { data, error } = await supabase
-        .from('extended_players' as any)
+        .from('master_players')
         .select('*')
-        .eq('player_id', playerId)
+        .eq('id', playerId)
         .maybeSingle();
 
       if (error) {
@@ -133,19 +133,16 @@ export function useExtendedPlayer(playerId: string | null) {
 
       if (!data) return null;
 
-      // Cast to any to access fields not in generated types
-      const row = data as any;
-
       return {
-        playerId: row.player_id,
-        cricbuzzId: row.cricbuzz_id,
-        imageId: row.image_id,
-        battingStyle: row.batting_style,
-        bowlingStyle: row.bowling_style,
-        dob: row.dob,
-        birthPlace: row.birth_place,
-        height: row.height,
-        bio: row.bio,
+        playerId: data.id,
+        cricbuzzId: data.cricbuzz_id,
+        imageId: data.image_id,
+        battingStyle: data.batting_style,
+        bowlingStyle: data.bowling_style,
+        dob: data.dob,
+        birthPlace: data.birth_place,
+        height: data.height,
+        bio: data.bio,
       } as ExtendedPlayerData;
     },
     enabled: !!playerId,
@@ -167,19 +164,12 @@ export function usePlayerInfo(cricbuzzPlayerId: string | null) {
       if (!cricbuzzPlayerId) throw new Error('Player ID required');
 
       const startDb = performance.now();
-      console.log(`[TRACE] 2. 🔍 Checking Supabase 'extended_players' for cached data...`);
+      console.log(`[TRACE] 2. 🔍 Checking Supabase 'master_players' for cached data...`);
 
-      // 1. Try to fetch from Database Cache
+      // 1. Try to fetch from Database Cache (master_players now stores extended info)
       const { data: dbData, error: dbError } = await supabase
-        .from('extended_players' as any)
-        .select(`
-          *,
-          player:players (
-            name,
-            team,
-            role
-          )
-        `)
+        .from('master_players')
+        .select('*')
         .eq('cricbuzz_id', cricbuzzPlayerId)
         .maybeSingle();
 
@@ -188,28 +178,22 @@ export function usePlayerInfo(cricbuzzPlayerId: string | null) {
       if (dbError) console.error('[TRACE] ❌ DB Error:', dbError);
 
       // 2. Check if Cache Hit (Must have Bio and DOB to be considered valid cache for details)
-      const cached = dbData as any;
-      if (cached && cached.bio && cached.dob) {
+      if (dbData && dbData.bio && dbData.dob) {
         console.log(`[TRACE] 3. ✅ Supabase CACHE HIT! Returning DB data. (Latency: ${(endDb - startDb).toFixed(2)}ms)`);
-
-        // Map cached data to PlayerDetails
-        const row = dbData as any;
-        const player = row.player || {}; // Joined player data
 
         return {
           id: cricbuzzPlayerId,
-          name: player.name || '', // Fallback empty if not linked, UI usually has name from props
-          role: player.role,
-          team: player.team,
-          // Map DB columns to PlayerDetails keys
-          battingStyle: row.batting_style,
-          bowlingStyle: row.bowling_style,
-          birthPlace: row.birth_place,
-          dateOfBirth: row.dob,
-          height: row.height,
-          imageId: row.image_id,
-          bio: row.bio,
-          // Rankings are not cached in DB, ensuring we don't show stale info or just omitted
+          name: dbData.name || '',
+          role: dbData.primary_role,
+          team: dbData.teams?.[0],
+          battingStyle: dbData.batting_style,
+          bowlingStyle: dbData.bowling_style,
+          birthPlace: dbData.birth_place,
+          dateOfBirth: dbData.dob,
+          height: dbData.height,
+          imageId: dbData.image_id,
+          bio: dbData.bio,
+          // Rankings are not cached in DB
           rankings: undefined,
         } as PlayerDetails;
       }
@@ -226,10 +210,10 @@ export function usePlayerInfo(cricbuzzPlayerId: string | null) {
 
         const transformed = transformPlayerInfo(response);
 
-        // 4. Update Cache (Fire and Forget - don't block return)
+        // 4. Update Cache in master_players (Fire and Forget - don't block return)
         if (dbData) {
           console.log(`[TRACE] 5. 💾 Updating Supabase cache with new data...`);
-          const updatePayload: any = {
+          const updatePayload = {
             bio: transformed.bio,
             dob: transformed.dateOfBirth,
             birth_place: transformed.birthPlace,
@@ -237,20 +221,19 @@ export function usePlayerInfo(cricbuzzPlayerId: string | null) {
             batting_style: transformed.battingStyle,
             bowling_style: transformed.bowlingStyle,
             image_id: transformed.imageId,
-            updated_at: new Date().toISOString(),
           };
 
           // Don't await this, let it happen in background
           supabase
-            .from('extended_players' as any)
+            .from('master_players')
             .update(updatePayload)
             .eq('cricbuzz_id', cricbuzzPlayerId)
-            .then(({ error }: any) => {
+            .then(({ error }) => {
               if (error) console.error('[TRACE] ❌ Failed to update cache:', error);
               else console.log('[TRACE] ✅ Supabase cache updated successfully');
             });
         } else {
-          console.log(`[TRACE] 5. ⚠️ No 'extended_players' record found to update. Sync might be needed.`);
+          console.log(`[TRACE] 5. ⚠️ No 'master_players' record found for this cricbuzz_id. Sync might be needed.`);
         }
 
         return transformed;
