@@ -14,81 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _archive_extended_players: {
-        Row: {
-          batting_style: string | null
-          bio: string | null
-          birth_place: string | null
-          bowling_style: string | null
-          created_at: string | null
-          cricbuzz_id: string | null
-          dob: string | null
-          height: string | null
-          image_id: number | null
-          player_id: string | null
-          teams: string[] | null
-          updated_at: string | null
-        }
-        Insert: {
-          batting_style?: string | null
-          bio?: string | null
-          birth_place?: string | null
-          bowling_style?: string | null
-          created_at?: string | null
-          cricbuzz_id?: string | null
-          dob?: string | null
-          height?: string | null
-          image_id?: number | null
-          player_id?: string | null
-          teams?: string[] | null
-          updated_at?: string | null
-        }
-        Update: {
-          batting_style?: string | null
-          bio?: string | null
-          birth_place?: string | null
-          bowling_style?: string | null
-          created_at?: string | null
-          cricbuzz_id?: string | null
-          dob?: string | null
-          height?: string | null
-          image_id?: number | null
-          player_id?: string | null
-          teams?: string[] | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      _archive_players: {
-        Row: {
-          created_at: string | null
-          id: string | null
-          is_international: boolean | null
-          league_id: string | null
-          name: string | null
-          role: string | null
-          team: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string | null
-          is_international?: boolean | null
-          league_id?: string | null
-          name?: string | null
-          role?: string | null
-          team?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string | null
-          is_international?: boolean | null
-          league_id?: string | null
-          name?: string | null
-          role?: string | null
-          team?: string | null
-        }
-        Relationships: []
-      }
       cricket_matches: {
         Row: {
           city: string | null
@@ -330,8 +255,11 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          league_id: string | null
+          manager1_id: string | null
           manager1_name: string
           manager1_wins: number
+          manager2_id: string | null
           manager2_name: string
           manager2_wins: number
           updated_at: string
@@ -339,8 +267,11 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          league_id?: string | null
+          manager1_id?: string | null
           manager1_name: string
           manager1_wins?: number
+          manager2_id?: string | null
           manager2_name: string
           manager2_wins?: number
           updated_at?: string
@@ -348,13 +279,38 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          league_id?: string | null
+          manager1_id?: string | null
           manager1_name?: string
           manager1_wins?: number
+          manager2_id?: string | null
           manager2_name?: string
           manager2_wins?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "head_to_head_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "head_to_head_manager1_id_fkey"
+            columns: ["manager1_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "head_to_head_manager2_id_fkey"
+            columns: ["manager2_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       historical_records: {
         Row: {
@@ -363,6 +319,8 @@ export type Database = {
           historical_losses: number
           historical_wins: number
           id: string
+          league_id: string | null
+          manager_id: string | null
           manager_name: string
           top_3_finishes: number
           updated_at: string
@@ -373,6 +331,8 @@ export type Database = {
           historical_losses?: number
           historical_wins?: number
           id?: string
+          league_id?: string | null
+          manager_id?: string | null
           manager_name: string
           top_3_finishes?: number
           updated_at?: string
@@ -383,11 +343,28 @@ export type Database = {
           historical_losses?: number
           historical_wins?: number
           id?: string
+          league_id?: string | null
+          manager_id?: string | null
           manager_name?: string
           top_3_finishes?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "historical_records_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historical_records_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       league_player_pool: {
         Row: {
@@ -396,6 +373,7 @@ export type Database = {
           is_available: boolean | null
           league_id: string
           player_id: string
+          status: Database["public"]["Enums"]["player_availability"] | null
           team_override: string | null
         }
         Insert: {
@@ -404,6 +382,7 @@ export type Database = {
           is_available?: boolean | null
           league_id: string
           player_id: string
+          status?: Database["public"]["Enums"]["player_availability"] | null
           team_override?: string | null
         }
         Update: {
@@ -412,6 +391,7 @@ export type Database = {
           is_available?: boolean | null
           league_id?: string
           player_id?: string
+          status?: Database["public"]["Enums"]["player_availability"] | null
           team_override?: string | null
         }
         Relationships: [
@@ -559,7 +539,6 @@ export type Database = {
       }
       managers: {
         Row: {
-          bench: string[] | null
           created_at: string
           id: string
           is_league_manager: boolean | null
@@ -567,13 +546,11 @@ export type Database = {
           losses: number
           name: string
           points: number
-          roster: string[] | null
           team_name: string
           user_id: string | null
           wins: number
         }
         Insert: {
-          bench?: string[] | null
           created_at?: string
           id?: string
           is_league_manager?: boolean | null
@@ -581,13 +558,11 @@ export type Database = {
           losses?: number
           name: string
           points?: number
-          roster?: string[] | null
           team_name: string
           user_id?: string | null
           wins?: number
         }
         Update: {
-          bench?: string[] | null
           created_at?: string
           id?: string
           is_league_manager?: boolean | null
@@ -595,7 +570,6 @@ export type Database = {
           losses?: number
           name?: string
           points?: number
-          roster?: string[] | null
           team_name?: string
           user_id?: string | null
           wins?: number
@@ -664,40 +638,12 @@ export type Database = {
         }
         Relationships: []
       }
-      player_id_mapping: {
-        Row: {
-          created_at: string | null
-          cricbuzz_id: string | null
-          league_id: string | null
-          new_master_player_id: string
-          old_player_id: string
-          player_name: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          cricbuzz_id?: string | null
-          league_id?: string | null
-          new_master_player_id: string
-          old_player_id: string
-          player_name?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          cricbuzz_id?: string | null
-          league_id?: string | null
-          new_master_player_id?: string
-          old_player_id?: string
-          player_name?: string | null
-        }
-        Relationships: []
-      }
       player_match_stats: {
         Row: {
           balls_faced: number | null
           batting_position: number | null
           catches: number | null
           created_at: string | null
-          cricbuzz_player_id: string
           dismissal_type: string | null
           dots: number | null
           economy: number | null
@@ -733,7 +679,6 @@ export type Database = {
           batting_position?: number | null
           catches?: number | null
           created_at?: string | null
-          cricbuzz_player_id: string
           dismissal_type?: string | null
           dots?: number | null
           economy?: number | null
@@ -769,7 +714,6 @@ export type Database = {
           batting_position?: number | null
           catches?: number | null
           created_at?: string | null
-          cricbuzz_player_id?: string
           dismissal_type?: string | null
           dots?: number | null
           economy?: number | null
@@ -916,6 +860,52 @@ export type Database = {
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_players: {
+        Row: {
+          created_at: string | null
+          id: string
+          player_id: string
+          side: string
+          trade_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          player_id: string
+          side: string
+          trade_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          player_id?: string
+          side?: string
+          trade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "league_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "master_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_players_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
             referencedColumns: ["id"]
           },
         ]
@@ -1170,7 +1160,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      player_availability: "available" | "rostered" | "injured" | "suspended"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1297,6 +1287,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      player_availability: ["available", "rostered", "injured", "suspended"],
+    },
   },
 } as const
