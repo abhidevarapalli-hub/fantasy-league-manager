@@ -574,7 +574,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
             <Button variant="outline" onClick={handleReset}>
               Reset Draft
             </Button>
-            {!draftState?.isFinalized && getDraftedPlayerIds().length > 0 && (
+            {!draftState?.isFinalized && getDraftedPlayerIds().length === rounds * positions && (
               <Button
                 variant="default"
                 onClick={handleFinalize}
