@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, User, Plane, Timer, Pause, Play, RefreshCw, Shuffle, Bot, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, User, Plane, Timer, Pause, Play, RefreshCw, Shuffle, Bot, CheckCircle, AlertCircle, Flag } from 'lucide-react';
 import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { useGameStore } from '@/store/useGameStore';
 import { useDraft } from '@/hooks/useDraft';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
+import { TeamConstraints } from '@/components/TeamConstraints';
 import { cn } from '@/lib/utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { toast } from 'sonner';
@@ -334,6 +335,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     resumeDraft,
     resetClock,
     getRemainingTime,
+    finalizeDraft,
   } = useDraft();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -356,6 +358,18 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     if (readOnly) return;
     if (window.confirm('Are you sure you want to reset the draft? All picks will be cleared.')) {
       await resetDraft();
+    }
+  };
+
+  const handleFinalize = async () => {
+    if (readOnly || isSubmitting) return;
+    if (window.confirm('Are you sure you want to finalize the draft? This will populate all team rosters with their drafted players.')) {
+      setIsSubmitting(true);
+      try {
+        await finalizeDraft();
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -408,6 +422,9 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
           />
         </div>
       )}
+
+      {/* Team Constraints */}
+      <TeamConstraints config={config} className="mb-4" />
 
       {/* LM Controls */}
       {!readOnly && (
@@ -554,6 +571,17 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
             <Button variant="outline" onClick={handleReset}>
               Reset Draft
             </Button>
+            {!draftState?.isFinalized && getDraftedPlayerIds().length > 0 && (
+              <Button
+                variant="default"
+                onClick={handleFinalize}
+                disabled={isSubmitting}
+                className="gap-1.5 bg-green-600 hover:bg-green-700"
+              >
+                <Flag className="w-4 h-4" />
+                {isSubmitting ? 'Finalizing...' : 'Finalize Draft'}
+              </Button>
+            )}
           </div>
         )}
       </div>
