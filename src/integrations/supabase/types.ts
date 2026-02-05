@@ -498,6 +498,65 @@ export type Database = {
         }
         Relationships: []
       }
+      manager_roster: {
+        Row: {
+          created_at: string | null
+          id: string
+          league_id: string
+          manager_id: string
+          player_id: string
+          position: number
+          slot_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          league_id: string
+          manager_id: string
+          player_id: string
+          position?: number
+          slot_type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          league_id?: string
+          manager_id?: string
+          player_id?: string
+          position?: number
+          slot_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manager_roster_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manager_roster_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manager_roster_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "league_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manager_roster_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "master_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       managers: {
         Row: {
           bench: string[] | null

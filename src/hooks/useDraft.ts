@@ -129,8 +129,13 @@ export const useDraft = () => {
     }
   }, [draftOrder]);
 
-  // Finalize draft - clear all rosters first, then update with drafted players using optimal Active 11
+  // Finalize draft - clear all rosters first, then insert into junction table with optimal Active 11
   const finalizeDraft = useCallback(async () => {
+    if (!leagueId) {
+      toast.error('No league selected');
+      return false;
+    }
+
     try {
       // Group picks by manager
       const picksByManager = new Map<string, string[]>();
@@ -148,11 +153,11 @@ export const useDraft = () => {
         return false;
       }
 
-      // First, clear ALL manager rosters
+      // First, clear ALL roster entries for this league from junction table
       const { error: clearError } = await supabase
-        .from('managers')
-        .update({ roster: [], bench: [] })
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all managers
+        .from('manager_roster' as 'managers')
+        .delete()
+        .eq('league_id', leagueId);
 
       if (clearError) {
         console.error('Failed to clear rosters:', clearError);
@@ -160,7 +165,7 @@ export const useDraft = () => {
         return false;
       }
 
-      // Update each manager's roster with drafted players using optimal Active 11 building
+      // Insert roster entries for each manager using optimal Active 11 building
       for (const [managerId, playerIds] of picksByManager) {
         // Get the actual player objects
         const draftedPlayers: Player[] = playerIds
@@ -170,18 +175,34 @@ export const useDraft = () => {
         // Build optimal Active 11 based on positional requirements
         const { active, bench } = buildOptimalActive11(draftedPlayers);
 
-        const activeRoster = active.map(p => p.id);
-        const benchRoster = bench.map(p => p.id);
+        // Prepare roster entries for insertion
+        const rosterEntries = [
+          ...active.map((p, idx) => ({
+            manager_id: managerId,
+            player_id: p.id,
+            league_id: leagueId,
+            slot_type: 'active' as const,
+            position: idx,
+          })),
+          ...bench.map((p, idx) => ({
+            manager_id: managerId,
+            player_id: p.id,
+            league_id: leagueId,
+            slot_type: 'bench' as const,
+            position: idx,
+          })),
+        ];
 
-        const { error } = await supabase
-          .from('managers')
-          .update({ roster: activeRoster, bench: benchRoster })
-          .eq('id', managerId);
+        if (rosterEntries.length > 0) {
+          const { error } = await supabase
+            .from('manager_roster' as 'managers')
+            .insert(rosterEntries as any);
 
-        if (error) {
-          console.error('Failed to update manager roster:', error);
-          toast.error('Failed to update rosters');
-          return false;
+          if (error) {
+            console.error('Failed to insert manager roster:', error);
+            toast.error('Failed to update rosters');
+            return false;
+          }
         }
       }
 
@@ -192,6 +213,7 @@ export const useDraft = () => {
         manager_id: null,
         manager_team_name: null,
         week: null,
+        league_id: leagueId,
       });
 
       // Update draft state
@@ -199,7 +221,7 @@ export const useDraft = () => {
         await supabase
           .from('draft_state')
           .update({ is_finalized: true, finalized_at: new Date().toISOString() })
-          .eq('league_id', leagueId!);
+          .eq('league_id', leagueId);
       }
 
       toast.success(`Draft finalized! All rosters cleared and ${picksByManager.size} teams updated with optimized Active 11.`);
@@ -209,7 +231,7 @@ export const useDraft = () => {
       toast.error('Failed to finalize draft');
       return false;
     }
-  }, [draftPicks, draftState, players]);
+  }, [draftPicks, draftState, players, leagueId]);
 
   // Make a draft pick
   const makePick = useCallback(async (round: number, position: number, playerId: string, isAutoDraft = false) => {

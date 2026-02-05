@@ -10,11 +10,13 @@ import { GameState } from './gameStore/types';
 import {
   mapDbPlayer,
   mapDbManager,
+  mapDbManagerWithRoster,
   mapDbSchedule,
   mapDbTransaction,
   mapDbDraftPick,
   mapDbDraftOrder,
-  mapDbDraftState
+  mapDbDraftState,
+  ManagerRosterEntry
 } from './gameStore/mappers';
 
 export const useGameStore = create<GameState>()(
@@ -123,38 +125,49 @@ export const useGameStore = create<GameState>()(
         const player = players.find((p) => p.id === playerId);
         const dropPlayer = dropPlayerId ? players.find((p) => p.id === dropPlayerId) : null;
 
-        if (!manager || !player) return;
+        if (!manager || !player || !currentLeagueId) return;
 
         const ROSTER_CAP = config.activeSize + config.benchSize;
         const rosterCount = manager.activeRoster.length + manager.bench.length;
         if (rosterCount >= ROSTER_CAP && !dropPlayerId) return;
 
-        let newRoster = [...manager.activeRoster];
-        let newBench = [...manager.bench];
+        // Calculate new roster state to determine slot_type
+        let newActiveCount = manager.activeRoster.length;
+        let newBenchCount = manager.bench.length;
 
         if (dropPlayerId) {
-          newRoster = newRoster.filter((id) => id !== dropPlayerId);
-          newBench = newBench.filter((id) => id !== dropPlayerId);
+          if (manager.activeRoster.includes(dropPlayerId)) newActiveCount--;
+          if (manager.bench.includes(dropPlayerId)) newBenchCount--;
+          // Delete from junction table
+          await supabase.from("manager_roster" as "managers").delete().eq("player_id", dropPlayerId).eq("league_id", currentLeagueId);
         }
 
-        const activeNotFull = newRoster.length < config.activeSize;
-        const benchNotFull = newBench.length < config.benchSize;
-        let playerAdded = false;
+        const activeNotFull = newActiveCount < config.activeSize;
+        const benchNotFull = newBenchCount < config.benchSize;
+        let slotType: 'active' | 'bench';
 
         if (activeNotFull) {
-          newRoster = [...newRoster, playerId];
-          playerAdded = true;
+          slotType = 'active';
         } else if (benchNotFull) {
-          newBench = [...newBench, playerId];
-          playerAdded = true;
-        }
-
-        if (!playerAdded) {
+          slotType = 'bench';
+        } else {
           toast.error(`Cannot add ${player.name} - roster is full`);
           return;
         }
 
-        await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
+        // Insert into junction table
+        const { error } = await supabase.from("manager_roster" as "managers").insert({
+          manager_id: managerId,
+          player_id: playerId,
+          league_id: currentLeagueId,
+          slot_type: slotType,
+          position: slotType === 'active' ? newActiveCount : newBenchCount,
+        } as any);
+
+        if (error) {
+          toast.error(`Failed to add player: ${error.message}`);
+          return;
+        }
 
         const playerTransactions: PlayerTransaction[] = [];
         if (dropPlayer) {
@@ -175,7 +188,7 @@ export const useGameStore = create<GameState>()(
           league_id: currentLeagueId,
         });
 
-        const addedTo = newRoster.includes(playerId) ? 'active roster' : 'bench';
+        const addedTo = slotType === 'active' ? 'active roster' : 'bench';
         if (dropPlayer) {
           toast.success(`Dropped ${dropPlayer.name}, added ${player.name} to ${addedTo}`);
         } else {
@@ -187,12 +200,20 @@ export const useGameStore = create<GameState>()(
         const { managers, players, currentLeagueId } = get();
         const manager = managers.find((m) => m.id === managerId);
         const player = players.find((p) => p.id === playerId);
-        if (!manager || !player) return;
+        if (!manager || !player || !currentLeagueId) return;
 
-        const newRoster = manager.activeRoster.filter((id) => id !== playerId);
-        const newBench = manager.bench.filter((id) => id !== playerId);
+        // Delete from junction table
+        const { error } = await supabase
+          .from("manager_roster" as "managers")
+          .delete()
+          .eq("player_id", playerId)
+          .eq("league_id", currentLeagueId);
 
-        await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
+        if (error) {
+          toast.error(`Failed to drop player: ${error.message}`);
+          return;
+        }
+
         await supabase.from("transactions").insert({
           type: "drop" as const,
           manager_id: managerId,
@@ -206,10 +227,10 @@ export const useGameStore = create<GameState>()(
       },
 
       moveToActive: async (managerId, playerId) => {
-        const { managers, players, config } = get();
+        const { managers, players, config, currentLeagueId } = get();
         const manager = managers.find((m) => m.id === managerId);
         const player = players.find((p) => p.id === playerId);
-        if (!manager || !player) return { success: false, error: "Manager or player not found" };
+        if (!manager || !player || !currentLeagueId) return { success: false, error: "Manager or player not found" };
         if (manager.activeRoster.length >= config.activeSize) {
           return { success: false, error: `Active roster is full (${config.activeSize} players max)` };
         }
@@ -218,48 +239,69 @@ export const useGameStore = create<GameState>()(
         const validation = canAddToActive(currentActivePlayers, player, config);
         if (!validation.isValid) return { success: false, error: validation.errors[0] };
 
-        const newRoster = [...manager.activeRoster, playerId];
-        const newBench = manager.bench.filter((id) => id !== playerId);
-        await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
+        // Update slot_type in junction table
+        const { error } = await supabase
+          .from("manager_roster" as "managers")
+          .update({ slot_type: 'active', position: manager.activeRoster.length } as any)
+          .eq("player_id", playerId)
+          .eq("league_id", currentLeagueId);
+
+        if (error) {
+          return { success: false, error: error.message };
+        }
         return { success: true };
       },
 
       moveToBench: async (managerId, playerId) => {
-        const { managers, config } = get();
+        const { managers, config, currentLeagueId } = get();
         const manager = managers.find((m) => m.id === managerId);
-        if (!manager) return { success: false, error: "Manager not found" };
+        if (!manager || !currentLeagueId) return { success: false, error: "Manager not found" };
         if (manager.bench.length >= config.benchSize) {
           return { success: false, error: `Bench is full (${config.benchSize} players max)` };
         }
 
-        const newBench = [...manager.bench, playerId];
-        const newRoster = manager.activeRoster.filter((id) => id !== playerId);
-        await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
+        // Update slot_type in junction table
+        const { error } = await supabase
+          .from("manager_roster" as "managers")
+          .update({ slot_type: 'bench', position: manager.bench.length } as any)
+          .eq("player_id", playerId)
+          .eq("league_id", currentLeagueId);
+
+        if (error) {
+          return { success: false, error: error.message };
+        }
         return { success: true };
       },
 
       swapPlayers: async (managerId, player1Id, player2Id) => {
-        const { managers } = get();
+        const { managers, currentLeagueId } = get();
         const manager = managers.find((m) => m.id === managerId);
-        if (!manager) return { success: false, error: "Manager not found" };
+        if (!manager || !currentLeagueId) return { success: false, error: "Manager not found" };
 
         const player1InActive = manager.activeRoster.includes(player1Id);
         const player2InActive = manager.activeRoster.includes(player2Id);
 
-        let newRoster = [...manager.activeRoster];
-        let newBench = [...manager.bench];
-
-        if (player1InActive && !player2InActive) {
-          newRoster = newRoster.filter(id => id !== player1Id).concat(player2Id);
-          newBench = newBench.filter(id => id !== player2Id).concat(player1Id);
-        } else if (!player1InActive && player2InActive) {
-          newRoster = newRoster.filter(id => id !== player2Id).concat(player1Id);
-          newBench = newBench.filter(id => id !== player1Id).concat(player2Id);
-        } else {
+        if ((player1InActive && player2InActive) || (!player1InActive && !player2InActive)) {
           return { success: false, error: "Players must be in different sections to swap" };
         }
 
-        await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", managerId);
+        // Swap slot_types in junction table
+        const [update1, update2] = await Promise.all([
+          supabase
+            .from("manager_roster" as "managers")
+            .update({ slot_type: player1InActive ? 'bench' : 'active' } as any)
+            .eq("player_id", player1Id)
+            .eq("league_id", currentLeagueId),
+          supabase
+            .from("manager_roster" as "managers")
+            .update({ slot_type: player2InActive ? 'bench' : 'active' } as any)
+            .eq("player_id", player2Id)
+            .eq("league_id", currentLeagueId),
+        ]);
+
+        if (update1.error || update2.error) {
+          return { success: false, error: update1.error?.message || update2.error?.message || "Swap failed" };
+        }
         return { success: true };
       },
 
@@ -355,7 +397,7 @@ export const useGameStore = create<GameState>()(
       },
 
       removePlayerFromLeague: async (playerId) => {
-        const { players, managers, currentLeagueId } = get();
+        const { players, currentLeagueId } = get();
         if (!currentLeagueId) return;
 
         const player = players.find((p) => p.id === playerId);
@@ -364,15 +406,12 @@ export const useGameStore = create<GameState>()(
           return;
         }
 
-        const managersWithPlayer = managers.filter(
-          (m) => m.activeRoster.includes(playerId) || m.bench.includes(playerId)
-        );
-
-        for (const manager of managersWithPlayer) {
-          const newRoster = manager.activeRoster.filter((id) => id !== playerId);
-          const newBench = manager.bench.filter((id) => id !== playerId);
-          await supabase.from("managers").update({ roster: newRoster, bench: newBench }).eq("id", manager.id);
-        }
+        // Remove from manager_roster junction table (cascade handles this for us, but we do it explicitly)
+        await supabase
+          .from("manager_roster" as "managers")
+          .delete()
+          .eq("player_id", playerId)
+          .eq("league_id", currentLeagueId);
 
         // Remove from league_player_pool (not master_players - player may be used in other leagues)
         const { error } = await supabase
@@ -401,17 +440,30 @@ export const useGameStore = create<GameState>()(
         const { managers, players, currentLeagueId } = get();
         const manager1 = managers.find((m) => m.id === manager1Id);
         const manager2 = managers.find((m) => m.id === manager2Id);
-        if (!manager1 || !manager2) return;
+        if (!manager1 || !manager2 || !currentLeagueId) return;
 
-        const new1Roster = [...manager1.activeRoster.filter((id) => !players1.includes(id)), ...players2.filter((id) => manager2.activeRoster.includes(id))];
-        const new1Bench = [...manager1.bench.filter((id) => !players1.includes(id)), ...players2.filter((id) => manager2.bench.includes(id))];
-        const new2Roster = [...manager2.activeRoster.filter((id) => !players2.includes(id)), ...players1.filter((id) => manager1.activeRoster.includes(id))];
-        const new2Bench = [...manager2.bench.filter((id) => !players2.includes(id)), ...players1.filter((id) => manager1.bench.includes(id))];
+        // For trades, we need to swap manager_id while preserving slot_type
+        // Update players going from manager1 to manager2
+        const trade1to2 = players1.map(playerId => {
+          const wasActive = manager1.activeRoster.includes(playerId);
+          return supabase
+            .from("manager_roster" as "managers")
+            .update({ manager_id: manager2Id, slot_type: wasActive ? 'active' : 'bench' } as any)
+            .eq("player_id", playerId)
+            .eq("league_id", currentLeagueId);
+        });
 
-        await Promise.all([
-          supabase.from("managers").update({ roster: new1Roster, bench: new1Bench }).eq("id", manager1Id),
-          supabase.from("managers").update({ roster: new2Roster, bench: new2Bench }).eq("id", manager2Id),
-        ]);
+        // Update players going from manager2 to manager1
+        const trade2to1 = players2.map(playerId => {
+          const wasActive = manager2.activeRoster.includes(playerId);
+          return supabase
+            .from("manager_roster" as "managers")
+            .update({ manager_id: manager1Id, slot_type: wasActive ? 'active' : 'bench' } as any)
+            .eq("player_id", playerId)
+            .eq("league_id", currentLeagueId);
+        });
+
+        await Promise.all([...trade1to2, ...trade2to1]);
 
         const player1Names = players1.map((id) => players.find((p) => p.id === id)?.name).join(", ");
         const player2Names = players2.map((id) => players.find((p) => p.id === id)?.name).join(", ");
@@ -431,8 +483,14 @@ export const useGameStore = create<GameState>()(
         const { managers, schedule, currentLeagueId } = get();
         if (!currentLeagueId) return;
 
+        // Delete all roster entries for this league from junction table
+        await supabase
+          .from("manager_roster" as "managers")
+          .delete()
+          .eq("league_id", currentLeagueId);
+
         for (const manager of managers) {
-          await supabase.from("managers").update({ wins: 0, losses: 0, points: 0, roster: [], bench: [] }).eq("id", manager.id);
+          await supabase.from("managers").update({ wins: 0, losses: 0, points: 0 }).eq("id", manager.id);
         }
         for (const match of schedule) {
           await supabase.from("schedule").update({ home_score: null, away_score: null, is_finalized: false }).eq("id", match.id);
@@ -583,10 +641,12 @@ export const useGameStore = create<GameState>()(
           const parallelFetchStart = performance.now();
           // console.log(`[useGameStore] 🔄 Starting parallel fetch of players, managers, schedule, transactions...`);
 
-          const [playersRes, managersRes, scheduleRes, transactionsRes, draftPicksRes, draftOrderRes, draftStateRes] = await Promise.all([
+          const [playersRes, managersRes, rosterRes, scheduleRes, transactionsRes, draftPicksRes, draftOrderRes, draftStateRes] = await Promise.all([
             // Query the league_players view which joins master_players + league_player_pool
             supabase.from("league_players").select("*").eq("league_id", leagueId).order("name"),
             supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
+            // Fetch roster entries from junction table
+            supabase.from("manager_roster" as "managers").select("*").eq("league_id", leagueId),
             supabase.from("schedule" as 'schedule').select("*").eq("league_id", leagueId).order("week").order("created_at"),
             supabase.from("transactions" as 'transactions').select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
             supabase.from("draft_picks").select("*").eq("league_id", leagueId).order("round").order("pick_position"),
@@ -599,7 +659,11 @@ export const useGameStore = create<GameState>()(
 
           const mappingStart = performance.now();
           const players = (playersRes.data as Tables<"league_players">[] | null)?.map(mapDbPlayer) || [];
-          const managers = (managersRes.data as Tables<"managers">[] | null)?.map(mapDbManager) || [];
+          // Map roster entries for use with mapDbManagerWithRoster
+          // Cast as unknown first since types aren't regenerated yet
+          const rosterEntries = (rosterRes.data as unknown as ManagerRosterEntry[] | null) || [];
+          // Use mapDbManagerWithRoster to reconstruct rosters from junction table
+          const managers = (managersRes.data as Tables<"managers">[] | null)?.map(m => mapDbManagerWithRoster(m, rosterEntries)) || [];
           const schedule = (scheduleRes.data as Tables<"schedule">[] | null)?.map(mapDbSchedule) || [];
           const activities = (transactionsRes.data as Tables<"transactions">[] | null)?.map(mapDbTransaction) || [];
 
@@ -658,6 +722,19 @@ export const useGameStore = create<GameState>()(
             }
             else if (payload.eventType === "UPDATE") get().updateManager(payload.new.id, mapDbManager(payload.new as Tables<"managers">));
             else if (payload.eventType === "DELETE") get().removeManager(payload.old.id);
+          })
+          // Subscribe to manager_roster changes - refetch managers when rosters change
+          .on("postgres_changes", { event: "*", schema: "public", table: "manager_roster", filter }, async () => {
+            // Refetch managers with their rosters when junction table changes
+            const [managersRes, rosterRes] = await Promise.all([
+              supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
+              supabase.from("manager_roster" as "managers").select("*").eq("league_id", leagueId),
+            ]);
+            if (managersRes.data && rosterRes.data) {
+              const rosterEntries = rosterRes.data as unknown as ManagerRosterEntry[];
+              const managers = (managersRes.data as Tables<"managers">[]).map(m => mapDbManagerWithRoster(m, rosterEntries));
+              set({ managers });
+            }
           })
           .on("postgres_changes", { event: "*", schema: "public", table: "schedule", filter }, (payload) => {
             if (payload.eventType === "INSERT") {

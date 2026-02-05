@@ -2,6 +2,16 @@ import { Tables } from '@/integrations/supabase/types';
 import { Player, Manager, Match, Activity, PlayerTransaction } from '@/lib/supabase-types';
 import { DraftPick, DraftOrder, DraftState, DbDraftPick, DbDraftOrder, DbDraftState } from '@/lib/draft-types';
 
+// Type for manager_roster junction table entries
+export interface ManagerRosterEntry {
+  id: string;
+  manager_id: string;
+  player_id: string;
+  league_id: string;
+  slot_type: 'active' | 'bench';
+  position: number;
+}
+
 // Maps data from league_players view (which joins master_players + league_player_pool)
 export const mapDbPlayer = (db: Tables<"league_players">): Player => ({
   id: db.id!,
@@ -23,6 +33,38 @@ export const mapDbManager = (db: Tables<"managers">): Manager => ({
   activeRoster: db.roster || [],
   bench: db.bench || [],
 });
+
+// Maps manager data with roster entries from junction table
+// This reconstructs the activeRoster and bench arrays from manager_roster entries
+export const mapDbManagerWithRoster = (
+  db: Tables<"managers">,
+  rosterEntries: ManagerRosterEntry[]
+): Manager => {
+  // Filter entries for this manager and sort by position
+  const managerEntries = rosterEntries.filter(e => e.manager_id === db.id);
+
+  const activeRoster = managerEntries
+    .filter(e => e.slot_type === 'active')
+    .sort((a, b) => a.position - b.position)
+    .map(e => e.player_id);
+
+  const bench = managerEntries
+    .filter(e => e.slot_type === 'bench')
+    .sort((a, b) => a.position - b.position)
+    .map(e => e.player_id);
+
+  return {
+    id: db.id,
+    name: db.name,
+    teamName: db.team_name,
+    wins: db.wins,
+    losses: db.losses,
+    points: db.points,
+    userId: db.user_id,
+    activeRoster,
+    bench,
+  };
+};
 
 export const mapDbSchedule = (db: Tables<"schedule">): Match => ({
   id: db.id,
