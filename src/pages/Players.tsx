@@ -7,13 +7,12 @@ import { PlayerCard } from '@/components/PlayerCard';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { AppLayout } from '@/components/AppLayout';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { RosterManagementDialog } from '@/components/RosterManagementDialog';
 import { TradeDialog } from '@/components/TradeDialog';
 import { Player, Manager } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
 import { usePlayerFilters } from '@/hooks/usePlayerFilters';
-import { getTeamFilterColors, getTeamPillStyles } from '@/lib/team-colors';
+import { getTeamPillStyles } from '@/lib/team-colors';
 
 const ROLE_AND_NATIONALITY_FILTERS = {
   All: 'bg-primary/20 text-primary border-primary/30',

@@ -1,21 +1,18 @@
-
 import React, { useMemo } from 'react';
-import { Loader2, Plane, Calendar, Clock, ChevronRight } from 'lucide-react';
+import { Plane, Clock } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
-    DialogHeader,
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
 import { TournamentPlayer } from '@/lib/cricket-types';
-import { TournamentType, getTournamentById, SUPPORTED_TOURNAMENTS } from '@/lib/tournaments';
-import { usePlayerInfo, usePlayerSchedule, useExtendedPlayer, PlayerMatchPerformance } from '@/hooks/usePlayerDetails';
+import { getTournamentById, SUPPORTED_TOURNAMENTS } from '@/lib/tournaments';
+import { usePlayerSchedule, useExtendedPlayer, PlayerMatchPerformance } from '@/hooks/usePlayerDetails';
 import { getPlayerAvatarUrl, getPlayerTeamForTournament, TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
@@ -217,7 +214,7 @@ export function PlayerDetailDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none z-[100]">
                 {/* Background Pattern */}
-                <div className="absolute inset-0 bg-[#0f1014] rounded-xl overflow-hidden">
+                <div className="absolute inset-0 bg-[#0f1014] rounded-xl overflow-hidden pointer-events-none">
                     {/* Header Background Gradient */}
                     <div className={cn("absolute inset-x-0 top-0 h-48 bg-gradient-to-b opacity-20", teamColors.bg)} />
                 </div>
@@ -320,13 +317,6 @@ export function PlayerDetailDialog({
 
                 {/* Content Section */}
                 <div className="bg-card flex-1 flex flex-col min-h-0">
-                    <div className="p-3 border-b flex-shrink-0 flex items-center justify-between bg-muted/5">
-                        <h3 className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-2">
-                            <Calendar className="w-3.5 h-3.5" />
-                            Game Log
-                        </h3>
-                    </div>
-
                     <ScrollArea className="flex-1 w-full">
                         <div className="p-0">
                             <div className="min-w-[700px] md:min-w-full">
