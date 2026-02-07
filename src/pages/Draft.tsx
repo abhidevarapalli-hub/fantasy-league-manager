@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 const Draft = () => {
   const loading = useGameStore(state => state.loading);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
-
+  const config = useGameStore(state => state.config);
+  const totalRounds = config.activeSize + config.benchSize;
 
   if (loading) {
     return (
@@ -22,7 +23,7 @@ const Draft = () => {
   return (
     <AppLayout
       title="Draft Board"
-      subtitle="8 teams × 14 rounds snake draft"
+      subtitle={`${config.managerCount} teams × ${totalRounds} rounds snake draft`}
       headerActions={
         !isLeagueManager ? <Lock className="w-4 h-4 text-muted-foreground" /> : null
       }

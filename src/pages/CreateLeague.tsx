@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Trophy, Users, Shield, Layout, Save, ChevronRight, Globe, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSeedDatabase } from '@/hooks/useSeedDatabase';
 import { SUPPORTED_TOURNAMENTS, type Tournament } from '@/lib/tournaments';
+import { validateLeagueMinimums, LeagueConfig } from '@/lib/roster-validation';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 import { toast } from 'sonner';
 
@@ -28,6 +31,50 @@ const CreateLeague = () => {
     const [managerCount, setManagerCount] = useState(8);
     const [activeSize, setActiveSize] = useState(11);
     const [benchSize, setBenchSize] = useState(3);
+
+    // Position Minimums (Defaults for Size 11)
+    const [minWks, setMinWks] = useState(1);
+    const [minBatsmen, setMinBatsmen] = useState(1); // Standard default is 1, but we might want 3 for size 11
+    const [minBowlers, setMinBowlers] = useState(3);
+    const [minAllRounders, setMinAllRounders] = useState(1);
+
+    // Dynamic Defaults based on Active Size
+    useEffect(() => {
+        // Only set intelligent defaults if the user hasn't heavily customized (optional refinement, but simple overwrite is easier for now)
+        switch (activeSize) {
+            case 11:
+                setMinWks(1); setMinBatsmen(3); setMinBowlers(3); setMinAllRounders(1);
+                break;
+            case 10:
+                setMinWks(1); setMinBatsmen(2); setMinBowlers(3); setMinAllRounders(1);
+                break;
+            case 9:
+                setMinWks(1); setMinBatsmen(2); setMinBowlers(2); setMinAllRounders(1);
+                break;
+            case 8:
+                setMinWks(1); setMinBatsmen(2); setMinBowlers(2); setMinAllRounders(1);
+                break;
+            case 7:
+                setMinWks(1); setMinBatsmen(1); setMinBowlers(2); setMinAllRounders(1);
+                break;
+            case 6:
+                setMinWks(1); setMinBatsmen(1); setMinBowlers(1); setMinAllRounders(1);
+                break;
+            default:
+                // Safe fallbacks for other sizes
+                setMinWks(1); setMinBatsmen(1); setMinBowlers(1); setMinAllRounders(1);
+        }
+    }, [activeSize]);
+
+    // Validation
+    const leagueConfigForValidation: LeagueConfig = {
+        managerCount, activeSize, benchSize,
+        minWks, minBatsmen, minBowlers, minAllRounders,
+        maxBatsmen: 10, // Not used in UI yet, but required by type
+        maxInternational: 4 // Not user configurable yet
+    };
+    const validationResult = validateLeagueMinimums(leagueConfigForValidation);
+
 
     // Tournament Selection (default to IPL)
     const [selectedTournament, setSelectedTournament] = useState<Tournament>(
@@ -67,11 +114,11 @@ const CreateLeague = () => {
                 manager_count: managerCount,
                 active_size: activeSize,
                 bench_size: benchSize,
-                min_batsmen: 1,
-                max_batsmen: 6,
-                min_bowlers: 3,
-                min_wks: 1,
-                min_all_rounders: 1,
+                min_batsmen: minBatsmen,
+                max_batsmen: 6, // Kept for schema compat, or update if we add a slider
+                min_bowlers: minBowlers,
+                min_wks: minWks,
+                min_all_rounders: minAllRounders,
                 max_international: selectedTournament.type === 'international' ? 11 : 4, // Allow all international for T20 WC
             };
 
@@ -361,8 +408,8 @@ const CreateLeague = () => {
                                                     htmlFor={`tournament-${tournament.id}`}
                                                     className={`
                                                         flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all
-                                                        ${selectedTournament.id === tournament.id 
-                                                            ? 'border-primary bg-primary/5' 
+                                                        ${selectedTournament.id === tournament.id
+                                                            ? 'border-primary bg-primary/5'
                                                             : 'border-border hover:border-primary/50 hover:bg-primary/5'}
                                                     `}
                                                 >
@@ -444,6 +491,67 @@ const CreateLeague = () => {
                                             <p className="text-xs text-muted-foreground">Reserve players kept out of the lineup (0-5).</p>
                                         </div>
                                     </div>
+
+                                    {/* Position Requirements Section */}
+                                    <div className="space-y-6 pt-4 border-t border-primary/10">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                                                <Shield className="w-5 h-5 text-primary" />
+                                                Roster Requirements (Minimums)
+                                            </h3>
+                                            <div className="flex flex-col items-end">
+                                                <span className={`text-sm font-bold px-2 py-0.5 rounded-md ${!validationResult.isValid ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
+                                                    Total: {minWks + minBatsmen + minBowlers + minAllRounders} / {activeSize}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {!validationResult.isValid && (
+                                            <Alert variant="destructive">
+                                                <AlertCircle className="h-4 w-4" />
+                                                <AlertTitle>Invalid Configuration</AlertTitle>
+                                                <AlertDescription>
+                                                    {validationResult.message}
+                                                </AlertDescription>
+                                            </Alert>
+                                        )}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center">
+                                                    <Label>Min Wicket Keepers</Label>
+                                                    <span className="text-sm font-bold bg-muted px-2 rounded">{minWks}</span>
+                                                </div>
+                                                <Slider value={[minWks]} min={0} max={5} step={1} onValueChange={([v]) => setMinWks(v)} />
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center">
+                                                    <Label>Min Batsmen</Label>
+                                                    <span className="text-sm font-bold bg-muted px-2 rounded">{minBatsmen}</span>
+                                                </div>
+                                                <Slider value={[minBatsmen]} min={0} max={6} step={1} onValueChange={([v]) => setMinBatsmen(v)} />
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center">
+                                                    <Label>Min All-Rounders</Label>
+                                                    <span className="text-sm font-bold bg-muted px-2 rounded">{minAllRounders}</span>
+                                                </div>
+                                                <Slider value={[minAllRounders]} min={0} max={6} step={1} onValueChange={([v]) => setMinAllRounders(v)} />
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center">
+                                                    <Label>Min Bowlers</Label>
+                                                    <span className="text-sm font-bold bg-muted px-2 rounded">{minBowlers}</span>
+                                                </div>
+                                                <Slider value={[minBowlers]} min={0} max={6} step={1} onValueChange={([v]) => setMinBowlers(v)} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="pb-4"></div>
+
                                 </>
                             ) : (
                                 <div className="space-y-6">
@@ -477,7 +585,7 @@ const CreateLeague = () => {
                             <Button
                                 className="flex-1 h-12 text-lg font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
                                 onClick={() => step === 1 ? setStep(2) : handleCreateLeague()}
-                                disabled={loading || (step === 1 && !leagueName) || (step === 2 && !teamName)}
+                                disabled={loading || (step === 1 && (!leagueName || !validationResult.isValid)) || (step === 2 && !teamName)}
 
                             >
                                 {loading ? (

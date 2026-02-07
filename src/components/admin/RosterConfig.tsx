@@ -4,7 +4,8 @@ import { useGameStore } from '@/store/useGameStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LeagueConfig } from '@/lib/roster-validation';
+import { LeagueConfig, validateLeagueMinimums } from '@/lib/roster-validation';
+import { AlertCircle } from 'lucide-react';
 
 interface ConfigField {
   key: keyof LeagueConfig;
@@ -44,7 +45,11 @@ export const RosterConfig = () => {
     setEditedConfig(prev => ({ ...prev, [key]: numValue }));
   };
 
+  const validationResult = validateLeagueMinimums(editedConfig);
+
   const handleSave = async () => {
+    if (!validationResult.isValid) return;
+
     setSaving(true);
     try {
       const result = await updateLeagueConfig(editedConfig);
@@ -72,6 +77,13 @@ export const RosterConfig = () => {
         )}
       </div>
 
+      {!validationResult.isValid && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2 text-red-500">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <p className="text-sm font-medium">{validationResult.message}</p>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {CONFIG_FIELDS.map((field) => (
@@ -92,13 +104,18 @@ export const RosterConfig = () => {
           ))}
         </div>
 
-        {/* Summary */}
-        <div className="bg-muted/50 rounded-lg p-3 border border-border">
+        <div className="bg-muted/50 rounded-lg p-3 border border-border space-y-1">
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">Total Roster Cap:</span>{' '}
             {editedConfig.activeSize + editedConfig.benchSize} players
             ({editedConfig.activeSize} active + {editedConfig.benchSize} bench)
           </p>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Minimum Requirements Sum:</span>
+            <span className={`font-mono font-bold ${!validationResult.isValid ? 'text-red-500' : 'text-green-500'}`}>
+              {editedConfig.minWks + editedConfig.minBatsmen + editedConfig.minBowlers + editedConfig.minAllRounders} / {editedConfig.activeSize}
+            </span>
+          </div>
         </div>
 
         {/* Action buttons */}
@@ -114,7 +131,7 @@ export const RosterConfig = () => {
           <Button
             onClick={handleSave}
             className="flex-1"
-            disabled={!hasChanges || saving}
+            disabled={!hasChanges || saving || !validationResult.isValid}
           >
             {saving ? (
               'Saving...'

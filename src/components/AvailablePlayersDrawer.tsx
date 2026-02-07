@@ -10,7 +10,7 @@ import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Player } from '@/lib/supabase-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RosterGrid } from '@/components/RosterGrid';
-import { getActiveRosterSlots } from '@/lib/roster-validation';
+import { buildOptimalActive11 } from '@/lib/roster-validation';
 import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
 import { getTeamFilterColors, getTeamPillStyles } from '@/lib/team-colors';
 
@@ -139,24 +139,37 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
         .filter((p): p is Player => p !== undefined);
 
       // Distribute into Active and Bench using the validation logic
-      // getActiveRosterSlots returns the optimal active lineup
-      const activeSlots = getActiveRosterSlots(pickedPlayers, config);
+      let { active, bench } = buildOptimalActive11(pickedPlayers, config);
 
-      const activePlayerIds = activeSlots
-        .map(slot => slot.player?.id)
-        .filter((id): id is string => id !== undefined);
+      if (manager.teamName === 'Run') {
+        console.log(`[Drawer Debug] Picks=${managerPicks.length}, Resolved=${pickedPlayers.length}`);
+        console.log(`[Drawer] Run Team: All=${pickedPlayers.length}, Active=${active.length}, Bench=${bench.length}`);
+        console.log(`[Drawer] Config: ActiveSize=${config.activeSize}, BenchSize=${config.benchSize}`);
 
-      const activePlayerIdsSet = new Set(activePlayerIds);
+        // Debug attachment
+        (manager as any)._debugInfo = {
+          picks: managerPicks.length,
+          resolved: pickedPlayers.length,
+          active: active.length,
+          bench: bench.length,
+          cfgActive: config.activeSize,
+          cfgBench: config.benchSize
+        };
+      }
 
-      // Remaining players go to bench
-      const benchPlayerIds = pickedPlayers
-        .filter(p => !activePlayerIdsSet.has(p.id))
-        .map(p => p.id);
+      // SAFEGUARD: Ensure no players are lost
+      const processedIds = new Set([...active, ...bench].map(p => p.id));
+      const missingPlayers = pickedPlayers.filter(p => !processedIds.has(p.id));
+
+      if (missingPlayers.length > 0) {
+        console.warn(`[Drawer] Found ${missingPlayers.length} missing players for ${manager.teamName}, forcing to bench`, missingPlayers);
+        bench = [...bench, ...missingPlayers];
+      }
 
       return {
         ...manager,
-        activeRoster: activePlayerIds,
-        bench: benchPlayerIds
+        activeRoster: active.map(p => p.id),
+        bench: bench.map(p => p.id)
       };
     });
   }, [managers, draftPicks, players, config]);
@@ -392,7 +405,19 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
                 {displayManagers.map(manager => (
                   <div key={manager.id} className="min-h-[400px] space-y-2 flex flex-col bg-card/30 rounded-xl border border-border/50 p-2">
                     <div className="flex justify-between items-center py-1 border-b px-1">
-                      <h3 className="font-bold text-sm truncate max-w-[70%]">{manager.teamName}</h3>
+                      <h3 className="font-bold text-sm truncate max-w-[70%]">
+                        {manager.teamName}
+                        {(manager as any)._debugInfo && (
+                          <span className="text-[10px] ml-2 text-yellow-500 font-mono">
+                            P:{(manager as any)._debugInfo.picks}/
+                            R:{(manager as any)._debugInfo.resolved}
+                            Activ:{(manager as any)._debugInfo.active}/
+                            ActCfg:{(manager as any)._debugInfo.cfgActive}
+                            Bnch:{(manager as any)._debugInfo.bench}/
+                            BnchCfg:{(manager as any)._debugInfo.cfgBench}
+                          </span>
+                        )}
+                      </h3>
                       <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full whitespace-nowrap">
                         {(manager.activeRoster?.length || 0) + (manager.bench?.length || 0)} / {config.activeSize + config.benchSize}
                       </span>
