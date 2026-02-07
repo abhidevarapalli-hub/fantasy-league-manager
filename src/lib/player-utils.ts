@@ -13,7 +13,7 @@ export type AppRole = 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper';
  */
 export function mapApiRole(apiRole: string): AppRole {
   const normalizedRole = apiRole.toLowerCase().trim();
-  
+
   if (normalizedRole.includes('wk') || normalizedRole.includes('wicket')) {
     return 'Wicket Keeper';
   }
@@ -26,7 +26,7 @@ export function mapApiRole(apiRole: string): AppRole {
   if (normalizedRole.includes('bat')) {
     return 'Batsman';
   }
-  
+
   // Default to All Rounder for unknown roles
   return 'All Rounder';
 }
@@ -68,7 +68,7 @@ export function getTeamCode(teamName: string): string {
   if (INTERNATIONAL_TEAM_CODES[teamName]) {
     return INTERNATIONAL_TEAM_CODES[teamName];
   }
-  
+
   // For IPL/franchise teams, they usually already have short codes
   // or we generate a 2-3 letter code from the name
   const words = teamName.split(' ');
@@ -76,7 +76,7 @@ export function getTeamCode(teamName: string): string {
     // Take first letter of first two words (e.g., "Mumbai Indians" -> "MI")
     return words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
   }
-  
+
   // Fallback: first 3 characters
   return teamName.substring(0, 3).toUpperCase();
 }
@@ -134,6 +134,7 @@ export const TEAM_SHORT_TO_COUNTRY: Record<string, string> = {
   'SL': 'Sri Lanka',
   'UAE': 'United Arab Emirates',
   'USA': 'United States of America',
+  'US': 'United States of America',
   'HK': 'Hong Kong',
   'PNG': 'Papua New Guinea',
 };
@@ -162,13 +163,13 @@ export function getPlayerTeamForTournament(
   if (tournamentType === 'league') {
     return franchiseTeam;
   }
-  
+
   // For international tournaments (T20 WC)
   // Domestic players (not international) are Indian
   if (!isInternational) {
     return 'IND';
   }
-  
+
   // For overseas players, use the national team if provided
   if (nationalTeam) {
     // nationalTeam might be full name or short code
@@ -179,7 +180,7 @@ export function getPlayerTeamForTournament(
     // Convert full name to short code
     return INTERNATIONAL_TEAM_CODES[nationalTeam] || nationalTeam;
   }
-  
+
   // Fallback: return franchise team (won't match international matches)
   // The UI should handle this by fetching player info from API
   return franchiseTeam;

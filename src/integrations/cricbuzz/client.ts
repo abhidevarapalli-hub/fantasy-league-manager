@@ -492,6 +492,7 @@ export interface SeriesMatchInfo {
   };
   seriesStartDt?: string;
   seriesEndDt?: string;
+  week?: number;
 }
 
 /**

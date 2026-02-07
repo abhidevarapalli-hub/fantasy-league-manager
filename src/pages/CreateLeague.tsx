@@ -238,7 +238,7 @@ const CreateLeague = () => {
 
             const managerIds = allManagers.map(m => m.id);
             const numTeams = managerIds.length;
-            const weeks = 7;
+            const weeks = selectedTournament.type === 'international' ? 5 : 7;
             const matchups: any[] = [];
 
             // Helper to shuffle array

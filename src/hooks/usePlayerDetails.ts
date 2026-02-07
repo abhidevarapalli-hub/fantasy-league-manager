@@ -296,10 +296,64 @@ export function useSeriesMatches(seriesId: number | null) {
     queryKey: ['series', 'matches', seriesId],
     queryFn: async () => {
       if (!seriesId) throw new Error('Series ID required');
+
+      // T20 WC 2026: Fetch from Database
+      if (seriesId === 11253) {
+        const { data, error } = await supabase
+          .from('cricket_matches')
+          .select('*')
+          .eq('series_id', seriesId);
+
+        if (error) {
+          console.error('Error fetching schedule from DB:', error);
+          throw error;
+        }
+
+        // Helper to normalize team codes from DB to match App/Cricbuzz standard
+        const normalizeDBTeamCode = (code: string) => {
+          const map: Record<string, string> = {
+            'OMAN': 'OMN',
+            'RSA': 'SA',
+            'USA': 'US'
+          };
+          return map[code] || code;
+        };
+
+        // Map DB structure to API structure to maintain compatibility
+        return data.map((m: any) => ({
+          matchInfo: {
+            matchId: m.cricbuzz_match_id,
+            matchDesc: m.match_description || '',
+            matchFormat: m.match_format || 'T20',
+            startDate: new Date(m.match_date || Date.now()).getTime().toString(),
+            endDate: new Date(m.match_date || Date.now()).getTime().toString(), // Placeholder
+            state: m.state || 'Upcoming',
+            status: m.result || '',
+            team1: {
+              teamId: m.team1_id || 0,
+              teamName: m.team1_name || '',
+              teamSName: normalizeDBTeamCode(m.team1_short || ''),
+            },
+            team2: {
+              teamId: m.team2_id || 0,
+              teamName: m.team2_name || '',
+              teamSName: normalizeDBTeamCode(m.team2_short || ''),
+            },
+            venueInfo: {
+              ground: m.venue || '',
+              city: m.city || '',
+              timezone: 'GMT',
+            },
+            week: m.match_week || 6, // Default to week 6 if null (Knockouts/Super 8)
+          },
+          matchScore: undefined, // No scores in schedule table yet
+        }));
+      }
+
       const response = await fetchSeriesMatches(seriesId);
       return extractSeriesMatches(response);
     },
-    enabled: !!seriesId && isApiConfigured(),
+    enabled: !!seriesId && (seriesId === 11253 || isApiConfigured()),
     staleTime: 5 * 60 * 1000,
     retry: 2,
   });
@@ -378,6 +432,7 @@ export function usePlayerSchedule(
         result: matchInfo.status,
         isUpcoming,
         matchState: matchInfo.state,
+        week: matchInfo.week,
         // Score summary for completed matches
         teamScore: isTeam1 ? matchScore?.team1Score : matchScore?.team2Score,
         opponentScore: isTeam1 ? matchScore?.team2Score : matchScore?.team1Score,

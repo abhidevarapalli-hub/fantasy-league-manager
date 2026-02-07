@@ -377,7 +377,7 @@ export function PlayerDetailDialog({
                                         const result = (matchItem as any).result;
 
                                         // Week number
-                                        const weekNum = index + 1;
+                                        const weekNum = (matchItem as any).week || index + 1;
 
                                         return (
                                             <div
