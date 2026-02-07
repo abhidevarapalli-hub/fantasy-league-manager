@@ -383,8 +383,8 @@ export const StatsImport = () => {
           addedCount++;
           setMatches(prev => [
             {
-              id: data[0].match_id,
-              leagueMatchId: data[0].league_match_id,
+              id: data[0].out_match_id,
+              leagueMatchId: data[0].out_league_match_id,
               cricbuzzMatchId: match.matchId,
               matchDescription: match.matchDesc,
               team1Name: match.team1.teamName,
@@ -473,8 +473,8 @@ export const StatsImport = () => {
       if (data && data.length > 0) {
         setMatches(prev => [
           {
-            id: data[0].match_id,
-            leagueMatchId: data[0].league_match_id,
+            id: data[0].out_match_id,
+            leagueMatchId: data[0].out_league_match_id,
             cricbuzzMatchId: cricbuzzMatchId,
             matchDescription: `Match #${cricbuzzMatchId}`,
             team1Name: '',

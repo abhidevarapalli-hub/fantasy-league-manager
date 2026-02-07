@@ -59,7 +59,9 @@ Key characteristics:
 - Verify frontend changes on the browser
 - Use strict typing whenever possible
 - Use the playwright MCP when asked to verify changes in the browser
- 
+- Look for servers before starting a new server, kill old ones if a new one needs to start
+- Consider database schema changes with future scalability in mind
+
 ## Don't Change
  
 - Production environment variables

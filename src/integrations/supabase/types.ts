@@ -1396,8 +1396,8 @@ export type Database = {
           p_week?: number | null
         }
         Returns: {
-          match_id: string
-          league_match_id: string
+          out_match_id: string
+          out_league_match_id: string
           is_new_match: boolean
         }[]
       }
