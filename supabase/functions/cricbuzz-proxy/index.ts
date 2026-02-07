@@ -1,11 +1,34 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const RAPIDAPI_HOST = 'cricbuzz-cricket.p.rapidapi.com';
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds cache
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Simple in-memory cache with TTL
+interface CacheEntry {
+  data: unknown;
+  timestamp: number;
+  status: number;
+}
+
+const cache = new Map<string, CacheEntry>();
+
+// Clean expired entries periodically
+function cleanCache() {
+  const now = Date.now();
+  for (const [key, entry] of cache.entries()) {
+    if (now - entry.timestamp > CACHE_TTL_MS) {
+      cache.delete(key);
+    }
+  }
+}
+
+// Clean cache every minute
+setInterval(cleanCache, 60 * 1000);
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -15,14 +38,17 @@ serve(async (req) => {
 
   try {
     let endpoint: string | null = null;
+    let bypassCache = false;
 
     // Support both GET with query param and POST with body
     if (req.method === 'GET') {
       const url = new URL(req.url);
       endpoint = url.searchParams.get('endpoint');
+      bypassCache = url.searchParams.get('bypass_cache') === 'true';
     } else if (req.method === 'POST') {
       const body = await req.json();
       endpoint = body.endpoint;
+      bypassCache = body.bypass_cache === true;
     }
 
     if (!endpoint) {
@@ -30,6 +56,26 @@ serve(async (req) => {
         JSON.stringify({ error: 'Missing endpoint parameter' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Check cache first (unless bypass requested)
+    if (!bypassCache) {
+      const cached = cache.get(endpoint);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        console.log(`Cache hit for ${endpoint}`);
+        return new Response(
+          JSON.stringify(cached.data),
+          {
+            status: cached.status,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'X-Cache': 'HIT',
+              'X-Cache-Age': String(Math.floor((Date.now() - cached.timestamp) / 1000)),
+            }
+          }
+        );
+      }
     }
 
     const rapidApiKey = Deno.env.get('RAPIDAPI_KEY');
@@ -53,11 +99,25 @@ serve(async (req) => {
 
     const data = await response.json();
 
+    // Cache successful responses
+    if (response.ok) {
+      cache.set(endpoint, {
+        data,
+        timestamp: Date.now(),
+        status: response.status,
+      });
+      console.log(`Cached response for ${endpoint}`);
+    }
+
     return new Response(
       JSON.stringify(data),
       {
         status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'X-Cache': 'MISS',
+        }
       }
     );
   } catch (error) {

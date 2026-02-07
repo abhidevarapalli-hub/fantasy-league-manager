@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Download,
   Search,
@@ -9,6 +9,9 @@ import {
   RefreshCw,
   Trophy,
   Zap,
+  Radio,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +36,9 @@ import {
   parseScorecard,
   matchStatsToLeaguePlayers,
   saveMatchStats,
+  saveMatchStatsLive,
+  finalizeMatchStats,
+  extractManOfMatch,
   type PlayerStatsWithOwnership,
   type CricbuzzScorecard,
 } from '@/lib/cricbuzz-stats-service';
@@ -44,9 +50,14 @@ import {
   type CricbuzzSeries,
   type CricbuzzMatch,
 } from '@/lib/cricbuzz-api';
+import {
+  livePollingService,
+  type PollingStatus,
+} from '@/lib/live-polling-service';
 
 interface CricketMatch {
   id: string;
+  leagueMatchId: string; // ID from league_matches junction table
   cricbuzzMatchId: number;
   matchDescription: string;
   team1Name: string;
@@ -57,6 +68,8 @@ interface CricketMatch {
   statsImported: boolean;
   week: number | null;
   isLive?: boolean;
+  matchState?: 'Upcoming' | 'Live' | 'Complete';
+  pollingEnabled?: boolean;
 }
 
 export const StatsImport = () => {
@@ -84,39 +97,208 @@ export const StatsImport = () => {
   const [isLoadingSeriesMatches, setIsLoadingSeriesMatches] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Polling state
+  const [pollingStatuses, setPollingStatuses] = useState<Map<number, PollingStatus>>(new Map());
+  const [isTogglingPolling, setIsTogglingPolling] = useState<number | null>(null);
+  const [isTriggeringPoll, setIsTriggeringPoll] = useState<number | null>(null);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+
   const maxWeek = Math.max(7, ...schedule.map(m => m.week));
 
-  // Fetch saved matches for the league
+  // Fetch polling statuses
+  const fetchPollingStatuses = useCallback(async () => {
+    if (!currentLeagueId) return;
+
+    const statuses = await livePollingService.getLeaguePollingStatuses(currentLeagueId);
+    const statusMap = new Map<number, PollingStatus>();
+    for (const status of statuses) {
+      statusMap.set(status.cricbuzzMatchId, status);
+    }
+    setPollingStatuses(statusMap);
+  }, [currentLeagueId]);
+
+  // Subscribe to polling status updates
+  useEffect(() => {
+    if (!currentLeagueId || matches.length === 0) return;
+
+    const unsubscribes: Array<() => void> = [];
+
+    for (const match of matches) {
+      const unsubscribe = livePollingService.subscribeToPollingStatus(
+        match.cricbuzzMatchId,
+        (status) => {
+          setPollingStatuses(prev => {
+            const newMap = new Map(prev);
+            newMap.set(status.cricbuzzMatchId, status);
+            return newMap;
+          });
+        }
+      );
+      unsubscribes.push(unsubscribe);
+    }
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [currentLeagueId, matches]);
+
+  // Fetch polling statuses when matches change
+  useEffect(() => {
+    fetchPollingStatuses();
+  }, [fetchPollingStatuses, matches]);
+
+  // Fetch saved matches for the league via league_matches junction table
   useEffect(() => {
     if (!currentLeagueId) return;
 
     const fetchMatches = async () => {
+      // Query league_matches and join with cricket_matches for shared data
       const { data, error } = await supabase
-        .from('cricket_matches')
-        .select('*')
-        .eq('league_id', currentLeagueId)
-        .order('match_date', { ascending: false });
+        .from('league_matches')
+        .select(`
+          id,
+          week,
+          stats_imported,
+          stats_imported_at,
+          match:cricket_matches (
+            id,
+            cricbuzz_match_id,
+            match_description,
+            team1_name,
+            team2_name,
+            result,
+            match_date,
+            venue,
+            match_state,
+            polling_enabled
+          )
+        `)
+        .eq('league_id', currentLeagueId);
 
       if (data && !error) {
-        setMatches(
-          data.map(m => ({
-            id: m.id,
-            cricbuzzMatchId: m.cricbuzz_match_id,
-            matchDescription: m.match_description || '',
-            team1Name: m.team1_name || '',
-            team2Name: m.team2_name || '',
-            result: m.result || '',
-            matchDate: m.match_date || '',
-            venue: m.venue || '',
-            statsImported: m.stats_imported || false,
-            week: m.week,
-          }))
-        );
+        const mappedMatches = data
+          .filter(lm => lm.match) // Filter out any with null match (shouldn't happen)
+          .map(lm => ({
+            id: lm.match!.id,
+            leagueMatchId: lm.id,
+            cricbuzzMatchId: lm.match!.cricbuzz_match_id,
+            matchDescription: lm.match!.match_description || '',
+            team1Name: lm.match!.team1_name || '',
+            team2Name: lm.match!.team2_name || '',
+            result: lm.match!.result || '',
+            matchDate: lm.match!.match_date || '',
+            venue: lm.match!.venue || '',
+            statsImported: lm.stats_imported || false,
+            week: lm.week,
+            matchState: lm.match!.match_state as CricketMatch['matchState'],
+            pollingEnabled: lm.match!.polling_enabled,
+          }));
+
+        // Sort by match_date descending (most recent first)
+        mappedMatches.sort((a, b) => {
+          if (!a.matchDate && !b.matchDate) return 0;
+          if (!a.matchDate) return 1;
+          if (!b.matchDate) return -1;
+          return new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime();
+        });
+
+        setMatches(mappedMatches);
       }
     };
 
     fetchMatches();
   }, [currentLeagueId]);
+
+  // Toggle polling for a match
+  const handleTogglePolling = async (cricbuzzMatchId: number, enable: boolean) => {
+    setIsTogglingPolling(cricbuzzMatchId);
+    try {
+      const success = enable
+        ? await livePollingService.enablePolling(cricbuzzMatchId)
+        : await livePollingService.disablePolling(cricbuzzMatchId);
+
+      if (success) {
+        toast.success(enable ? 'Polling enabled' : 'Polling disabled');
+        fetchPollingStatuses();
+      } else {
+        toast.error('Failed to update polling status');
+      }
+    } catch (error) {
+      toast.error('Failed to update polling status');
+    } finally {
+      setIsTogglingPolling(null);
+    }
+  };
+
+  // Manually trigger a poll
+  const handleTriggerPoll = async (cricbuzzMatchId: number) => {
+    setIsTriggeringPoll(cricbuzzMatchId);
+    try {
+      const result = await livePollingService.triggerPoll(cricbuzzMatchId);
+
+      if (result.success) {
+        toast.success(`Poll complete: ${result.data?.statsUpserted || 0} stats updated`);
+        if (result.data?.matchState === 'Complete') {
+          toast.info('Match completed - stats finalized');
+        }
+        fetchPollingStatuses();
+
+        // Refresh the selected match if it's the one we just polled
+        if (selectedMatch?.cricbuzzMatchId === cricbuzzMatchId) {
+          handleFetchScorecard(selectedMatch, true);
+        }
+      } else {
+        toast.error(result.error || 'Poll failed');
+      }
+    } catch (error) {
+      toast.error('Failed to trigger poll');
+    } finally {
+      setIsTriggeringPoll(null);
+    }
+  };
+
+  // Finalize match stats
+  const handleFinalizeMatch = async () => {
+    if (!selectedMatch || !currentLeagueId) return;
+
+    setIsFinalizing(true);
+    try {
+      // Find MoM from parsed stats
+      const momPlayer = parsedStats.find(
+        p => p.pointsBreakdown.common.manOfTheMatch > 0
+      );
+
+      const result = await finalizeMatchStats(
+        currentLeagueId,
+        selectedMatch.id,
+        momPlayer?.cricbuzzPlayerId.toString()
+      );
+
+      if (result.success) {
+        toast.success(`Stats finalized for ${result.updatedCount || 0} players`);
+
+        // Update local state
+        setMatches(prev =>
+          prev.map(m =>
+            m.id === selectedMatch.id
+              ? { ...m, statsImported: true, matchState: 'Complete' as const, isLive: false }
+              : m
+          )
+        );
+
+        // Clear preview state
+        setSelectedMatch(null);
+        setParsedStats([]);
+        setIsMatchLive(false);
+      } else {
+        toast.error(result.error || 'Failed to finalize stats');
+      }
+    } catch (error) {
+      toast.error('Failed to finalize stats');
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
 
   // Load series list
   const handleLoadSeries = async () => {
@@ -161,50 +343,60 @@ export const StatsImport = () => {
       const completedMatches = seriesMatches.filter(m => m.state === 'Complete');
 
       for (const match of completedMatches) {
-        // Check if already exists
-        const { data: existing } = await supabase
+        // Check if already exists in this league via league_matches
+        const { data: existingMatch } = await supabase
           .from('cricket_matches')
           .select('id')
           .eq('cricbuzz_match_id', match.matchId)
-          .eq('league_id', currentLeagueId)
           .single();
 
-        if (!existing) {
-          const { data, error } = await supabase
-            .from('cricket_matches')
-            .insert({
-              cricbuzz_match_id: match.matchId,
-              league_id: currentLeagueId,
-              series_id: match.seriesId,
-              match_description: match.matchDesc,
-              team1_name: match.team1.teamName,
-              team2_name: match.team2.teamName,
-              match_date: new Date(parseInt(match.startDate)).toISOString(),
-              venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
-              result: match.status,
-              stats_imported: false,
-            })
-            .select()
+        if (existingMatch) {
+          // Match exists, check if it's linked to this league
+          const { data: existingLink } = await supabase
+            .from('league_matches')
+            .select('id')
+            .eq('league_id', currentLeagueId)
+            .eq('match_id', existingMatch.id)
             .single();
 
-          if (!error && data) {
-            addedCount++;
-            setMatches(prev => [
-              {
-                id: data.id,
-                cricbuzzMatchId: match.matchId,
-                matchDescription: match.matchDesc,
-                team1Name: match.team1.teamName,
-                team2Name: match.team2.teamName,
-                result: match.status,
-                matchDate: new Date(parseInt(match.startDate)).toISOString(),
-                venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
-                statsImported: false,
-                week: null,
-              },
-              ...prev,
-            ]);
+          if (existingLink) {
+            // Already linked to this league, skip
+            continue;
           }
+        }
+
+        // Use the upsert_league_match function to handle both cricket_matches and league_matches
+        const { data, error } = await supabase.rpc('upsert_league_match', {
+          p_league_id: currentLeagueId,
+          p_cricbuzz_match_id: match.matchId,
+          p_series_id: match.seriesId,
+          p_match_description: match.matchDesc,
+          p_team1_name: match.team1.teamName,
+          p_team2_name: match.team2.teamName,
+          p_match_date: new Date(parseInt(match.startDate)).toISOString(),
+          p_venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
+          p_result: match.status,
+          p_week: null,
+        });
+
+        if (!error && data && data.length > 0 && data[0].is_new_match) {
+          addedCount++;
+          setMatches(prev => [
+            {
+              id: data[0].match_id,
+              leagueMatchId: data[0].league_match_id,
+              cricbuzzMatchId: match.matchId,
+              matchDescription: match.matchDesc,
+              team1Name: match.team1.teamName,
+              team2Name: match.team2.teamName,
+              result: match.status,
+              matchDate: new Date(parseInt(match.startDate)).toISOString(),
+              venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
+              statsImported: false,
+              week: null,
+            },
+            ...prev,
+          ]);
         }
       }
 
@@ -235,35 +427,42 @@ export const StatsImport = () => {
 
     setIsLoading(true);
     try {
-      const matchId = extractMatchId(matchIdInput);
-      if (!matchId) {
+      const cricbuzzMatchId = extractMatchId(matchIdInput);
+      if (!cricbuzzMatchId) {
         toast.error('Invalid match ID. Enter a number or paste a Cricbuzz URL.');
         return;
       }
 
-      const { data: existing } = await supabase
+      // Check if match already exists in this league
+      const { data: existingMatch } = await supabase
         .from('cricket_matches')
         .select('id')
-        .eq('cricbuzz_match_id', matchId)
-        .eq('league_id', currentLeagueId)
+        .eq('cricbuzz_match_id', cricbuzzMatchId)
         .single();
 
-      if (existing) {
-        toast.error('Match already added');
-        return;
+      if (existingMatch) {
+        // Match exists in cricket_matches, check if linked to this league
+        const { data: existingLink } = await supabase
+          .from('league_matches')
+          .select('id')
+          .eq('league_id', currentLeagueId)
+          .eq('match_id', existingMatch.id)
+          .single();
+
+        if (existingLink) {
+          toast.error('Match already added to this league');
+          return;
+        }
       }
 
-      const { data, error } = await supabase
-        .from('cricket_matches')
-        .insert({
-          cricbuzz_match_id: matchId,
-          league_id: currentLeagueId,
-          series_id: 0,
-          match_description: `Match #${matchId}`,
-          stats_imported: false,
-        })
-        .select()
-        .single();
+      // Use the upsert_league_match function
+      const { data, error } = await supabase.rpc('upsert_league_match', {
+        p_league_id: currentLeagueId,
+        p_cricbuzz_match_id: cricbuzzMatchId,
+        p_series_id: 0,
+        p_match_description: `Match #${cricbuzzMatchId}`,
+        p_week: null,
+      });
 
       if (error) {
         toast.error('Failed to add match');
@@ -271,24 +470,27 @@ export const StatsImport = () => {
         return;
       }
 
-      setMatches(prev => [
-        {
-          id: data.id,
-          cricbuzzMatchId: matchId,
-          matchDescription: `Match #${matchId}`,
-          team1Name: '',
-          team2Name: '',
-          result: '',
-          matchDate: '',
-          venue: '',
-          statsImported: false,
-          week: null,
-        },
-        ...prev,
-      ]);
+      if (data && data.length > 0) {
+        setMatches(prev => [
+          {
+            id: data[0].match_id,
+            leagueMatchId: data[0].league_match_id,
+            cricbuzzMatchId: cricbuzzMatchId,
+            matchDescription: `Match #${cricbuzzMatchId}`,
+            team1Name: '',
+            team2Name: '',
+            result: '',
+            matchDate: '',
+            venue: '',
+            statsImported: false,
+            week: null,
+          },
+          ...prev,
+        ]);
 
-      setMatchIdInput('');
-      toast.success('Match added');
+        setMatchIdInput('');
+        toast.success('Match added');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -331,11 +533,14 @@ export const StatsImport = () => {
 
       setParsedStats(statsWithOwnership);
 
-      // Update match info and live status
+      // Update match info and live status (shared cricket_matches data)
       if (scorecard.status) {
         await supabase
           .from('cricket_matches')
-          .update({ result: scorecard.status })
+          .update({
+            result: scorecard.status,
+            match_state: isLive ? 'Live' : 'Complete',
+          })
           .eq('id', match.id);
 
         // Update local match state with live status
@@ -418,24 +623,53 @@ export const StatsImport = () => {
     setIsSaving(true);
     try {
       const weekNum = parseInt(selectedWeek);
-      const result = await saveMatchStats(
-        currentLeagueId,
-        selectedMatch.id,
-        weekNum,
-        parsedStats
-      );
+
+      // Use live stats save if match is live
+      const result = isMatchLive
+        ? await saveMatchStatsLive(
+            currentLeagueId,
+            selectedMatch.id,
+            weekNum,
+            parsedStats,
+            true // isLive = true
+          )
+        : await saveMatchStats(
+            currentLeagueId,
+            selectedMatch.id,
+            weekNum,
+            parsedStats
+          );
 
       if (result.success) {
-        toast.success(`Stats imported for Week ${weekNum}`);
+        if (isMatchLive) {
+          toast.success(`Live stats imported for Week ${weekNum}`);
+          // Update match state but don't mark as fully imported
+          setMatches(prev =>
+            prev.map(m =>
+              m.id === selectedMatch.id
+                ? { ...m, week: weekNum, isLive: true, matchState: 'Live' as const }
+                : m
+            )
+          );
+        } else {
+          toast.success(`Stats imported for Week ${weekNum}`);
+          // Update match in list to show imported status
+          setMatches(prev =>
+            prev.map(m =>
+              m.id === selectedMatch.id
+                ? { ...m, statsImported: true, week: weekNum, isLive: false, matchState: 'Complete' as const }
+                : m
+            )
+          );
+        }
 
-        // Update match in list to show imported status
-        setMatches(prev =>
-          prev.map(m =>
-            m.id === selectedMatch.id
-              ? { ...m, statsImported: true, week: weekNum, isLive: false }
-              : m
-          )
-        );
+        // Update league_matches with week number
+        if (currentLeagueId && selectedMatch.leagueMatchId) {
+          await supabase
+            .from('league_matches')
+            .update({ week: weekNum })
+            .eq('id', selectedMatch.leagueMatchId);
+        }
 
         // Clear all preview state
         setSelectedMatch(null);
@@ -686,54 +920,125 @@ export const StatsImport = () => {
                   No matches added yet. Use series sync or add manually.
                 </p>
               ) : (
-                matches.map(match => (
-                  <div
-                    key={match.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedMatch?.id === match.id
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50'
-                    } ${match.statsImported ? 'opacity-60' : ''}`}
-                    onClick={() =>
-                      !match.statsImported && handleFetchScorecard(match)
-                    }
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm">
-                            {match.team1Name && match.team2Name
-                              ? `${match.team1Name} vs ${match.team2Name}`
-                              : match.matchDescription}
-                          </p>
-                          {match.isLive && (
-                            <Badge className="bg-red-500 animate-pulse text-xs">
-                              LIVE
-                            </Badge>
+                matches.map(match => {
+                  const pollingStatus = pollingStatuses.get(match.cricbuzzMatchId);
+                  const isPollingEnabled = pollingStatus?.pollingEnabled ?? false;
+                  const matchIsLive = match.matchState === 'Live' || match.isLive;
+
+                  return (
+                    <div
+                      key={match.id}
+                      className={`p-3 rounded-lg border transition-colors ${
+                        selectedMatch?.id === match.id
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                      } ${match.statsImported && !matchIsLive ? 'opacity-60' : ''}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div
+                          className="flex-1 cursor-pointer"
+                          onClick={() => handleFetchScorecard(match)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">
+                              {match.team1Name && match.team2Name
+                                ? `${match.team1Name} vs ${match.team2Name}`
+                                : match.matchDescription}
+                            </p>
+                            {matchIsLive && (
+                              <Badge className="bg-red-500 animate-pulse text-xs">
+                                <Radio className="w-3 h-3 mr-1" />
+                                LIVE
+                              </Badge>
+                            )}
+                            {isPollingEnabled && (
+                              <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/30">
+                                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                Polling
+                              </Badge>
+                            )}
+                          </div>
+                          {match.result && (
+                            <p className="text-xs text-muted-foreground">
+                              {match.result}
+                            </p>
+                          )}
+                          {pollingStatus && (
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              {pollingStatus.lastPolledAt && (
+                                <span>
+                                  Last poll: {new Date(pollingStatus.lastPolledAt).toLocaleTimeString()}
+                                </span>
+                              )}
+                              {pollingStatus.pollCount > 0 && (
+                                <span>({pollingStatus.pollCount} polls)</span>
+                              )}
+                              {pollingStatus.errorCount > 0 && (
+                                <span className="text-red-500 flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  {pollingStatus.errorCount} errors
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
-                        {match.result && (
-                          <p className="text-xs text-muted-foreground">
-                            {match.result}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {match.week && (
-                          <Badge variant="outline">Week {match.week}</Badge>
-                        )}
-                        {match.statsImported ? (
-                          <Badge className="bg-green-500">
-                            <Check className="w-3 h-3 mr-1" />
-                            Imported
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Pending</Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {/* Polling controls */}
+                          {!match.statsImported && (
+                            <div
+                              className="flex items-center gap-3 mr-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleTriggerPoll(match.cricbuzzMatchId)}
+                                disabled={isTriggeringPoll === match.cricbuzzMatchId}
+                                className="h-7 px-2 text-xs"
+                              >
+                                {isTriggeringPoll === match.cricbuzzMatchId ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                ) : (
+                                  <RefreshCw className="w-3 h-3 mr-1" />
+                                )}
+                                Poll Now
+                              </Button>
+                              <div className="flex items-center gap-1.5">
+                                <Switch
+                                  id={`polling-${match.cricbuzzMatchId}`}
+                                  checked={isPollingEnabled}
+                                  disabled={isTogglingPolling === match.cricbuzzMatchId}
+                                  onCheckedChange={(checked) =>
+                                    handleTogglePolling(match.cricbuzzMatchId, checked)
+                                  }
+                                />
+                                <Label
+                                  htmlFor={`polling-${match.cricbuzzMatchId}`}
+                                  className="text-xs cursor-pointer text-muted-foreground"
+                                >
+                                  Auto
+                                </Label>
+                              </div>
+                            </div>
+                          )}
+                          {match.week && (
+                            <Badge variant="outline">Week {match.week}</Badge>
+                          )}
+                          {match.statsImported ? (
+                            <Badge className="bg-green-500">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Imported
+                            </Badge>
+                          ) : matchIsLive ? (
+                            <Badge className="bg-amber-500">In Progress</Badge>
+                          ) : (
+                            <Badge variant="secondary">Pending</Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </ScrollArea>
@@ -867,8 +1172,9 @@ export const StatsImport = () => {
             <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 {isMatchLive ? (
-                  <span className="text-yellow-500">
-                    Match is live - wait for completion to import final stats
+                  <span className="text-yellow-500 flex items-center gap-1">
+                    <Radio className="w-4 h-4 animate-pulse" />
+                    Match is live - stats will update automatically if polling is enabled
                   </span>
                 ) : (
                   <span>
@@ -877,18 +1183,34 @@ export const StatsImport = () => {
                   </span>
                 )}
               </div>
-              <Button
-                onClick={handleSaveStats}
-                disabled={isSaving || ownedPlayers.length === 0}
-                variant={isMatchLive ? 'secondary' : 'default'}
-              >
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Check className="w-4 h-4 mr-2" />
+              <div className="flex items-center gap-2">
+                {isMatchLive && (
+                  <Button
+                    onClick={handleFinalizeMatch}
+                    disabled={isFinalizing || ownedPlayers.length === 0}
+                    variant="outline"
+                  >
+                    {isFinalizing ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                    )}
+                    Finalize Now
+                  </Button>
                 )}
-                {isMatchLive ? 'Import Current Stats' : `Import to Week ${selectedWeek}`}
-              </Button>
+                <Button
+                  onClick={handleSaveStats}
+                  disabled={isSaving || ownedPlayers.length === 0}
+                  variant={isMatchLive ? 'secondary' : 'default'}
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Check className="w-4 h-4 mr-2" />
+                  )}
+                  {isMatchLive ? 'Import as Live Stats' : `Import to Week ${selectedWeek}`}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

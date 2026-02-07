@@ -1,9 +1,15 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Manager } from '@/lib/supabase-types';
-import { ChevronRight, Trophy, Loader2 } from 'lucide-react';
-import { useFantasyStandings } from '@/hooks/useFantasyStandings';
+import { ChevronRight, Trophy, Loader2, Radio } from 'lucide-react';
+import { useLiveFantasyStandings } from '@/hooks/useLiveFantasyPoints';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface StandingsTableProps {
   managers: Manager[];
@@ -14,11 +20,17 @@ interface StandingsTableProps {
 export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }: StandingsTableProps) => {
   const navigate = useNavigate();
   const { leagueId } = useParams();
-  const { standings, loading: loadingStandings } = useFantasyStandings(leagueId || null);
+  const { standings, loading: loadingStandings, hasLiveData, lastUpdated } = useLiveFantasyStandings(leagueId || null);
 
-  // Create a map of manager fantasy points
+  // Create maps of manager fantasy points and live status
   const fantasyPointsMap = new Map(
     standings.map(s => [s.managerId, s.totalPoints])
+  );
+  const livePointsMap = new Map(
+    standings.map(s => [s.managerId, s.livePoints])
+  );
+  const hasLiveStatsMap = new Map(
+    standings.map(s => [s.managerId, s.hasLiveStats])
   );
 
   // Sort managers by fantasy points (from database) if available, else by W/L
@@ -39,24 +51,42 @@ export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }
   const hasFantasyPoints = standings.some(s => s.totalPoints > 0);
 
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
-      <div className={cn(
-        "grid gap-2 px-4 py-3 bg-muted/30 border-b border-border",
-        hasFantasyPoints
-          ? "grid-cols-[1fr_40px_40px_70px]"
-          : "grid-cols-[1fr_40px_40px_50px]"
-      )}>
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Team</span>
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">W</span>
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">L</span>
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center flex items-center justify-center gap-1">
-          {hasFantasyPoints && <Trophy className="w-3 h-3" />}
-          Pts
-        </span>
-      </div>
+    <TooltipProvider>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        {/* Live indicator header */}
+        {hasLiveData && (
+          <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Radio className="w-4 h-4 text-red-500 animate-pulse" />
+              <span className="text-sm font-medium text-red-500">Live Match Stats</span>
+            </div>
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                Updated {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className={cn(
+          "grid gap-2 px-4 py-3 bg-muted/30 border-b border-border",
+          hasFantasyPoints
+            ? "grid-cols-[1fr_40px_40px_70px]"
+            : "grid-cols-[1fr_40px_40px_50px]"
+        )}>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Team</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">W</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">L</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center flex items-center justify-center gap-1">
+            {hasFantasyPoints && <Trophy className="w-3 h-3" />}
+            Pts
+          </span>
+        </div>
 
       {sortedManagers.map((manager, index) => {
         const fantasyPoints = fantasyPointsMap.get(manager.id) ?? 0;
+        const livePoints = livePointsMap.get(manager.id) ?? 0;
+        const managerHasLiveStats = hasLiveStatsMap.get(manager.id) ?? false;
         const displayPoints = hasFantasyPoints ? fantasyPoints : manager.points;
 
         return (
@@ -84,7 +114,22 @@ export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }
                 {index + 1}
               </span>
               <div className="text-left min-w-0">
-                <p className="font-semibold text-foreground truncate">{manager.teamName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-foreground truncate">{manager.teamName}</p>
+                  {managerHasLiveStats && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 bg-red-500/10 text-red-500 border-red-500/30 animate-pulse">
+                          <Radio className="w-2 h-2 mr-0.5" />
+                          LIVE
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>+{livePoints.toLocaleString()} live points</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">{manager.name}</p>
               </div>
             </div>
@@ -97,7 +142,7 @@ export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }
                 <>
                   <span className={cn(
                     "font-bold",
-                    hasFantasyPoints ? "text-amber-500" : "text-primary"
+                    managerHasLiveStats ? "text-red-500" : hasFantasyPoints ? "text-amber-500" : "text-primary"
                   )}>
                     {displayPoints.toLocaleString()}
                   </span>
@@ -109,11 +154,12 @@ export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }
         );
       })}
 
-      {managers.length === 0 && (
-        <div className="py-8 text-center text-muted-foreground">
-          No teams in this league yet.
-        </div>
-      )}
-    </div>
+        {managers.length === 0 && (
+          <div className="py-8 text-center text-muted-foreground">
+            No teams in this league yet.
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 };

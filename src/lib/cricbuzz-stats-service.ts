@@ -443,6 +443,20 @@ export async function saveMatchStats(
   week: number,
   stats: PlayerStatsWithOwnership[]
 ): Promise<{ success: boolean; error?: string }> {
+  return saveMatchStatsLive(leagueId, matchId, week, stats, false);
+}
+
+/**
+ * Save match stats with live stats flag
+ * @param isLive - If true, marks stats as live (not finalized)
+ */
+export async function saveMatchStatsLive(
+  leagueId: string,
+  matchId: string,
+  week: number,
+  stats: PlayerStatsWithOwnership[],
+  isLive: boolean = false
+): Promise<{ success: boolean; error?: string }> {
   try {
     // Prepare records for insertion
     const records = stats
@@ -478,10 +492,14 @@ export async function saveMatchStats(
         // Context
         is_in_playing_11: s.isInPlaying11,
         is_impact_player: false,
-        is_man_of_match: false,
+        is_man_of_match: s.pointsBreakdown.common.manOfTheMatch > 0,
         team_won: s.teamWon,
         // Calculated
         fantasy_points: s.fantasyPoints,
+        // Live stats tracking
+        is_live_stats: isLive,
+        live_updated_at: isLive ? new Date().toISOString() : null,
+        finalized_at: isLive ? null : new Date().toISOString(),
       }));
 
     if (records.length === 0) {
@@ -501,19 +519,101 @@ export async function saveMatchStats(
       return { success: false, error: error.message };
     }
 
-    // Mark match as imported
+    // Update cricket_matches (shared data) - match_state only
     await supabase
       .from('cricket_matches')
       .update({
-        stats_imported: true,
-        stats_imported_at: new Date().toISOString(),
-        week: week,
+        match_state: isLive ? 'Live' : 'Complete',
       })
       .eq('id', matchId);
+
+    // Update league_matches (league-specific data) - stats_imported, week
+    await supabase
+      .from('league_matches')
+      .update({
+        stats_imported: !isLive,
+        stats_imported_at: isLive ? null : new Date().toISOString(),
+        week: week,
+      })
+      .eq('league_id', leagueId)
+      .eq('match_id', matchId);
 
     return { success: true };
   } catch (err) {
     console.error('Error in saveMatchStats:', err);
     return { success: false, error: 'Unknown error occurred' };
   }
+}
+
+/**
+ * Finalize match stats - mark as non-live and apply Man of Match
+ */
+export async function finalizeMatchStats(
+  leagueId: string,
+  matchId: string,
+  manOfMatchCricbuzzId?: string
+): Promise<{ success: boolean; error?: string; updatedCount?: number }> {
+  try {
+    const { data, error } = await supabase.rpc('finalize_match_stats', {
+      p_league_id: leagueId,
+      p_match_id: matchId,
+      p_man_of_match_cricbuzz_id: manOfMatchCricbuzzId || null,
+    });
+
+    if (error) {
+      console.error('Error finalizing match stats:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, updatedCount: data };
+  } catch (err) {
+    console.error('Error in finalizeMatchStats:', err);
+    return { success: false, error: 'Unknown error occurred' };
+  }
+}
+
+/**
+ * Extract Man of Match from Cricbuzz scorecard response
+ * The API returns playersOfTheMatch array with the MoM player(s)
+ */
+export function extractManOfMatch(
+  scorecardResponse: { playersOfTheMatch?: Array<{ id: number; name: string }> }
+): { id: number; name: string } | null {
+  if (
+    scorecardResponse.playersOfTheMatch &&
+    scorecardResponse.playersOfTheMatch.length > 0
+  ) {
+    return scorecardResponse.playersOfTheMatch[0];
+  }
+  return null;
+}
+
+/**
+ * Check if a match has live stats
+ */
+export async function hasLiveStats(
+  leagueId: string,
+  matchId: string
+): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('player_match_stats')
+    .select('id', { count: 'exact', head: true })
+    .eq('league_id', leagueId)
+    .eq('match_id', matchId)
+    .eq('is_live_stats', true);
+
+  return !error && (count ?? 0) > 0;
+}
+
+/**
+ * Get live stats count for a league
+ */
+export async function getLiveStatsCount(leagueId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('player_match_stats')
+    .select('id', { count: 'exact', head: true })
+    .eq('league_id', leagueId)
+    .eq('is_live_stats', true);
+
+  return error ? 0 : (count ?? 0);
 }
