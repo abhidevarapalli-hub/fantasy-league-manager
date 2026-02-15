@@ -222,9 +222,8 @@ export const useDraft = () => {
 
       // --- Schedule Generation ---
       // Clear existing schedule for this league to avoid duplicates
-      // Use 'league_schedules' as per migration
       const { error: clearScheduleError } = await supabase
-        .from('league_schedules' as 'transactions') // Casting to avoid type errors if types aren't updated yet
+        .from('league_schedules' as 'transactions') // Using actual DB table name
         .delete()
         .eq('league_id', leagueId);
 

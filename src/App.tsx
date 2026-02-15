@@ -14,7 +14,6 @@ import TeamView from "./pages/TeamView";
 import Draft from "./pages/Draft";
 import LeagueHistory from "./pages/LeagueHistory";
 import Dashboard from "./pages/Dashboard";
-import Roster from "./pages/Roster";
 import Players from "./pages/Players";
 import Trades from "./pages/Trades";
 import Login from "./pages/Login";
@@ -114,7 +113,6 @@ const AppRoutes = () => {
 
       <Route element={<ProtectedRoute><LeagueLayout /></ProtectedRoute>}>
         <Route path="/:leagueId" element={<Dashboard />} />
-        <Route path="/:leagueId/roster" element={<Roster />} />
         <Route path="/:leagueId/players" element={<Players />} />
         <Route path="/:leagueId/activity" element={<Activity />} />
         <Route path="/:leagueId/trades" element={<Trades />} />

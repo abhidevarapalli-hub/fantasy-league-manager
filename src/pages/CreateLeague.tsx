@@ -283,10 +283,10 @@ const CreateLeague = () => {
                     matchups.push({
                         league_id: league.id,
                         week: w,
-                        home_manager_id: homeId,
-                        away_manager_id: awayId,
-                        home_score: 0,
-                        away_score: 0,
+                        manager1_id: homeId,
+                        manager2_id: awayId,
+                        manager1_score: 0,
+                        manager2_score: 0,
                         is_finalized: false
                     });
                 });
@@ -300,7 +300,7 @@ const CreateLeague = () => {
             const step5Start = performance.now();
 
             const { error: scheduleError } = await (supabase
-                .from('schedule' as any)
+                .from('league_schedules' as any)
                 .insert(matchups) as any);
 
             const step5Duration = performance.now() - step5Start;

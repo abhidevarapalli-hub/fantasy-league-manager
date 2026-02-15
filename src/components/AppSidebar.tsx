@@ -32,7 +32,6 @@ export function AppSidebar() {
     ...(currentManagerId ? [
       { title: 'My Team', url: `/${leagueId}/team/${currentManagerId}`, icon: Shirt },
     ] : []),
-    { title: 'Rosters', url: `/${leagueId}/roster`, icon: Users },
     { title: 'Players', url: `/${leagueId}/players`, icon: UsersRound },
     { title: 'Trades', url: `/${leagueId}/trades`, icon: ArrowLeftRight },
     { title: 'Activity', url: `/${leagueId}/activity`, icon: Activity },

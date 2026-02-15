@@ -11,7 +11,6 @@ export const BottomNav = () => {
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Home', path: '/' },
-    { icon: Users, label: 'Rosters', path: '/roster' },
     { icon: UsersRound, label: 'Players', path: '/players' },
     { icon: ArrowLeftRight, label: 'Trades', path: '/trades' },
     { icon: Activity, label: 'Activity', path: '/activity' },
