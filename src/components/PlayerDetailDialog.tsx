@@ -239,8 +239,8 @@ export function PlayerDetailDialog({
                         backgroundColor: teamColors.raw,
                     } : {}}
                 >
-                    {/* Player Image - Fixed Width, No Crop */}
-                    <div className="relative w-36 md:w-48 flex-shrink-0 flex items-end justify-center overflow-hidden bg-black/10 border-r border-white/5">
+                    {/* Player Image - Full Space */}
+                    <div className="relative w-48 md:w-64 flex-shrink-0 flex items-end justify-center overflow-hidden bg-black/10 border-r border-white/5">
                         {/* Shaded background for depth */}
                         <div className="absolute inset-0 bg-black/10 z-10" />
                         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/40 to-transparent z-20" />
@@ -248,7 +248,7 @@ export function PlayerDetailDialog({
                         <img
                             src={getPlayerAvatarUrl(imageId, 'det')}
                             alt={player.name}
-                            className="relative z-30 h-full w-full object-contain object-bottom drop-shadow-[0_8px_16px_rgba(0,0,0,0.4)]"
+                            className="relative z-30 h-full w-full object-cover object-top drop-shadow-[0_8px_16px_rgba(0,0,0,0.4)]"
                         />
                     </div>
 
