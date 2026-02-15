@@ -1,22 +1,25 @@
 import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, History, ArrowLeftRight } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { leagueId } = useParams<{ leagueId: string }>();
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
+  // Only show bottom nav if we're in a league
+  if (!leagueId) return null;
 
   const navItems = [
-    { icon: LayoutDashboard, label: 'Home', path: '/' },
-    { icon: UsersRound, label: 'Players', path: '/players' },
-    { icon: ArrowLeftRight, label: 'Trades', path: '/trades' },
-    { icon: Activity, label: 'Activity', path: '/activity' },
-    { icon: ClipboardList, label: 'Draft', path: '/draft' },
+    { icon: LayoutDashboard, label: 'Home', path: `/${leagueId}` },
+    { icon: UsersRound, label: 'Players', path: `/${leagueId}/players` },
+    { icon: ArrowLeftRight, label: 'Trades', path: `/${leagueId}/trades` },
+    { icon: Activity, label: 'Activity', path: `/${leagueId}/activity` },
+    { icon: ClipboardList, label: 'Draft', path: `/${leagueId}/draft` },
     // Only show Admin tab for league managers
-    ...(isLeagueManager ? [{ icon: Settings, label: 'Admin', path: '/admin' }] : []),
+    ...(isLeagueManager ? [{ icon: Settings, label: 'Admin', path: `/${leagueId}/admin` }] : []),
   ];
 
   return (
@@ -24,7 +27,7 @@ export const BottomNav = () => {
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path ||
-            (item.path === '/' && location.pathname.startsWith('/team/'));
+            (item.path === `/${leagueId}` && location.pathname.startsWith(`/${leagueId}/team/`));
 
           return (
             <button
