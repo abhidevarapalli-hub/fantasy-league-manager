@@ -61,6 +61,23 @@ const INTERNATIONAL_TEAM_CODES: Record<string, string> = {
 };
 
 /**
+ * Team code mappings for franchise teams (IPL)
+ */
+const FRANCHISE_TEAM_CODES: Record<string, string> = {
+  'Chennai Super Kings': 'CSK',
+  'Royal Challengers Bengaluru': 'RCB',
+  'Royal Challengers Bangalore': 'RCB',
+  'Sunrisers Hyderabad': 'SRH',
+  'Punjab Kings': 'PBKS',
+  'Lucknow Super Giants': 'LSG',
+  'Mumbai Indians': 'MI',
+  'Gujarat Titans': 'GT',
+  'Delhi Capitals': 'DC',
+  'Rajasthan Royals': 'RR',
+  'Kolkata Knight Riders': 'KKR',
+};
+
+/**
  * Get 3-letter team code from full team name
  */
 export function getTeamCode(teamName: string): string {
@@ -69,8 +86,12 @@ export function getTeamCode(teamName: string): string {
     return INTERNATIONAL_TEAM_CODES[teamName];
   }
 
-  // For IPL/franchise teams, they usually already have short codes
-  // or we generate a 2-3 letter code from the name
+  // Check if it's a known franchise team
+  if (FRANCHISE_TEAM_CODES[teamName]) {
+    return FRANCHISE_TEAM_CODES[teamName];
+  }
+
+  // For other teams, generate code
   const words = teamName.split(' ');
   if (words.length >= 2) {
     // Take first letter of first two words (e.g., "Mumbai Indians" -> "MI")

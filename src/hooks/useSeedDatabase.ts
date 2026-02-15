@@ -386,16 +386,20 @@ export const useSeedDatabase = () => {
       const tournament = getTournamentById(tournamentId);
       const isInternational = tournament?.type === 'international';
 
+      const targetTeams = tournament?.teams || [];
       const testTeam = isInternational ? 'NAM' : 'CSK';
+      // Fallback to testTeam if targetTeams is empty, though it shouldn't be for supported tournaments
+      const teamsToCheck = targetTeams.length > 0 ? targetTeams : [testTeam];
+
       const { count: masterCount } = await supabase
         .from("master_players")
         .select("*", { count: "exact", head: true })
-        .contains("teams", [testTeam]);
+        .overlaps("teams", teamsToCheck);
 
       const hasLocalData = (masterCount || 0) > 10;
 
       if (hasLocalData && !forceRefresh) {
-        console.log(`[Seed] found local data for ${testTeam} (${masterCount} players). Using local master_players.`);
+        console.log(`[Seed] found local data for ${teamsToCheck.join(',')} (${masterCount} players). Using local master_players.`);
 
         const targetTeams = tournament?.teams || [];
 
