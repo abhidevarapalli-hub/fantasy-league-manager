@@ -13,6 +13,7 @@ export interface Tournament {
   shortName: string;
   type: TournamentType;
   description?: string;
+  teams: readonly string[];
 }
 
 export const SUPPORTED_TOURNAMENTS: readonly Tournament[] = [
@@ -22,6 +23,7 @@ export const SUPPORTED_TOURNAMENTS: readonly Tournament[] = [
     shortName: 'T20 WC 2026',
     type: 'international',
     description: 'International T20 tournament featuring national teams',
+    teams: ['IND', 'PAK', 'AUS', 'ENG', 'SA', 'NZ', 'WI', 'AFG', 'SL', 'BAN', 'NED', 'NEP', 'USA', 'CAN', 'NAM', 'SCO', 'OMN', 'PNG', 'UGA', 'IRE']
   },
   {
     id: 9241,
@@ -29,6 +31,7 @@ export const SUPPORTED_TOURNAMENTS: readonly Tournament[] = [
     shortName: 'IPL 2026',
     type: 'league',
     description: 'T20 franchise league with IPL teams',
+    teams: ['CSK', 'DC', 'GT', 'KKR', 'LSG', 'MI', 'PBKS', 'RR', 'RCB', 'SRH']
   },
 ] as const;
 

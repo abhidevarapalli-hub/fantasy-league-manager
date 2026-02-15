@@ -397,35 +397,35 @@ export const useSeedDatabase = () => {
       if (hasLocalData && !forceRefresh) {
         console.log(`[Seed] found local data for ${testTeam} (${masterCount} players). Using local master_players.`);
 
-        const t20wcTeams = ['IND', 'PAK', 'AUS', 'ENG', 'SA', 'NZ', 'WI', 'AFG', 'SL', 'BAN', 'NED', 'NEP', 'USA', 'CAN', 'NAM', 'SCO', 'OMN', 'PNG', 'UGA', 'IRE'];
-        const iplTeams = ['CSK', 'MI', 'RCB', 'KKR', 'GT', 'LSG', 'RR', 'PBKS', 'DC', 'SRH'];
-        const targetTeams = isInternational ? t20wcTeams : iplTeams;
+        const targetTeams = tournament?.teams || [];
 
-        const { data: localPlayers } = await supabase
-          .from("master_players")
-          .select("id, teams")
-          .overlaps("teams", targetTeams);
+        if (targetTeams.length > 0) {
+          const { data: localPlayers } = await supabase
+            .from("master_players")
+            .select("id, teams")
+            .overlaps("teams", targetTeams);
 
-        if (localPlayers && localPlayers.length > 200) {
-          console.log(`[Seed] Found ${localPlayers.length} players locally. Linking to league...`);
+          if (localPlayers && localPlayers.length > 200) {
+            console.log(`[Seed] Found ${localPlayers.length} players locally. Linking to league...`);
 
-          const poolInserts = localPlayers.map(p => {
-            // Find which team matched (first match)
-            const team = p.teams?.find((t: string) => targetTeams.includes(t)) || p.teams?.[0] || 'UNK';
-            return {
-              league_id: leagueId,
-              player_id: p.id,
-              team_override: team
-            };
-          });
+            const poolInserts = localPlayers.map(p => {
+              // Find which team matched (first match)
+              const team = p.teams?.find((t: string) => targetTeams.includes(t)) || p.teams?.[0] || 'UNK';
+              return {
+                league_id: leagueId,
+                player_id: p.id,
+                team_override: team
+              };
+            });
 
-          const chunkSize = 100;
-          for (let i = 0; i < poolInserts.length; i += chunkSize) {
-            const chunk = poolInserts.slice(i, i + chunkSize);
-            const { error } = await supabase.from("league_player_pool").upsert(chunk, { onConflict: 'league_id,player_id' });
-            if (error) console.error("Error linking chunk:", error);
+            const chunkSize = 100;
+            for (let i = 0; i < poolInserts.length; i += chunkSize) {
+              const chunk = poolInserts.slice(i, i + chunkSize);
+              const { error } = await supabase.from("league_player_pool").upsert(chunk, { onConflict: 'league_id,player_id' });
+              if (error) console.error("Error linking chunk:", error);
+            }
+            return true;
           }
-          return true;
         }
       }
 
