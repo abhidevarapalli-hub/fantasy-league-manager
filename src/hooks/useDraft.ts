@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DraftPick, DraftOrder, DraftState, mapDbDraftPick, mapDbDraftOrder, mapDbDraftState, DbDraftPick, DbDraftOrder, DbDraftState } from '@/lib/draft-types';
@@ -10,17 +10,21 @@ import { sortPlayersByPriority } from '@/lib/player-order';
 
 export const useDraft = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
+  // Select state slices individually to ensure proper subscriptions
   const managers = useGameStore(state => state.managers);
   const players = useGameStore(state => state.players);
-  const initializedDraftLeagueId = useGameStore(state => state.initializedDraftLeagueId);
-  const setInitializedDraftLeagueId = useGameStore(state => state.setInitializedDraftLeagueId);
   const draftPicks = useGameStore(state => state.draftPicks);
   const draftOrder = useGameStore(state => state.draftOrder);
   const draftState = useGameStore(state => state.draftState);
+
   const setDraftPicks = useGameStore(state => state.setDraftPicks);
   const setDraftOrder = useGameStore(state => state.setDraftOrder);
   const setDraftState = useGameStore(state => state.setDraftState);
+
   const [loading, setLoading] = useState(true);
+
+  // Track in-flight picks to prevent concurrency issues (like 409 Conflict)
+  const processingPicksRef = useRef<Set<string>>(new Set());
 
   // Fetch initial data
   useEffect(() => {
@@ -288,14 +292,15 @@ export const useDraft = () => {
     if (existingPick) {
       // Optimistic update for existing pick
       const oldPlayerId = existingPick.playerId;
-      // Use functional update or getState to ensure we have latest picks
-      // But setDraftPicks in useGameStore unfortunately doesn't support functional update yet (it's a simple setter)
-      // So we must use useGameStore.getState().draftPicks
+      // Get FRESH state for optimistic update to avoid race conditions
       const currentPicks = useGameStore.getState().draftPicks;
 
-      setDraftPicks(currentPicks.map(p =>
+      const optimisticPicks = currentPicks.map(p =>
         p.id === existingPick.id ? { ...p, playerId, managerId, isAutoDraft } : p
-      ));
+      );
+
+      console.log(`[useDraft] ⚡️ Optimistically updating existing pick ${existingPick.id}`);
+      setDraftPicks(optimisticPicks);
 
       const { error } = await supabase
         .from('draft_picks')
@@ -326,8 +331,9 @@ export const useDraft = () => {
         updatedAt: new Date(),
       };
 
-      // Get latest state before setting
+      // Get latest state
       const initialPicks = useGameStore.getState().draftPicks;
+      console.log(`[useDraft] ⚡️ Optimistically adding new pick ${tempId}`);
       setDraftPicks([...initialPicks, newPick]);
 
       const { data, error } = await supabase
@@ -347,30 +353,28 @@ export const useDraft = () => {
         // Revert on error
         const picksAfterError = useGameStore.getState().draftPicks;
         setDraftPicks(picksAfterError.filter(p => p.id !== tempId));
-        toast.error('Failed to make pick');
-        console.error(error);
+
+        if (error.code === '23505') {
+          console.warn(`[useDraft] ⚠️ Pick already exists in DB for ${round}.${position}. Realtime should fix it.`);
+        } else {
+          toast.error('Failed to make pick');
+          console.error(error);
+        }
       } else if (data) {
         // Replace temp pick with real one
         // CRITICAL: Get latest state again because Realtime might have fired
         const latestPicks = useGameStore.getState().draftPicks;
-
-        // If Realtime already added the Real pick (by checking round/position match with a REAL id), 
-        // we might have duplicates if we aren't careful.
-        // But mapDbDraftPick(data) has the REAL ID.
-        // If Realtime added it, there is already a pick with real ID.
-        // And our Temp pick is also there.
-        // We want to REMOVE the temp pick.
-        // If the Real pick is already there, we just remove temp.
-        // If Real pick is NOT there, we replace Temp with Real.
 
         const realPick = mapDbDraftPick(data as unknown as DbDraftPick);
         const alreadyHasReal = latestPicks.find(p => p.id === realPick.id);
 
         if (alreadyHasReal) {
           // Realtime beat us to it. Just remove the temp pick.
+          console.log(`[useDraft] 🔄 Realtime arrived first. Removing temp pick ${tempId}`);
           setDraftPicks(latestPicks.filter(p => p.id !== tempId));
         } else {
           // Replace temp with real
+          console.log(`[useDraft] ✅ Converting temp pick ${tempId} to real pick ${realPick.id}`);
           setDraftPicks(latestPicks.map(p =>
             p.id === tempId ? realPick : p
           ));
@@ -382,20 +386,30 @@ export const useDraft = () => {
     if (draftState?.isActive) {
       const config = useGameStore.getState().config;
       const totalPicks = config.managerCount * (config.activeSize + config.benchSize);
-      const currentTotalPicks = draftPicks.length + (existingPick ? 0 : 1);
+      // We use the store's draftPicks length + 1 (if new) to check if finished
+      const currentPicks = useGameStore.getState().draftPicks;
+      // Note: currentPicks already has the new pick included via opportunistic update
 
-      if (currentTotalPicks >= totalPicks) {
+      if (currentPicks.length >= totalPicks) {
         // Draft finished!
         finalizeDraft();
       } else {
         // Update timer for next pick
+        const newStartAt = new Date().toISOString();
+
+        // Optimistic update for UI responsiveness
+        setDraftState({
+          ...draftState,
+          currentPickStartAt: new Date(newStartAt)
+        });
+
         await supabase
           .from('draft_state')
-          .update({ current_pick_start_at: new Date().toISOString() })
+          .update({ current_pick_start_at: newStartAt })
           .eq('id', draftState.id);
       }
     }
-  }, [draftOrder, getPick, draftState, draftPicks, finalizeDraft]);
+  }, [draftOrder, getPick, draftState, finalizeDraft, leagueId]);
 
   // Clear a pick
   const clearPick = useCallback(async (round: number, position: number) => {
@@ -439,12 +453,25 @@ export const useDraft = () => {
         .eq('league_id', leagueId);
 
       setDraftPicks([]);
+
+      // Update local state if we have it
+      if (draftState) {
+        setDraftState({
+          ...draftState,
+          isFinalized: false,
+          finalizedAt: null,
+          isActive: false,
+          currentPickStartAt: null,
+          pausedAt: null
+        });
+      }
+
       toast.success('Draft has been reset');
     } catch (error) {
       console.error('Failed to reset draft:', error);
       toast.error('Failed to reset draft');
     }
-  }, [leagueId]);
+  }, [leagueId, draftState]);
 
   // Randomize draft order and auto-assign all managers
   const randomizeDraftOrder = useCallback(async () => {
@@ -548,12 +575,22 @@ export const useDraft = () => {
       return;
     }
 
+    const startAt = new Date().toISOString();
     console.log('[useDraft] 📝 Updating draft_state to active...', { id: draftState.id });
+
+    // Optimistic update
+    setDraftState({
+      ...draftState,
+      isActive: true,
+      currentPickStartAt: new Date(startAt),
+      pausedAt: null
+    });
+
     const { error } = await supabase
       .from('draft_state')
       .update({
         is_active: true,
-        current_pick_start_at: new Date().toISOString(),
+        current_pick_start_at: startAt,
         paused_at: null
       })
       .eq('id', draftState.id);
@@ -561,6 +598,12 @@ export const useDraft = () => {
     if (error) {
       toast.error('Failed to start draft');
       console.error('[useDraft] ❌ Error starting draft:', error);
+      // Revert
+      setDraftState({
+        ...draftState,
+        isActive: false,
+        currentPickStartAt: draftState.currentPickStartAt // restore
+      });
     } else {
       console.log('[useDraft] ✅ Draft state successfully updated to active');
       toast.success('Draft started!');
@@ -571,17 +614,32 @@ export const useDraft = () => {
   const pauseDraft = useCallback(async () => {
     if (!draftState || !draftState.isActive) return;
 
+    const pausedAt = new Date().toISOString();
+
+    // Optimistic update
+    setDraftState({
+      ...draftState,
+      isActive: false,
+      pausedAt: new Date(pausedAt)
+    });
+
     const { error } = await supabase
       .from('draft_state')
       .update({
         is_active: false,
-        paused_at: new Date().toISOString()
+        paused_at: pausedAt
       })
       .eq('id', draftState.id);
 
     if (error) {
       toast.error('Failed to pause draft');
       console.error(error);
+      // Revert
+      setDraftState({
+        ...draftState,
+        isActive: true,
+        pausedAt: null
+      });
     }
   }, [draftState]);
 
@@ -596,11 +654,21 @@ export const useDraft = () => {
       newStartAt = new Date(draftState.currentPickStartAt.getTime() + pauseDuration);
     }
 
+    const startAtIso = newStartAt.toISOString();
+
+    // Optimistic update
+    setDraftState({
+      ...draftState,
+      isActive: true,
+      currentPickStartAt: newStartAt,
+      pausedAt: null
+    });
+
     const { error } = await supabase
       .from('draft_state')
       .update({
         is_active: true,
-        current_pick_start_at: newStartAt.toISOString(),
+        current_pick_start_at: startAtIso,
         paused_at: null
       })
       .eq('id', draftState.id);
@@ -608,6 +676,12 @@ export const useDraft = () => {
     if (error) {
       toast.error('Failed to resume draft');
       console.error(error);
+      // Revert
+      setDraftState({
+        ...draftState,
+        isActive: false,
+        pausedAt: draftState.pausedAt
+      });
     }
   }, [draftState]);
 
@@ -628,46 +702,12 @@ export const useDraft = () => {
     }
   }, [draftState]);
 
-  // Get remaining time for current pick (in ms)
-  const getRemainingTime = useCallback(() => {
-    const timerDuration = 30000; // 30 seconds as requested
-    if (!draftState || !draftState.currentPickStartAt) return timerDuration;
-
-    const now = draftState.pausedAt?.getTime() || Date.now();
-    const elapsed = now - draftState.currentPickStartAt.getTime();
-    return Math.max(0, timerDuration - elapsed);
-  }, [draftState]);
-
-  // Execute an auto-pick
-  const executeAutoPick = useCallback(async (round: number, position: number) => {
-    console.log(`[useDraft] 🤖 Executing auto-pick for ${round}.${position}`);
-    const draftedIds = getDraftedPlayerIds();
-    const available = players.filter(p => !draftedIds.includes(p.id));
-
-    if (available.length === 0) {
-      console.warn('[useDraft] 🤖 Auto-pick failed: No players available');
-      return;
-    }
-
-    const sorted = sortPlayersByPriority(available);
-    const bestPlayer = sorted[0];
-
-    console.log(`[useDraft] 🤖 Auto-picking ${bestPlayer.name} for ${round}.${position}`);
-    await makePick(round, position, bestPlayer.id, true);
-  }, [getDraftedPlayerIds, players, makePick]);
-
-  // Timer side-effect for auto-drafting and empty team handling
-  useEffect(() => {
-    if (!draftState?.isActive || draftState?.isFinalized) return;
-
-    // If paused, we don't tick, but we also don't auto-pick
-    if (draftState?.pausedAt) return;
-
-    // Calculate current position details once
+  // Calculate current pick position details
+  const getCurrentPickData = useCallback(() => {
     const currentTotalPicks = draftPicks.length;
     const positionsCount = managers.length;
 
-    if (positionsCount === 0) return;
+    if (positionsCount === 0) return null;
 
     const round = Math.floor(currentTotalPicks / positionsCount) + 1;
     const pickIndexInRound = currentTotalPicks % positionsCount;
@@ -676,43 +716,106 @@ export const useDraft = () => {
       ? (positionsCount - pickIndexInRound)
       : (pickIndexInRound + 1);
 
+    const orderNode = draftOrder.find(o => o.position === position);
+    const isAutoDraftEnabled = orderNode?.autoDraftEnabled || false;
+
+    return { round, position, orderNode, isAutoDraftEnabled };
+  }, [draftPicks.length, managers.length, draftOrder]);
+
+  // Get remaining time for current pick (in ms)
+  const getRemainingTime = useCallback(() => {
+    const pickData = getCurrentPickData();
+    let timerDuration = 30000; // default 30s
+
+    if (pickData?.isAutoDraftEnabled) {
+      timerDuration = 10000;
+    }
+
+    if (!draftState || !draftState.currentPickStartAt) return timerDuration;
+
+    const now = draftState.pausedAt?.getTime() || Date.now();
+    const elapsed = now - draftState.currentPickStartAt.getTime();
+    return Math.max(0, timerDuration - elapsed);
+  }, [draftState, getCurrentPickData]);
+
+  // Execute an auto-pick
+  const executeAutoPick = useCallback(async (round: number, position: number) => {
+    const slotKey = `${round}-${position}`;
+
+    // Concurrency Lock: Prevent multiple calls for the same slot
+    if (processingPicksRef.current.has(slotKey)) {
+      console.warn(`[useDraft] 🛡️ Pick for ${slotKey} is already in flight. Skipping.`);
+      return;
+    }
+
+    // Secondary check: pick already exists in state
+    const currentPicks = useGameStore.getState().draftPicks;
+    if (currentPicks.some(p => p.round === round && p.pickPosition === position)) {
+      console.warn(`[useDraft] ⚠️ Pick for ${slotKey} already exists in store. Skipping.`);
+      return;
+    }
+
+    console.log(`[useDraft] 🤖 Executing auto-pick for ${slotKey}`);
+    processingPicksRef.current.add(slotKey);
+
+    try {
+      const draftedIds = getDraftedPlayerIds();
+      const available = players.filter(p => !draftedIds.includes(p.id));
+
+      if (available.length === 0) {
+        console.warn('[useDraft] 🤖 Auto-pick failed: No players available');
+        return;
+      }
+
+      const sorted = sortPlayersByPriority(available);
+      const bestPlayer = sorted[0];
+
+      console.log(`[useDraft] 🤖 Auto-picking ${bestPlayer.name} for ${slotKey}`);
+      await makePick(round, position, bestPlayer.id, true);
+    } catch (e) {
+      console.error(`[useDraft] ❌ Auto-pick error for ${slotKey}:`, e);
+    } finally {
+      // Only clear after a small delay to ensure Realtime/State catch up
+      setTimeout(() => {
+        processingPicksRef.current.delete(slotKey);
+      }, 1000);
+    }
+  }, [getDraftedPlayerIds, players, makePick]);
+
+  // Timer side-effect for auto-drafting and empty team handling
+  useEffect(() => {
+    if (!draftState?.isActive || draftState?.isFinalized) return;
+    if (draftState?.pausedAt) return;
+
+    // Calculate current position details once
+    const pickData = getCurrentPickData();
+    if (!pickData) return;
+
+    const { round, position, orderNode, isAutoDraftEnabled } = pickData;
+
     // Check if the current position has a manager assigned
-    const currentOrderNode = draftOrder.find(o => o.position === position);
-    const hasManager = !!currentOrderNode?.managerId;
+    const hasManager = !!orderNode?.managerId;
 
     // Check if manager is a bot (empty team with no user_id)
-    const manager = hasManager ? managers.find(m => m.id === currentOrderNode!.managerId) : null;
-    // Treat as bot if explicitly auto-draft enabled OR no attached user (Empty Team)
-    const isBot = (manager && !manager.userId) || (currentOrderNode?.autoDraftEnabled);
+    const manager = hasManager ? managers.find(m => m.id === orderNode!.managerId) : null;
 
-    // Immediate auto-pick if no manager assigned OR if it's a bot
-    // We only auto-pick for "Empty Teams" immediately. 
-    // For human teams with auto-draft enabled, we might want to respect the timer? 
-    // The user request specified "Empty teams". 
-    // "Just use it in the pick order. in the screen shot the empty teams should be auto picking"
-    // So assume immediate for no-user teams.
+    const isAssignedToUser = !!manager?.userId;
+
     const shouldImmediatePick = !hasManager || (manager && !manager.userId);
+
+    console.log(`[useDraft] ⏱️ Tick: ${round}.${position} | Manager: ${manager?.teamName || 'None'} | User: ${isAssignedToUser ? 'Yes' : 'No'} | AutoDraft: ${isAutoDraftEnabled} | Immediate: ${shouldImmediatePick}`);
 
     if (shouldImmediatePick) {
       console.log(`[useDraft] 👻 No human manager for ${round}.${position}. Executing immediate auto-pick.`);
-      // Add a small delay to avoid race conditions with state updates
       const timeout = setTimeout(() => {
         executeAutoPick(round, position);
-      }, 1000);
+      }, 2000);
       return () => clearTimeout(timeout);
     }
-
-    // For human teams with auto-draft, we let the timer run out (standard behavior) or pick immediately?
-    // Usually auto-draft means "Pick for me when it's my turn". Immediate is better UX.
-    // I'll add them to immediate pick too if user explicitly enabled it?
-    // User only asked for "Empty teams". I'll stick to that strictly to avoid surprises.
-    // But wait, if human toggles auto-draft, they expect it to pick.
-    // I'll stick to !manager.userId for now.
 
     const timer = setInterval(() => {
       const remaining = getRemainingTime();
 
-      // If time is up, trigger auto-pick
       if (remaining <= 0) {
         console.log(`[useDraft] ⏰ Time up for ${round}.${position}. Triggering auto-pick.`);
         executeAutoPick(round, position);
@@ -720,7 +823,7 @@ export const useDraft = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [draftState, getRemainingTime, draftPicks, managers, executeAutoPick, draftOrder]);
+  }, [draftState, getRemainingTime, managers, executeAutoPick, getCurrentPickData]);
 
   return {
     draftPicks,
