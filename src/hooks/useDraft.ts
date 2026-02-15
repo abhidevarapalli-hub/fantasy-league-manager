@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DraftPick, DraftOrder, DraftState, mapDbDraftPick, mapDbDraftOrder, mapDbDraftState, DbDraftPick, DbDraftOrder, DbDraftState } from '@/lib/draft-types';
@@ -617,10 +617,6 @@ export const useDraft = () => {
     await makePick(round, position, bestPlayer.id, true);
   }, [getDraftedPlayerIds, players, makePick]);
 
-  // Track pending auto-picks to avoid race conditions
-  const pendingAutoPickRef = useRef<{ round: number; position: number } | null>(null);
-  const autoPickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   // Timer side-effect for auto-drafting and empty team handling
   useEffect(() => {
     if (!draftState?.isActive || draftState?.isFinalized) return;
@@ -647,50 +643,33 @@ export const useDraft = () => {
 
     // Check if manager is a bot (empty team with no user_id)
     const manager = hasManager ? managers.find(m => m.id === currentOrderNode!.managerId) : null;
+    // Treat as bot if explicitly auto-draft enabled OR no attached user (Empty Team)
+    const isBot = (manager && !manager.userId) || (currentOrderNode?.autoDraftEnabled);
 
-    // Immediate auto-pick if no manager assigned OR if it's a bot (no user_id)
+    // Immediate auto-pick if no manager assigned OR if it's a bot
+    // We only auto-pick for "Empty Teams" immediately. 
+    // For human teams with auto-draft enabled, we might want to respect the timer? 
+    // The user request specified "Empty teams". 
+    // "Just use it in the pick order. in the screen shot the empty teams should be auto picking"
+    // So assume immediate for no-user teams.
     const shouldImmediatePick = !hasManager || (manager && !manager.userId);
 
     if (shouldImmediatePick) {
-      // Only set up new auto-pick if we're not already waiting for this exact position
-      // This prevents the timeout from being reset when draftPicks changes
-      const pendingKey = `${round}-${position}`;
-      const currentPendingKey = pendingAutoPickRef.current
-        ? `${pendingAutoPickRef.current.round}-${pendingAutoPickRef.current.position}`
-        : null;
-
-      if (currentPendingKey !== pendingKey) {
-        // Clear any existing timeout for a different position
-        if (autoPickTimeoutRef.current) {
-          clearTimeout(autoPickTimeoutRef.current);
-        }
-
-        console.log(`[useDraft] 👻 No human manager for ${round}.${position}. Scheduling auto-pick.`);
-        pendingAutoPickRef.current = { round, position };
-
-        autoPickTimeoutRef.current = setTimeout(() => {
-          // Verify this is still the position we want to pick for
-          if (pendingAutoPickRef.current?.round === round &&
-              pendingAutoPickRef.current?.position === position) {
-            console.log(`[useDraft] 👻 Executing auto-pick for ${round}.${position}`);
-            pendingAutoPickRef.current = null;
-            executeAutoPick(round, position);
-          }
-        }, 500); // Reduced to 500ms for faster auto-picks
-      }
-      return;
+      console.log(`[useDraft] 👻 No human manager for ${round}.${position}. Executing immediate auto-pick.`);
+      // Add a small delay to avoid race conditions with state updates
+      const timeout = setTimeout(() => {
+        executeAutoPick(round, position);
+      }, 1000);
+      return () => clearTimeout(timeout);
     }
 
-    // Clear pending auto-pick when moving to a human player
-    if (pendingAutoPickRef.current) {
-      pendingAutoPickRef.current = null;
-      if (autoPickTimeoutRef.current) {
-        clearTimeout(autoPickTimeoutRef.current);
-        autoPickTimeoutRef.current = null;
-      }
-    }
+    // For human teams with auto-draft, we let the timer run out (standard behavior) or pick immediately?
+    // Usually auto-draft means "Pick for me when it's my turn". Immediate is better UX.
+    // I'll add them to immediate pick too if user explicitly enabled it?
+    // User only asked for "Empty teams". I'll stick to that strictly to avoid surprises.
+    // But wait, if human toggles auto-draft, they expect it to pick.
+    // I'll stick to !manager.userId for now.
 
-    // For human teams, set up timer for timeout auto-pick
     const timer = setInterval(() => {
       const remaining = getRemainingTime();
 
@@ -703,15 +682,6 @@ export const useDraft = () => {
 
     return () => clearInterval(timer);
   }, [draftState, getRemainingTime, draftPicks, managers, executeAutoPick, draftOrder]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (autoPickTimeoutRef.current) {
-        clearTimeout(autoPickTimeoutRef.current);
-      }
-    };
-  }, []);
 
   return {
     draftPicks,

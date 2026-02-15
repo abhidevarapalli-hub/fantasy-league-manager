@@ -1,4 +1,4 @@
-import { Plus, Minus, ArrowUp, ArrowDown, Plane, ArrowLeftRight, Repeat, Star } from 'lucide-react';
+import { Plus, Minus, ArrowUp, ArrowDown, Plane, ArrowLeftRight, Repeat } from 'lucide-react';
 import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
@@ -19,10 +19,6 @@ interface PlayerCardProps {
   isOwned?: boolean;
   showActions?: boolean;
   variant?: 'compact' | 'full';
-  recommendation?: {
-    isRecommended: boolean;
-    reason?: string;
-  };
 }
 
 // Team colors are now centralized in src/lib/team-colors.ts
@@ -48,8 +44,7 @@ export const PlayerCard = ({
   isOwned = false,
   showActions = true,
   variant = 'full',
-  managerName,
-  recommendation,
+  managerName
 }: PlayerCardProps & { managerName?: string }) => {
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger if clicking on action buttons
@@ -101,9 +96,6 @@ export const PlayerCard = ({
 
       <div className="flex-1 min-w-0 z-10">
         <div className="flex items-center gap-1.5 leading-tight">
-          {recommendation?.isRecommended && (
-            <Star className="w-3.5 h-3.5 flex-shrink-0 text-amber-400 fill-amber-400" />
-          )}
           <p className={cn(
             "font-medium truncate",
             variant === 'compact' ? "text-xs" : "text-sm md:text-base",
@@ -118,11 +110,6 @@ export const PlayerCard = ({
             )} />
           )}
         </div>
-        {recommendation?.isRecommended && recommendation.reason && (
-          <p className="text-[9px] font-medium text-amber-400 mt-0.5 truncate">
-            {recommendation.reason}
-          </p>
-        )}
         <div className="flex items-center gap-1.5 mt-0.5">
           <span
             className={cn(

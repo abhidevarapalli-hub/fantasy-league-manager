@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
 import { TeamConstraints } from '@/components/TeamConstraints';
-import { DraftRosterProgress } from '@/components/DraftRosterProgress';
 import { cn } from '@/lib/utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { toast } from 'sonner';
@@ -430,16 +429,6 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
       {/* Team Constraints */}
       <TeamConstraints config={config} className="mb-4" />
 
-      {/* Roster Progress for Current Picker */}
-      {draftState?.isActive && !draftState?.isFinalized && getManagerAtPosition(currentPosition) && (
-        <DraftRosterProgress
-          managerId={getManagerAtPosition(currentPosition)!.id}
-          managerName={getManagerAtPosition(currentPosition)!.teamName}
-          draftPicks={draftPicks.map(p => ({ managerId: p.managerId, playerId: p.playerId }))}
-          className="mb-4"
-        />
-      )}
-
       {/* LM Controls */}
       {!isEffectivelyReadOnly && (
         <div className="flex flex-col gap-2">
@@ -611,7 +600,6 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
           draftedPlayerIds={getDraftedPlayerIds().filter(id => id !== selectedPick?.playerId)}
           currentPlayerId={selectedPick?.playerId || null}
           onConfirm={handlePickConfirm}
-          managerDraftPicks={draftPicks.map(p => ({ managerId: p.managerId, playerId: p.playerId }))}
         />
       )}
 
