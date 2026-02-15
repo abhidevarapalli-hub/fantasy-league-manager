@@ -97,9 +97,23 @@ serve(async (req) => {
       },
     });
 
+    // Handle binary responses (images)
+    const contentType = response.headers.get('content-type');
+    if (contentType && (contentType.startsWith('image/') || contentType.includes('application/octet-stream'))) {
+      const arrayBuffer = await response.arrayBuffer();
+      return new Response(arrayBuffer, {
+        status: response.status,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=86400', // Cache images for 24 hours
+        }
+      });
+    }
+
     const data = await response.json();
 
-    // Cache successful responses
+    // Cache successful responses (JSON only)
     if (response.ok) {
       cache.set(endpoint, {
         data,

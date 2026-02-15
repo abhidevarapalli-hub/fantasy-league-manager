@@ -253,11 +253,14 @@ export function getCricbuzzImageUrl(
   if (!imageId) return null;
   // Cricbuzz image URL format: /img/v1/i1/c{imageId}/i.jpg
   // The 'c' prefix is required for the imageId
-  // Use proxy in development to handle auth headers for images
-  const baseUrl = import.meta.env.DEV
-    ? '/api/cricbuzz'
-    : 'https://cricbuzz-cricket.p.rapidapi.com';
-  return `${baseUrl}/img/v1/i1/c${imageId}/i.jpg?p=${size}&d=${quality}`;
+
+  // Use proxy in production to handle auth headers and CORS for images
+  if (import.meta.env.DEV) {
+    return `/api/cricbuzz/img/v1/i1/c${imageId}/i.jpg?p=${size}&d=${quality}`;
+  }
+
+  // Production uses the Supabase Edge Function proxy
+  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cricbuzz-proxy?endpoint=/img/v1/i1/c${imageId}/i.jpg?p=${size}%26d=${quality}`;
 }
 
 /**

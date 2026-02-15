@@ -21,8 +21,10 @@ const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
 const RAPIDAPI_HOST = import.meta.env.VITE_RAPIDAPI_HOST || 'cricbuzz-cricket.p.rapidapi.com';
 
 // Use Vite proxy in development to avoid CORS issues
-// In production, calls go directly to RapidAPI (requires server-side proxy or CORS-enabled endpoint)
-const BASE_URL = import.meta.env.DEV ? '/api/cricbuzz' : `https://${RAPIDAPI_HOST}`;
+// In production, calls go through the Supabase Edge Function proxy
+const BASE_URL = import.meta.env.DEV
+  ? '/api/cricbuzz'
+  : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cricbuzz-proxy?endpoint=`;
 
 // Common headers for all requests
 const getHeaders = () => ({
