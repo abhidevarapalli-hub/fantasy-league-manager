@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
-import { TeamConstraints } from '@/components/TeamConstraints';
 import { cn } from '@/lib/utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { toast } from 'sonner';
@@ -425,9 +424,6 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
           />
         </div>
       )}
-
-      {/* Team Constraints */}
-      <TeamConstraints config={config} className="mb-4" />
 
       {/* LM Controls */}
       {!isEffectivelyReadOnly && (
