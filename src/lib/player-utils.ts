@@ -55,7 +55,10 @@ const INTERNATIONAL_TEAM_CODES: Record<string, string> = {
   'Bangladesh': 'BAN',
   'Sri Lanka': 'SL',
   'United Arab Emirates': 'UAE',
+  'United States of America': 'USA',
+  'United States Of America': 'USA',
   'USA': 'USA',
+  'Uganda': 'UGA',
   'Hong Kong': 'HK',
   'Papua New Guinea': 'PNG',
 };
