@@ -216,22 +216,32 @@ export async function fetchAllTournamentPlayers(
   const results: Array<{ team: TournamentSquad; players: TournamentPlayer[] }> = [];
   let totalPlayers = 0;
 
-  for (let i = 0; i < squads.length; i++) {
-    const squad = squads[i];
+  // Process in batches to control concurrency (e.g., 3 requests at a time)
+  const CONCURRENCY = 3;
+  const BATCH_DELAY = 1000; // Wait 1s between batches to respect rate limits
 
-    try {
-      const players = await fetchSquadPlayers(seriesId, squad.squadId);
-      results.push({ team: squad, players });
-      totalPlayers += players.length;
-      console.log(`[CricbuzzAPI] [${i + 1}/${squads.length}] ${squad.teamName}: ${players.length} players`);
-    } catch (error) {
-      console.error(`[CricbuzzAPI] Failed to fetch ${squad.teamName}:`, error);
-      results.push({ team: squad, players: [] });
-    }
+  for (let i = 0; i < squads.length; i += CONCURRENCY) {
+    const batch = squads.slice(i, i + CONCURRENCY);
+    console.log(`[CricbuzzAPI] Processing batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(squads.length / CONCURRENCY)}...`);
 
-    // Add 300ms delay between requests to stay under rate limit
-    if (i < squads.length - 1) {
-      await sleepMs(300);
+    const batchPromises = batch.map(async (squad) => {
+      try {
+        const players = await fetchSquadPlayers(seriesId, squad.squadId);
+        console.log(`[CricbuzzAPI] ${squad.teamName}: ${players.length} players`);
+        return { team: squad, players };
+      } catch (error) {
+        console.error(`[CricbuzzAPI] Failed to fetch ${squad.teamName}:`, error);
+        return { team: squad, players: [] };
+      }
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+    totalPlayers += batchResults.reduce((sum, r) => sum + r.players.length, 0);
+
+    // Delay between batches
+    if (i + CONCURRENCY < squads.length) {
+      await sleepMs(BATCH_DELAY);
     }
   }
 

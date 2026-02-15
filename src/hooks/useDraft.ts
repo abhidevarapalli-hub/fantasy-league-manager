@@ -216,6 +216,45 @@ export const useDraft = () => {
         league_id: leagueId,
       });
 
+      // --- Schedule Generation ---
+      // Clear existing schedule for this league to avoid duplicates
+      // Use 'league_schedules' as per migration
+      const { error: clearScheduleError } = await supabase
+        .from('league_schedules' as 'transactions') // Casting to avoid type errors if types aren't updated yet
+        .delete()
+        .eq('league_id', leagueId);
+
+      if (clearScheduleError) {
+        console.error('Failed to clear existing schedule:', clearScheduleError);
+      }
+
+      // Generate new schedule
+      const managerIds = Array.from(picksByManager.keys());
+
+      // Dynamic import to avoid circular dependencies if any, or just for code splitting
+      const { generateSchedule } = await import('@/lib/scheduler');
+      const matchups = generateSchedule(managerIds);
+
+      if (matchups.length > 0) {
+        const scheduleRows = matchups.map(m => ({
+          league_id: leagueId,
+          week: m.round,
+          manager1_id: m.home,
+          manager2_id: m.away, // Can be null for bye
+        }));
+
+        const { error: scheduleError } = await supabase
+          .from('league_schedules' as 'transactions')
+          .insert(scheduleRows as any);
+
+        if (scheduleError) {
+          console.error('Failed to save schedule:', scheduleError);
+          toast.error('Draft finalized, but failed to generate schedule.');
+        } else {
+          console.log(`[useDraft] ✅ Generated ${matchups.length} matchups for 5 weeks.`);
+        }
+      }
+
       // Update draft state
       if (draftState) {
         await supabase

@@ -279,92 +279,65 @@ const PLAYERS_DATA = [
   { name: "Jack Edwards", team: "SRH", role: "All Rounder" },
 ];
 
-
 export const useSeedDatabase = () => {
-
   const [seeding, setSeeding] = useState(false);
 
   const seedDatabase = useCallback(async (leagueId?: string) => {
     if (!leagueId) return false;
-
     const seedStartTime = performance.now();
-    // console.log(`[useSeedDatabase] 🌱 seedDatabase started for league: ${leagueId}`);
-
     setSeeding(true);
     try {
-      // Check if data already exists for this league (check league_player_pool instead of players)
-      const checkStartTime = performance.now();
       const { data: existingPoolEntries } = await supabase.from("league_player_pool").select("id").eq("league_id", leagueId).limit(1);
-      const { data: existingManagers } = await supabase.from("managers").select("id").eq("league_id", leagueId).limit(1);
-      const checkDuration = performance.now() - checkStartTime;
-      // console.log(`[useSeedDatabase] 🔍 Existence check completed in ${checkDuration.toFixed(2)}ms`);
+      if ((existingPoolEntries?.length ?? 0) > 0) return true;
 
-      const hasPlayers = (existingPoolEntries?.length ?? 0) > 0;
-      const hasManagers = (existingManagers?.length ?? 0) > 0;
+      // Bulk insert hardcoded data
+      const names = PLAYERS_DATA.map(p => p.name);
+      const { data: existingMasters } = await supabase
+        .from("master_players")
+        .select("id, name, primary_role")
+        .in("name", names);
 
-      if (hasPlayers && hasManagers) {
-        // console.log(`[useSeedDatabase] ✅ League ${leagueId} already seeded (skipping), total time: ${(performance.now() - seedStartTime).toFixed(2)}ms`);
-        return true;
+      const existingMap = new Map(existingMasters?.map(p => [`${p.name}-${p.primary_role}`, p.id]) || []);
+
+      const newMasters = [];
+      const leaguePoolInserts = [];
+
+      for (const p of PLAYERS_DATA) {
+        const key = `${p.name}-${p.role}`;
+        if (existingMap.has(key)) {
+          leaguePoolInserts.push({
+            league_id: leagueId,
+            player_id: existingMap.get(key),
+            team_override: p.team
+          });
+        } else {
+          newMasters.push({
+            name: p.name,
+            primary_role: p.role,
+            is_international: isInternationalPlayer(p.name),
+            teams: [p.team]
+          });
+        }
       }
 
-      // Seed players using new schema: master_players + league_player_pool
-      if (!hasPlayers) {
-        const insertStartTime = performance.now();
-        console.log(`[useSeedDatabase] 📥 Inserting ${PLAYERS_DATA.length} players to master_players...`);
-
-        // For each player in hardcoded data:
-        // 1. Upsert to master_players (dedupe by name + role)
-        // 2. Insert to league_player_pool
-        for (const player of PLAYERS_DATA) {
-          // First, check if player already exists in master_players
-          const { data: existingMaster } = await supabase
-            .from("master_players")
-            .select("id")
-            .eq("name", player.name)
-            .eq("primary_role", player.role)
-            .maybeSingle();
-
-          let masterId: string;
-          if (existingMaster) {
-            masterId = existingMaster.id;
-          } else {
-            // Insert new master player
-            const { data: newMaster, error: masterError } = await supabase
-              .from("master_players")
-              .insert({
-                name: player.name,
-                primary_role: player.role,
-                is_international: isInternationalPlayer(player.name),
-                teams: [player.team],
-              })
-              .select("id")
-              .single();
-
-            if (masterError || !newMaster) {
-              console.error(`[useSeedDatabase] ❌ Error inserting master player ${player.name}:`, masterError);
-              continue;
+      if (newMasters.length > 0) {
+        const { data: inserted } = await supabase.from("master_players").insert(newMasters).select();
+        if (inserted) {
+          inserted.forEach(m => {
+            const original = PLAYERS_DATA.find(p => p.name === m.name && p.role === m.primary_role);
+            if (original) {
+              leaguePoolInserts.push({
+                league_id: leagueId,
+                player_id: m.id,
+                team_override: original?.team
+              });
             }
-            masterId = newMaster.id;
-          }
-
-          // Add to league player pool
-          const { error: poolError } = await supabase
-            .from("league_player_pool")
-            .upsert({
-              league_id: leagueId,
-              player_id: masterId,
-              team_override: player.team,
-            }, { onConflict: 'league_id,player_id' });
-
-          if (poolError) {
-            console.error(`[useSeedDatabase] ❌ Error adding ${player.name} to league pool:`, poolError);
-          }
+          });
         }
+      }
 
-        const insertDuration = performance.now() - insertStartTime;
-        console.log(`[useSeedDatabase] ✅ Players seeded successfully for league ${leagueId} in ${insertDuration.toFixed(2)}ms`);
-      } else {
-        console.log(`[useSeedDatabase] ✅ Players already exist, skipping insert`);
+      if (leaguePoolInserts.length > 0) {
+        await supabase.from("league_player_pool").insert(leaguePoolInserts);
       }
 
       const totalSeedDuration = performance.now() - seedStartTime;
@@ -372,7 +345,7 @@ export const useSeedDatabase = () => {
       return true;
 
     } catch (error) {
-      console.error(`[useSeedDatabase] ❌ Error seeding database (${(performance.now() - seedStartTime).toFixed(2)}ms):`, error);
+      console.error(`[useSeedDatabase] ❌ Error seeding database:`, error);
       return false;
     } finally {
       setSeeding(false);
@@ -383,322 +356,217 @@ export const useSeedDatabase = () => {
     if (!leagueId) return false;
     setSeeding(true);
     try {
-      // First, clear all manager rosters for this league (from junction table)
-      const { error: clearRostersError } = await supabase
-        .from("manager_roster" as any)
-        .delete()
-        .eq("league_id", leagueId);
-
-      if (clearRostersError) {
-        console.error("Error clearing rosters:", clearRostersError);
-        throw clearRostersError;
-      }
-
-      // Delete all existing league_player_pool entries for this league
-      const { error: deleteError } = await supabase
-        .from("league_player_pool")
-        .delete()
-        .eq("league_id", leagueId);
-
-      if (deleteError) {
-        console.error("Error deleting league player pool:", deleteError);
-        throw deleteError;
-      }
-
-      // Insert new players using master_players + league_player_pool
-      for (const player of PLAYERS_DATA) {
-        // Check if player exists in master_players
-        const { data: existingMaster } = await supabase
-          .from("master_players")
-          .select("id")
-          .eq("name", player.name)
-          .eq("primary_role", player.role)
-          .maybeSingle();
-
-        let masterId: string;
-        if (existingMaster) {
-          masterId = existingMaster.id;
-        } else {
-          // Insert new master player
-          const { data: newMaster, error: masterError } = await supabase
-            .from("master_players")
-            .insert({
-              name: player.name,
-              primary_role: player.role,
-              is_international: isInternationalPlayer(player.name),
-              teams: [player.team],
-            })
-            .select("id")
-            .single();
-
-          if (masterError || !newMaster) {
-            console.error(`Error inserting master player ${player.name}:`, masterError);
-            continue;
-          }
-          masterId = newMaster.id;
-        }
-
-        // Add to league player pool
-        await supabase
-          .from("league_player_pool")
-          .insert({
-            league_id: leagueId,
-            player_id: masterId,
-            team_override: player.team,
-          });
-      }
-
-      console.log("Players reseeded successfully for league", leagueId);
+      await supabase.from("manager_roster" as any).delete().eq("league_id", leagueId);
+      await supabase.from("league_player_pool").delete().eq("league_id", leagueId);
+      await seedDatabase(leagueId);
       return true;
-    } catch (error) {
-      console.error("Error reseeding players:", error);
+    } catch (e) {
+      console.error(e);
       return false;
     } finally {
       setSeeding(false);
     }
-  }, []);
+  }, [seedDatabase]);
 
-  /**
-   * Seed players from a tournament (T20 WC or IPL) via Cricbuzz API
-   * Falls back to hardcoded IPL data if API fails
-   */
-  const seedFromTournament = useCallback(async (leagueId: string, tournamentId: number): Promise<boolean> => {
+  const seedFromTournament = useCallback(async (leagueId: string, tournamentId: number, forceRefresh = false): Promise<boolean> => {
     setSeeding(true);
     try {
-      // Check if players already exist in league_player_pool
-      const { data: existingPoolEntries } = await supabase
-        .from("league_player_pool")
-        .select("id")
-        .eq("league_id", leagueId)
-        .limit(1);
+      if (!forceRefresh) {
+        const { count } = await supabase
+          .from("league_player_pool")
+          .select("*", { count: "exact", head: true })
+          .eq("league_id", leagueId);
 
-      if ((existingPoolEntries?.length ?? 0) > 0) {
-        console.log("[Seed] League already has players, skipping");
-        return true;
+        if (count && count > 0) {
+          console.log("[Seed] League already has players, skipping");
+          return true;
+        }
       }
 
-      // Check if API is configured
+      const tournament = getTournamentById(tournamentId);
+      const isInternational = tournament?.type === 'international';
+
+      const testTeam = isInternational ? 'NAM' : 'CSK';
+      const { count: masterCount } = await supabase
+        .from("master_players")
+        .select("*", { count: "exact", head: true })
+        .contains("teams", [testTeam]);
+
+      const hasLocalData = (masterCount || 0) > 10;
+
+      if (hasLocalData && !forceRefresh) {
+        console.log(`[Seed] found local data for ${testTeam} (${masterCount} players). Using local master_players.`);
+
+        const t20wcTeams = ['IND', 'PAK', 'AUS', 'ENG', 'SA', 'NZ', 'WI', 'AFG', 'SL', 'BAN', 'NED', 'NEP', 'USA', 'CAN', 'NAM', 'SCO', 'OMN', 'PNG', 'UGA', 'IRE'];
+        const iplTeams = ['CSK', 'MI', 'RCB', 'KKR', 'GT', 'LSG', 'RR', 'PBKS', 'DC', 'SRH'];
+        const targetTeams = isInternational ? t20wcTeams : iplTeams;
+
+        const { data: localPlayers } = await supabase
+          .from("master_players")
+          .select("id, teams")
+          .overlaps("teams", targetTeams);
+
+        if (localPlayers && localPlayers.length > 200) {
+          console.log(`[Seed] Found ${localPlayers.length} players locally. Linking to league...`);
+
+          const poolInserts = localPlayers.map(p => {
+            // Find which team matched (first match)
+            const team = p.teams?.find((t: string) => targetTeams.includes(t)) || p.teams?.[0] || 'UNK';
+            return {
+              league_id: leagueId,
+              player_id: p.id,
+              team_override: team
+            };
+          });
+
+          const chunkSize = 100;
+          for (let i = 0; i < poolInserts.length; i += chunkSize) {
+            const chunk = poolInserts.slice(i, i + chunkSize);
+            const { error } = await supabase.from("league_player_pool").upsert(chunk, { onConflict: 'league_id,player_id' });
+            if (error) console.error("Error linking chunk:", error);
+          }
+          return true;
+        }
+      }
+
       if (!isApiConfigured()) {
         console.warn("[Seed] API not configured, using hardcoded data");
         return await seedDatabase(leagueId);
       }
 
-      const tournament = getTournamentById(tournamentId);
-      const isInternationalTournament = tournament?.type === 'international';
-
       console.log(`[Seed] Fetching from ${tournament?.shortName || tournamentId}...`);
 
-      // Fetch all teams and players (with 60 second timeout)
       let teamsWithPlayers;
       try {
         teamsWithPlayers = await withTimeout(
           fetchAllTournamentPlayers(tournamentId),
           60000,
-          `API timeout: Failed to fetch tournament data within 60 seconds`
+          `API timeout`
         );
       } catch (apiError: any) {
-        console.error("[Seed] API fetch failed:", apiError?.message || apiError);
-        throw apiError;
-      }
-
-      console.log(`[Seed] Fetched ${teamsWithPlayers.length} teams`);
-
-      // Check if we got any data
-      if (!teamsWithPlayers || teamsWithPlayers.length === 0) {
-        console.warn("[useSeedDatabase] ⚠️ No teams returned from API, falling back to hardcoded data");
+        console.error("[Seed] API fetch failed:", apiError);
         return await seedDatabase(leagueId);
       }
 
-      // Transform API data and insert into master_players + league_player_pool
-      console.log(`[useSeedDatabase] 📥 Processing ${teamsWithPlayers.length} teams...`);
-      const insertStartTime = performance.now();
+      if (!teamsWithPlayers || teamsWithPlayers.length === 0) {
+        return await seedDatabase(leagueId);
+      }
 
-      let playersInserted = 0;
-      let playersLinked = 0;
+      console.log(`[useSeedDatabase] 📥 Processing ${teamsWithPlayers.length} teams...`);
+
+      // Flatten all players
+      const allPlayers: any[] = [];
 
       for (const { team, players } of teamsWithPlayers) {
         const teamCode = getTeamCode(team.teamName);
-        console.log(`[useSeedDatabase] 📋 Processing team: ${team.teamName} (${teamCode}) with ${players.length} players`);
-
         for (const player of players) {
-          // Determine if player is international
           let isIntl: boolean;
-          if (isInternationalTournament) {
-            // For T20 WC: non-India players are international
+          if (isInternational) {
             isIntl = isInternationalForT20WC(team.teamName);
           } else {
-            // For IPL: use the existing international player check
             isIntl = isInternationalPlayer(player.name);
           }
-
           const role = mapApiRole(player.role);
 
-          // Upsert to master_players using cricbuzz_id as unique key
-          let masterId: string | null = null;
+          allPlayers.push({
+            cricbuzz_id: player.id ? String(player.id) : null,
+            name: player.name,
+            primary_role: role,
+            is_international: isIntl,
+            image_id: player.imageId,
+            batting_style: player.battingStyle,
+            bowling_style: player.bowlingStyle,
+            teams: [teamCode],
+            team_code: teamCode
+          });
+        }
+      }
 
-          if (player.id) {
-            // Try to find existing master player by cricbuzz_id
-            const { data: existingByApi } = await supabase
-              .from("master_players")
-              .select("id")
-              .eq("cricbuzz_id", player.id)
-              .maybeSingle();
+      const upsertChunkSize = 50;
+      const leagueInserts = [];
 
-            if (existingByApi) {
-              masterId = existingByApi.id;
-            } else {
-              // Insert new master player with cricbuzz data
-              const { data: newMaster, error: insertErr } = await supabase
-                .from("master_players")
-                .insert({
-                  cricbuzz_id: player.id,
-                  name: player.name,
-                  primary_role: role,
-                  is_international: isIntl,
-                  image_id: player.imageId || null,
-                  batting_style: player.battingStyle || null,
-                  bowling_style: player.bowlingStyle || null,
-                  teams: [teamCode],
-                })
-                .select("id")
-                .single();
+      for (let i = 0; i < allPlayers.length; i += upsertChunkSize) {
+        const chunk = allPlayers.slice(i, i + upsertChunkSize);
 
-              if (insertErr) {
-                console.warn(`[useSeedDatabase] ⚠️ Error inserting master player ${player.name}:`, insertErr);
-                continue;
+        // Only upsert players with cricbuzz_id
+        const validPlayers = chunk.filter(p => p.cricbuzz_id);
+        const validPayload = validPlayers.map(p => ({
+          cricbuzz_id: p.cricbuzz_id,
+          name: p.name,
+          primary_role: p.primary_role,
+          is_international: p.is_international,
+          image_id: p.image_id,
+          batting_style: p.batting_style,
+          bowling_style: p.bowling_style,
+          teams: p.teams,
+        }));
+
+        if (validPayload.length > 0) {
+          const { data: upserted, error } = await supabase
+            .from("master_players")
+            .upsert(validPayload, { onConflict: 'cricbuzz_id' })
+            .select("id, cricbuzz_id");
+
+          if (error) {
+            console.error("Error upserting chunk:", error);
+          } else if (upserted) {
+            upserted.forEach(m => {
+              const original = chunk.find(c => c.cricbuzz_id == m.cricbuzz_id);
+              if (original) {
+                leagueInserts.push({
+                  league_id: leagueId,
+                  player_id: m.id,
+                  team_override: original.team_code
+                });
               }
-              masterId = newMaster?.id || null;
-              playersInserted++;
-            }
-          } else {
-            // No cricbuzz_id, fallback to name+role matching
-            const { data: existingByName } = await supabase
-              .from("master_players")
-              .select("id")
-              .eq("name", player.name)
-              .eq("primary_role", role)
-              .maybeSingle();
-
-            if (existingByName) {
-              masterId = existingByName.id;
-            } else {
-              // Insert new master player without cricbuzz data
-              const { data: newMaster, error: insertErr } = await supabase
-                .from("master_players")
-                .insert({
-                  name: player.name,
-                  primary_role: role,
-                  is_international: isIntl,
-                  teams: [teamCode],
-                })
-                .select("id")
-                .single();
-
-              if (insertErr) {
-                console.warn(`[useSeedDatabase] ⚠️ Error inserting master player ${player.name}:`, insertErr);
-                continue;
-              }
-              masterId = newMaster?.id || null;
-              playersInserted++;
-            }
+            });
           }
+        }
 
-          // Link player to league via league_player_pool
-          if (masterId) {
-            const { error: poolError } = await supabase
-              .from("league_player_pool")
-              .upsert({
-                league_id: leagueId,
-                player_id: masterId,
-                team_override: teamCode,
-              }, { onConflict: 'league_id,player_id' });
-
-            if (poolError) {
-              console.warn(`[useSeedDatabase] ⚠️ Error linking ${player.name} to league:`, poolError);
-            } else {
-              playersLinked++;
-            }
+        // Handle players without cricbuzz_id (rare fallback)
+        const noIdPlayers = chunk.filter(p => !p.cricbuzz_id);
+        for (const p of noIdPlayers) {
+          const { data: existing } = await supabase.from("master_players").select("id").eq("name", p.name).eq("primary_role", p.primary_role).maybeSingle();
+          if (existing) {
+            leagueInserts.push({ league_id: leagueId, player_id: existing.id, team_override: p.team_code });
+          } else {
+            const { data: newP } = await supabase.from("master_players").insert({
+              name: p.name, primary_role: p.primary_role, is_international: p.is_international, teams: p.teams
+            }).select("id").single();
+            if (newP) leagueInserts.push({ league_id: leagueId, player_id: newP.id, team_override: p.team_code });
           }
         }
       }
 
-      const insertDuration = performance.now() - insertStartTime;
-
-      // Check if we linked any players
-      if (playersLinked === 0) {
-        console.warn("[useSeedDatabase] ⚠️ No players linked to league, falling back to hardcoded data");
-        return await seedDatabase(leagueId);
+      for (let i = 0; i < leagueInserts.length; i += 100) {
+        const chunk = leagueInserts.slice(i, i + 100);
+        const { error } = await supabase.from("league_player_pool").upsert(chunk, { onConflict: 'league_id,player_id' });
+        if (error) console.error("Error linking pool:", error);
       }
 
-      console.log(`[useSeedDatabase] ✅ Inserted ${playersInserted} new master players, linked ${playersLinked} to league in ${insertDuration.toFixed(2)}ms`);
-      console.log(`[Seed] Completed - ${playersLinked} players from ${tournament?.shortName || tournamentId}`);
       return true;
 
     } catch (error: any) {
-      console.error(`[useSeedDatabase] ❌ Error seeding from tournament:`, error?.message || error);
-      console.error(`[useSeedDatabase] Stack:`, error?.stack);
-      // Fall back to hardcoded data on any error
-      console.log("[useSeedDatabase] 🔄 Falling back to hardcoded IPL data...");
+      console.error(`[useSeedDatabase] ❌ Error seeding from tournament:`, error);
       return await seedDatabase(leagueId);
     } finally {
       setSeeding(false);
     }
   }, [seedDatabase]);
 
-  /**
-   * Reseed players from a tournament (T20 WC or IPL) via Cricbuzz API
-   * This clears existing league_player_pool entries and fetches fresh data from the API
-   * Note: master_players entries are NOT deleted as they may be shared across leagues
-   */
-  const reseedFromTournament = useCallback(async (leagueId: string, tournamentId: number): Promise<boolean> => {
-    console.log(`[Reseed] Starting for tournament ${tournamentId}...`);
-
+  const reseedFromTournament = useCallback(async (leagueId: string, tournamentId: number) => {
     setSeeding(true);
     try {
-      // Clear all manager rosters for this league (from junction table)
-      const { error: clearRostersError } = await supabase
-        .from("manager_roster" as any)
-        .delete()
-        .eq("league_id", leagueId);
-
-      if (clearRostersError) {
-        console.error("[Reseed] Error clearing rosters:", clearRostersError);
-        throw clearRostersError;
-      }
-
-      // Delete all league_player_pool entries for this league
-      // Note: We don't delete master_players as they may be shared across leagues
-      const { error: deleteError } = await supabase
-        .from("league_player_pool")
-        .delete()
-        .eq("league_id", leagueId);
-
-      if (deleteError) {
-        console.error("[Reseed] Error deleting league player pool:", deleteError);
-        throw deleteError;
-      }
-
-      // Seed from tournament (will create new master_players as needed and link to league)
-      const result = await seedFromTournament(leagueId, tournamentId);
+      await supabase.from("manager_roster" as any).delete().eq("league_id", leagueId);
+      await supabase.from("league_player_pool").delete().eq("league_id", leagueId);
+      const result = await seedFromTournament(leagueId, tournamentId, true);
 
       if (result) {
-        // Update the league's tournament_id in the database
-        const { error: updateError } = await supabase
-          .from("leagues")
-          .update({ tournament_id: tournamentId })
-          .eq("id", leagueId);
-
-        if (updateError) {
-          console.warn("[Reseed] Warning: Failed to update tournament_id:", updateError);
-        } else {
-          console.log(`[Reseed] Updated league tournament_id to ${tournamentId}`);
-        }
+        await supabase.from("leagues").update({ tournament_id: tournamentId }).eq("id", leagueId);
       }
-
-      console.log(`[Reseed] Completed - Success: ${result}`);
       return result;
-    } catch (error) {
-      console.error("[Reseed] Failed:", error);
+    } catch (e) {
+      console.error(e);
       return false;
     } finally {
       setSeeding(false);

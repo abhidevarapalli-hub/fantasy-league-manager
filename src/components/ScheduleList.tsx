@@ -4,6 +4,7 @@ import { Match, Manager } from '@/lib/supabase-types';
 import { Calendar, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/useAuthStore';
+import { MatchupDetail } from './MatchupDetail';
 
 interface HeadToHead {
   id: string;
@@ -103,10 +104,16 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
     return acc;
   }, {} as Record<number, Match[]>);
 
+  /* Add state for selected match */
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
+  /* ... existing code ... */
+
   return (
     <div className="space-y-4">
       {Object.entries(groupedByWeek).map(([week, matches]) => (
         <div key={week} className="bg-card rounded-xl border border-border overflow-hidden">
+          {/* ... existing header ... */}
           <div className={cn(
             "flex items-center gap-2 px-4 py-2.5 border-b border-border",
             Number(week) === currentWeek ? "bg-primary/10" : "bg-muted/30"
@@ -133,10 +140,14 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
               const userPlaying = isUserMatch(match);
 
               return (
-                <div key={idx} className={cn(
-                  "px-4 py-3",
-                  userPlaying && "bg-secondary/10 border-l-2 border-l-secondary"
-                )}>
+                <div
+                  key={idx}
+                  onClick={() => setSelectedMatch(match)}
+                  className={cn(
+                    "px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors",
+                    userPlaying && "bg-secondary/10 border-l-2 border-l-secondary"
+                  )}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className={cn(
@@ -200,6 +211,19 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
           </div>
         </div>
       ))}
+
+      {/* Matchup Detail Modal */}
+      {selectedMatch && (
+        <MatchupDetail
+          open={!!selectedMatch}
+          onOpenChange={(open) => !open && setSelectedMatch(null)}
+          match={selectedMatch}
+          homeManager={getManager(selectedMatch.home)}
+          awayManager={getManager(selectedMatch.away)}
+        />
+      )}
     </div>
   );
 };
+
+
