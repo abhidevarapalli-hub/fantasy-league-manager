@@ -384,6 +384,117 @@ function extractManOfMatch(scorecard: CricbuzzScorecard): { id: number; name: st
   return null;
 }
 
+// Normalize scoring rules from DB format to expected format
+// DB format uses: matchBonuses, batting.duck, batting.milestones as flat object, etc.
+// Expected format uses: common, batting.duckDismissal, batting.milestones as array, etc.
+// deno-lint-ignore no-explicit-any
+function normalizeScoringRules(dbRules: any): ScoringRules {
+  const defaults: ScoringRules = {
+    common: { starting11: 5, matchWinningTeam: 5, impactPlayer: 5, impactPlayerWinBonus: 5, manOfTheMatch: 50 },
+    batting: {
+      runs: 1, four: 1, six: 2,
+      milestones: [
+        { runs: 25, points: 10 }, { runs: 40, points: 15 }, { runs: 60, points: 20 },
+        { runs: 80, points: 25 }, { runs: 100, points: 40 }, { runs: 150, points: 80 },
+      ],
+      duckDismissal: -10, lowScoreDismissal: -5,
+      strikeRateBonuses: [
+        { minSR: 0, maxSR: 99.99, points: -30, minBalls: 10 },
+        { minSR: 200.01, maxSR: 999.99, points: 30, minRuns: 10 },
+      ],
+    },
+    bowling: {
+      wickets: 30,
+      milestones: [
+        { wickets: 2, points: 10 }, { wickets: 3, points: 20 }, { wickets: 4, points: 30 },
+        { wickets: 5, points: 40 }, { wickets: 6, points: 60 },
+      ],
+      dotBall: 1, lbwOrBowledBonus: 5, widePenalty: -1, noBallPenalty: -5, maidenOver: 40,
+      economyRateBonuses: [
+        { minER: 0, maxER: 3.99, points: 40, minOvers: 2 },
+        { minER: 10.01, maxER: 99.99, points: -15, minOvers: 2 },
+      ],
+    },
+    fielding: { catch: 10, stumping: 20, runOut: 10, multiCatchBonus: { count: 2, points: 10 } },
+  };
+
+  if (!dbRules) return defaults;
+
+  // Already in expected format (has 'common' key)
+  if (dbRules.common) return dbRules;
+
+  // Convert from DB format (matchBonuses, flat milestones, different field names)
+  // deno-lint-ignore no-explicit-any
+  function normalizeBattingMilestones(milestones: any): { runs: number; points: number }[] {
+    if (Array.isArray(milestones)) return milestones;
+    if (!milestones || typeof milestones !== 'object') return defaults.batting.milestones;
+    const result: { runs: number; points: number }[] = [];
+    for (const [key, value] of Object.entries(milestones)) {
+      const match = key.match(/^runs(\d+)$/);
+      if (match) result.push({ runs: parseInt(match[1]), points: value as number });
+    }
+    result.sort((a, b) => a.runs - b.runs);
+    return result.length > 0 ? result : defaults.batting.milestones;
+  }
+
+  // deno-lint-ignore no-explicit-any
+  function normalizeWicketMilestones(milestones: any): { wickets: number; points: number }[] {
+    if (Array.isArray(milestones)) return milestones;
+    if (!milestones || typeof milestones !== 'object') return defaults.bowling.milestones;
+    const result: { wickets: number; points: number }[] = [];
+    for (const [key, value] of Object.entries(milestones)) {
+      const match = key.match(/^wickets(\d+)/);
+      if (match) result.push({ wickets: parseInt(match[1]), points: value as number });
+    }
+    result.sort((a, b) => a.wickets - b.wickets);
+    return result.length > 0 ? result : defaults.bowling.milestones;
+  }
+
+  return {
+    common: {
+      starting11: dbRules.matchBonuses?.startingXI ?? defaults.common.starting11,
+      matchWinningTeam: dbRules.matchBonuses?.winningTeam ?? defaults.common.matchWinningTeam,
+      impactPlayer: dbRules.matchBonuses?.impactPlayer ?? defaults.common.impactPlayer,
+      impactPlayerWinBonus: dbRules.matchBonuses?.impactPlayerWinningBonus ?? defaults.common.impactPlayerWinBonus,
+      manOfTheMatch: dbRules.matchBonuses?.manOfTheMatch ?? defaults.common.manOfTheMatch,
+    },
+    batting: {
+      runs: dbRules.batting?.runs ?? defaults.batting.runs,
+      four: dbRules.batting?.fours ?? defaults.batting.four,
+      six: dbRules.batting?.sixes ?? defaults.batting.six,
+      milestones: normalizeBattingMilestones(dbRules.batting?.milestones),
+      duckDismissal: dbRules.batting?.duck ?? defaults.batting.duckDismissal,
+      lowScoreDismissal: dbRules.batting?.lowScore ?? defaults.batting.lowScoreDismissal,
+      strikeRateBonuses: (dbRules.batting?.strikeRateBonuses || defaults.batting.strikeRateBonuses).map(
+        // deno-lint-ignore no-explicit-any
+        (b: any) => ({ minSR: b.minSR, maxSR: b.maxSR, points: b.points, minBalls: b.minBalls, minRuns: b.minRuns })
+      ),
+    },
+    bowling: {
+      wickets: dbRules.bowling?.wickets ?? defaults.bowling.wickets,
+      milestones: normalizeWicketMilestones(dbRules.bowling?.wicketMilestones),
+      dotBall: dbRules.bowling?.dotBalls ?? defaults.bowling.dotBall,
+      lbwOrBowledBonus: dbRules.bowling?.lbwBowledBonus ?? defaults.bowling.lbwOrBowledBonus,
+      widePenalty: dbRules.bowling?.wides ?? defaults.bowling.widePenalty,
+      noBallPenalty: dbRules.bowling?.noBalls ?? defaults.bowling.noBallPenalty,
+      maidenOver: dbRules.bowling?.maidens ?? defaults.bowling.maidenOver,
+      economyRateBonuses: (dbRules.bowling?.economyBonuses || defaults.bowling.economyRateBonuses).map(
+        // deno-lint-ignore no-explicit-any
+        (b: any) => ({ minER: b.minER, maxER: b.maxER, points: b.points, minOvers: b.minOvers })
+      ),
+    },
+    fielding: {
+      catch: dbRules.fielding?.catches ?? defaults.fielding.catch,
+      stumping: dbRules.fielding?.stumpings ?? defaults.fielding.stumping,
+      runOut: dbRules.fielding?.runOuts ?? defaults.fielding.runOut,
+      multiCatchBonus: {
+        count: 2,
+        points: dbRules.fielding?.twoCatchBonus ?? defaults.fielding.multiCatchBonus.points,
+      },
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -475,35 +586,8 @@ serve(async (req) => {
     for (const league of leagues) {
       const { league_id, match_id, scoring_rules } = league;
 
-      // Default scoring rules if not set
-      const rules: ScoringRules = scoring_rules || {
-        common: { starting11: 5, matchWinningTeam: 5, impactPlayer: 5, impactPlayerWinBonus: 5, manOfTheMatch: 50 },
-        batting: {
-          runs: 1, four: 1, six: 2,
-          milestones: [
-            { runs: 25, points: 10 }, { runs: 40, points: 15 }, { runs: 60, points: 20 },
-            { runs: 80, points: 25 }, { runs: 100, points: 40 }, { runs: 150, points: 80 },
-          ],
-          duckDismissal: -10, lowScoreDismissal: -5,
-          strikeRateBonuses: [
-            { minSR: 0, maxSR: 99.99, points: -30, minBalls: 10 },
-            { minSR: 200.01, maxSR: 999.99, points: 30, minRuns: 10 },
-          ],
-        },
-        bowling: {
-          wickets: 30,
-          milestones: [
-            { wickets: 2, points: 10 }, { wickets: 3, points: 20 }, { wickets: 4, points: 30 },
-            { wickets: 5, points: 40 }, { wickets: 6, points: 60 },
-          ],
-          dotBall: 1, lbwOrBowledBonus: 5, widePenalty: -1, noBallPenalty: -5, maidenOver: 40,
-          economyRateBonuses: [
-            { minER: 0, maxER: 3.99, points: 40, minOvers: 2 },
-            { minER: 10.01, maxER: 99.99, points: -15, minOvers: 2 },
-          ],
-        },
-        fielding: { catch: 10, stumping: 20, runOut: 10, multiCatchBonus: { count: 2, points: 10 } },
-      };
+      // Normalize scoring rules from DB format to expected format
+      const rules: ScoringRules = normalizeScoringRules(scoring_rules);
 
       // Get league players with cricbuzz_id mapping
       const { data: leaguePlayers } = await supabase
@@ -511,10 +595,10 @@ serve(async (req) => {
         .select('id, name, cricbuzz_id')
         .eq('league_id', league_id);
 
-      // Get managers with rosters
-      const { data: managers } = await supabase
-        .from('managers')
-        .select('id, name, roster, bench')
+      // Get roster entries from junction table
+      const { data: rosterEntries } = await supabase
+        .from('manager_roster')
+        .select('manager_id, player_id, slot_type')
         .eq('league_id', league_id);
 
       // Create lookup maps
@@ -531,17 +615,12 @@ serve(async (req) => {
       }
 
       const playerToManager = new Map<string, { managerId: string; isActive: boolean }>();
-      if (managers) {
-        for (const manager of managers) {
-          const roster = manager.roster || [];
-          const bench = manager.bench || [];
-
-          for (const playerId of roster) {
-            playerToManager.set(playerId, { managerId: manager.id, isActive: true });
-          }
-          for (const playerId of bench) {
-            playerToManager.set(playerId, { managerId: manager.id, isActive: false });
-          }
+      if (rosterEntries) {
+        for (const entry of rosterEntries) {
+          playerToManager.set(entry.player_id, {
+            managerId: entry.manager_id,
+            isActive: entry.slot_type === 'active',
+          });
         }
       }
 

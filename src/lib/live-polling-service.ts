@@ -36,6 +36,8 @@ class LivePollingService {
   private statsChannels: Map<string, RealtimeChannel> = new Map();
   private pollingStatusCallbacks: Map<number, Set<PollingStatusCallback>> = new Map();
   private liveStatsCallbacks: Map<string, Set<LiveStatsCallback>> = new Map();
+  private autoPollingInterval: ReturnType<typeof setInterval> | null = null;
+  private autoPollingLeagueId: string | null = null;
 
   /**
    * Get polling status for a Cricbuzz match
@@ -140,28 +142,20 @@ class LivePollingService {
     };
   }> {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/live-stats-poller`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ cricbuzz_match_id: cricbuzzMatchId }),
+      const { data, error } = await supabase.functions.invoke('live-stats-poller', {
+        body: { cricbuzz_match_id: cricbuzzMatchId },
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        return { success: false, error: result.error || 'Poll failed' };
+      if (error) {
+        return { success: false, error: error.message || 'Poll failed' };
       }
 
       return {
         success: true,
         data: {
-          matchState: result.matchState,
-          statsUpserted: result.statsUpserted,
-          manOfMatch: result.manOfMatch,
+          matchState: data.matchState,
+          statsUpserted: data.statsUpserted,
+          manOfMatch: data.manOfMatch,
         },
       };
     } catch (error) {
@@ -351,9 +345,74 @@ class LivePollingService {
   }
 
   /**
+   * Start auto-polling interval that calls live-stats-poller directly
+   * for each match with polling enabled.
+   * Interval: 60 seconds (matches typical cron frequency).
+   */
+  startAutoPolling(leagueId: string, intervalMs = 60_000): void {
+    // Don't start duplicate intervals for the same league
+    if (this.autoPollingInterval && this.autoPollingLeagueId === leagueId) return;
+
+    // Stop any existing interval first
+    this.stopAutoPolling();
+
+    this.autoPollingLeagueId = leagueId;
+    console.log(`[LivePolling] Starting auto-poll interval (${intervalMs / 1000}s) for league ${leagueId}`);
+
+    this.autoPollingInterval = setInterval(async () => {
+      try {
+        // Check if there are any matches with polling enabled before calling
+        const statuses = await this.getLeaguePollingStatuses(leagueId);
+        const activePolling = statuses.filter(s => s.pollingEnabled);
+
+        if (activePolling.length === 0) {
+          console.log('[LivePolling] No matches with polling enabled, skipping');
+          return;
+        }
+
+        console.log(`[LivePolling] Auto-triggering poll for ${activePolling.length} match(es)`);
+
+        // Poll each match directly via live-stats-poller (avoids 401 from poll-trigger
+        // which requires service role auth)
+        for (const match of activePolling) {
+          const result = await this.triggerPoll(match.cricbuzzMatchId);
+          if (result.success) {
+            console.log(`[LivePolling] Auto-poll match ${match.cricbuzzMatchId}:`, result.data);
+          } else {
+            console.error(`[LivePolling] Auto-poll match ${match.cricbuzzMatchId} error:`, result.error);
+          }
+        }
+      } catch (err) {
+        console.error('[LivePolling] Auto-poll interval error:', err);
+      }
+    }, intervalMs);
+  }
+
+  /**
+   * Stop auto-polling interval
+   */
+  stopAutoPolling(): void {
+    if (this.autoPollingInterval) {
+      console.log('[LivePolling] Stopping auto-poll interval');
+      clearInterval(this.autoPollingInterval);
+      this.autoPollingInterval = null;
+      this.autoPollingLeagueId = null;
+    }
+  }
+
+  /**
+   * Check if auto-polling is currently active
+   */
+  isAutoPollingActive(): boolean {
+    return this.autoPollingInterval !== null;
+  }
+
+  /**
    * Clean up all subscriptions
    */
   cleanup() {
+    this.stopAutoPolling();
+
     if (this.pollingChannel) {
       this.pollingChannel.unsubscribe();
       this.pollingChannel = null;

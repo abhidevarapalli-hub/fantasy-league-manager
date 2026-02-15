@@ -327,7 +327,7 @@ export function useSeriesMatches(seriesId: number | null) {
             matchFormat: m.match_format || 'T20',
             startDate: new Date(m.match_date || Date.now()).getTime().toString(),
             endDate: new Date(m.match_date || Date.now()).getTime().toString(), // Placeholder
-            state: m.state || 'Upcoming',
+            state: m.match_state || m.state || 'Upcoming',
             status: m.result || '',
             team1: {
               teamId: m.team1_id || 0,
@@ -445,6 +445,71 @@ export function usePlayerSchedule(
     isLoading,
     error,
   };
+}
+
+/**
+ * Hook to fetch a player's match stats from player_match_stats table
+ * Returns stats keyed by cricbuzz_match_id for easy merging with schedule data
+ */
+export function usePlayerMatchStats(
+  playerId: string | null,
+  leagueId: string | null
+) {
+  return useQuery({
+    queryKey: ['player-match-stats', playerId, leagueId],
+    queryFn: async () => {
+      if (!playerId || !leagueId) throw new Error('Player ID and League ID required');
+
+      const { data, error } = await supabase
+        .from('player_match_stats')
+        .select(`
+          *,
+          match:cricket_matches (
+            cricbuzz_match_id
+          )
+        `)
+        .eq('player_id', playerId)
+        .eq('league_id', leagueId);
+
+      if (error) {
+        console.error('[usePlayerMatchStats] Error:', error);
+        return new Map<number, PlayerMatchPerformance>();
+      }
+
+      // Build a map from cricbuzz_match_id to stats
+      const statsMap = new Map<number, PlayerMatchPerformance>();
+      for (const row of data || []) {
+        const cricbuzzMatchId = row.match?.cricbuzz_match_id;
+        if (!cricbuzzMatchId) continue;
+
+        statsMap.set(cricbuzzMatchId, {
+          matchId: cricbuzzMatchId,
+          matchDate: new Date(row.created_at),
+          opponent: '',
+          opponentShort: '',
+          runs: row.runs ?? undefined,
+          ballsFaced: row.balls_faced ?? undefined,
+          fours: row.fours ?? undefined,
+          sixes: row.sixes ?? undefined,
+          strikeRate: row.strike_rate != null ? Number(row.strike_rate) : undefined,
+          isNotOut: row.is_out === false,
+          overs: row.overs != null ? Number(row.overs) : undefined,
+          maidens: row.maidens ?? undefined,
+          runsConceded: row.runs_conceded ?? undefined,
+          wickets: row.wickets ?? undefined,
+          economy: row.economy != null ? Number(row.economy) : undefined,
+          catches: row.catches ?? undefined,
+          stumpings: row.stumpings ?? undefined,
+          runOuts: row.run_outs ?? undefined,
+          fantasyPoints: row.fantasy_points != null ? Number(row.fantasy_points) : undefined,
+        });
+      }
+
+      return statsMap;
+    },
+    enabled: !!playerId && !!leagueId,
+    staleTime: 5 * 60 * 1000,
+  });
 }
 
 /**

@@ -333,11 +333,20 @@ export async function matchStatsToLeaguePlayers(
     .select('id, name, team, cricbuzz_id')
     .eq('league_id', leagueId);
 
-  // Fetch managers with their rosters
-  const { data: managers } = await supabase
-    .from('managers')
-    .select('id, name, team_name, roster, bench')
-    .eq('league_id', leagueId);
+  // Fetch managers and their roster entries from junction table
+  const [managersRes, rosterRes] = await Promise.all([
+    supabase
+      .from('managers')
+      .select('id, name, team_name')
+      .eq('league_id', leagueId),
+    supabase
+      .from('manager_roster')
+      .select('manager_id, player_id, slot_type')
+      .eq('league_id', leagueId),
+  ]);
+
+  const managers = managersRes.data;
+  const rosterEntries = rosterRes.data;
 
   // Create lookup map from cricbuzz_id to player
   const cricbuzzToPlayer = new Map<string, { playerId: string; playerName: string }>();
@@ -352,26 +361,24 @@ export async function matchStatsToLeaguePlayers(
     }
   }
 
-  const playerToManager = new Map<string, { managerId: string; managerName: string; teamName: string; isActive: boolean }>();
+  // Build manager lookup
+  const managerMap = new Map<string, { name: string; teamName: string }>();
   if (managers) {
-    for (const manager of managers) {
-      const roster = manager.roster || [];
-      const bench = manager.bench || [];
+    for (const m of managers) {
+      managerMap.set(m.id, { name: m.name, teamName: m.team_name });
+    }
+  }
 
-      for (const playerId of roster) {
-        playerToManager.set(playerId, {
-          managerId: manager.id,
+  const playerToManager = new Map<string, { managerId: string; managerName: string; teamName: string; isActive: boolean }>();
+  if (rosterEntries) {
+    for (const entry of rosterEntries) {
+      const manager = managerMap.get(entry.manager_id);
+      if (manager) {
+        playerToManager.set(entry.player_id, {
+          managerId: entry.manager_id,
           managerName: manager.name,
-          teamName: manager.team_name,
-          isActive: true,
-        });
-      }
-      for (const playerId of bench) {
-        playerToManager.set(playerId, {
-          managerId: manager.id,
-          managerName: manager.name,
-          teamName: manager.team_name,
-          isActive: false,
+          teamName: manager.teamName,
+          isActive: entry.slot_type === 'active',
         });
       }
     }

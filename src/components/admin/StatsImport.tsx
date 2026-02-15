@@ -147,6 +147,23 @@ export const StatsImport = () => {
     fetchPollingStatuses();
   }, [fetchPollingStatuses, matches]);
 
+  // Start/stop auto-polling based on whether any matches have polling enabled
+  useEffect(() => {
+    if (!currentLeagueId) return;
+
+    const hasActivePolling = Array.from(pollingStatuses.values()).some(s => s.pollingEnabled);
+
+    if (hasActivePolling) {
+      livePollingService.startAutoPolling(currentLeagueId);
+    } else {
+      livePollingService.stopAutoPolling();
+    }
+
+    return () => {
+      livePollingService.stopAutoPolling();
+    };
+  }, [currentLeagueId, pollingStatuses]);
+
   // Fetch saved matches for the league via league_matches junction table
   useEffect(() => {
     if (!currentLeagueId) return;
@@ -332,23 +349,35 @@ export const StatsImport = () => {
     }
   };
 
-  // Sync all completed matches from series
-  const handleSyncCompletedMatches = async () => {
+  // Map Cricbuzz match state to our DB match state
+  const mapMatchState = (cricbuzzState: string): 'Upcoming' | 'Live' | 'Complete' => {
+    if (cricbuzzState === 'Complete') return 'Complete';
+    if (cricbuzzState === 'In Progress') return 'Live';
+    return 'Upcoming';
+  };
+
+  // Sync matches from series (completed + live, or completed only)
+  const handleSyncMatches = async (completedOnly = false) => {
     if (!currentLeagueId || seriesMatches.length === 0) return;
 
     setIsSyncing(true);
     let addedCount = 0;
+    let updatedCount = 0;
 
     try {
-      const completedMatches = seriesMatches.filter(m => m.state === 'Complete');
+      const matchesToSync = completedOnly
+        ? seriesMatches.filter(m => m.state === 'Complete')
+        : seriesMatches.filter(m => m.state === 'Complete' || m.state === 'In Progress');
 
-      for (const match of completedMatches) {
+      for (const match of matchesToSync) {
+        const matchState = mapMatchState(match.state);
+
         // Check if already exists in this league via league_matches
         const { data: existingMatch } = await supabase
           .from('cricket_matches')
           .select('id')
           .eq('cricbuzz_match_id', match.matchId)
-          .single();
+          .maybeSingle();
 
         if (existingMatch) {
           // Match exists, check if it's linked to this league
@@ -357,10 +386,18 @@ export const StatsImport = () => {
             .select('id')
             .eq('league_id', currentLeagueId)
             .eq('match_id', existingMatch.id)
-            .single();
+            .maybeSingle();
 
           if (existingLink) {
-            // Already linked to this league, skip
+            // Already linked — update match_state and result if changed
+            await supabase
+              .from('cricket_matches')
+              .update({
+                match_state: matchState,
+                result: match.status || null,
+              })
+              .eq('id', existingMatch.id);
+            updatedCount++;
             continue;
           }
         }
@@ -379,28 +416,46 @@ export const StatsImport = () => {
           p_week: null,
         });
 
-        if (!error && data && data.length > 0 && data[0].is_new_match) {
-          addedCount++;
-          setMatches(prev => [
-            {
-              id: data[0].out_match_id,
-              leagueMatchId: data[0].out_league_match_id,
-              cricbuzzMatchId: match.matchId,
-              matchDescription: match.matchDesc,
-              team1Name: match.team1.teamName,
-              team2Name: match.team2.teamName,
-              result: match.status,
-              matchDate: new Date(parseInt(match.startDate)).toISOString(),
-              venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
-              statsImported: false,
-              week: null,
-            },
-            ...prev,
-          ]);
+        if (!error && data && data.length > 0) {
+          // Update match_state on the cricket_matches record
+          await supabase
+            .from('cricket_matches')
+            .update({ match_state: matchState })
+            .eq('id', data[0].out_match_id);
+
+          if (data[0].is_new_match) {
+            addedCount++;
+          }
+
+          setMatches(prev => {
+            // Check if match already in local state
+            const exists = prev.some(m => m.cricbuzzMatchId === match.matchId);
+            if (exists) return prev;
+            return [
+              {
+                id: data[0].out_match_id,
+                leagueMatchId: data[0].out_league_match_id,
+                cricbuzzMatchId: match.matchId,
+                matchDescription: match.matchDesc,
+                team1Name: match.team1.teamName,
+                team2Name: match.team2.teamName,
+                result: match.status,
+                matchDate: new Date(parseInt(match.startDate)).toISOString(),
+                venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
+                statsImported: false,
+                week: null,
+                matchState,
+              },
+              ...prev,
+            ];
+          });
         }
       }
 
-      toast.success(`Synced ${addedCount} new completed matches`);
+      const parts = [];
+      if (addedCount > 0) parts.push(`${addedCount} new`);
+      if (updatedCount > 0) parts.push(`${updatedCount} updated`);
+      toast.success(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'All matches already synced');
     } catch (error) {
       console.error('Error syncing matches:', error);
       toast.error('Failed to sync some matches');
@@ -438,7 +493,7 @@ export const StatsImport = () => {
         .from('cricket_matches')
         .select('id')
         .eq('cricbuzz_match_id', cricbuzzMatchId)
-        .single();
+        .maybeSingle();
 
       if (existingMatch) {
         // Match exists in cricket_matches, check if linked to this league
@@ -447,7 +502,7 @@ export const StatsImport = () => {
           .select('id')
           .eq('league_id', currentLeagueId)
           .eq('match_id', existingMatch.id)
-          .single();
+          .maybeSingle();
 
         if (existingLink) {
           toast.error('Match already added to this league');
@@ -571,33 +626,71 @@ export const StatsImport = () => {
     setIsSyncing(true);
     let successCount = 0;
     let errorCount = 0;
+    let skippedLive = 0;
 
     for (const match of pendingMatches) {
       try {
-        await handleFetchScorecard(match);
+        // Fetch and parse scorecard inline (don't rely on React state)
+        const scorecard = await getMatchScorecard(match.cricbuzzMatchId);
+        const isLive = !scorecard.ismatchcomplete;
+
+        if (isLive) {
+          // Skip live matches — they should be polled, not auto-imported
+          skippedLive++;
+          continue;
+        }
+
+        const winnerMatch = scorecard.status.match(/^(\w+)\s+won/i);
+        const winnerTeamName = winnerMatch ? winnerMatch[1] : null;
+
+        const parsed = parseScorecard(scorecard as CricbuzzScorecard, winnerTeamName);
+        const statsWithOwnership = await matchStatsToLeaguePlayers(
+          parsed,
+          currentLeagueId!,
+          scoringRules
+        );
+
+        if (statsWithOwnership.length === 0) {
+          console.warn(`No stats parsed for match ${match.cricbuzzMatchId}, skipping`);
+          errorCount++;
+          continue;
+        }
+
+        // Update match result in DB
+        if (scorecard.status) {
+          await supabase
+            .from('cricket_matches')
+            .update({
+              result: scorecard.status,
+              match_state: 'Complete',
+            })
+            .eq('id', match.id);
+        }
+
+        const weekNum = parseInt(selectedWeek);
+        const result = await saveMatchStats(
+          currentLeagueId!,
+          match.id,
+          weekNum,
+          statsWithOwnership
+        );
+
+        if (result.success) {
+          successCount++;
+          setMatches(prev =>
+            prev.map(m =>
+              m.id === match.id
+                ? { ...m, statsImported: true, week: weekNum, matchState: 'Complete' as const }
+                : m
+            )
+          );
+        } else {
+          console.error(`Failed to save stats for match ${match.cricbuzzMatchId}:`, result.error);
+          errorCount++;
+        }
+
         // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 500));
-
-        if (parsedStats.length > 0) {
-          const weekNum = parseInt(selectedWeek);
-          const result = await saveMatchStats(
-            currentLeagueId!,
-            match.id,
-            weekNum,
-            parsedStats
-          );
-
-          if (result.success) {
-            successCount++;
-            setMatches(prev =>
-              prev.map(m =>
-                m.id === match.id ? { ...m, statsImported: true, week: weekNum } : m
-              )
-            );
-          } else {
-            errorCount++;
-          }
-        }
       } catch (error) {
         console.error(`Error importing match ${match.cricbuzzMatchId}:`, error);
         errorCount++;
@@ -608,12 +701,11 @@ export const StatsImport = () => {
     setParsedStats([]);
     setSelectedMatch(null);
 
-    if (successCount > 0) {
-      toast.success(`Imported ${successCount} matches`);
-    }
-    if (errorCount > 0) {
-      toast.error(`Failed to import ${errorCount} matches`);
-    }
+    const parts = [];
+    if (successCount > 0) parts.push(`${successCount} imported`);
+    if (skippedLive > 0) parts.push(`${skippedLive} skipped (live)`);
+    if (errorCount > 0) parts.push(`${errorCount} failed`);
+    toast[errorCount > 0 && successCount === 0 ? 'error' : 'success'](parts.join(', '));
   };
 
   // Save stats to database
@@ -830,14 +922,14 @@ export const StatsImport = () => {
 
                   {seriesMatches.length > 0 && (
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {seriesMatches.filter(m => m.state === 'Complete').length}{' '}
-                          completed matches found
-                        </span>
+                      <div className="text-sm text-muted-foreground">
+                        {seriesMatches.length} matches found ({seriesMatches.filter(m => m.state === 'Complete').length} completed, {seriesMatches.filter(m => m.state === 'In Progress').length} live)
+                      </div>
+                      <div className="flex items-center gap-2 justify-end">
                         <Button
                           size="sm"
-                          onClick={handleSyncCompletedMatches}
+                          variant="outline"
+                          onClick={() => handleSyncMatches(true)}
                           disabled={isSyncing}
                         >
                           {isSyncing ? (
@@ -845,7 +937,19 @@ export const StatsImport = () => {
                           ) : (
                             <Download className="w-4 h-4 mr-2" />
                           )}
-                          Sync All Completed
+                          Sync Completed
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleSyncMatches(false)}
+                          disabled={isSyncing}
+                        >
+                          {isSyncing ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Download className="w-4 h-4 mr-2" />
+                          )}
+                          Sync Completed + Live
                         </Button>
                       </div>
                     </div>

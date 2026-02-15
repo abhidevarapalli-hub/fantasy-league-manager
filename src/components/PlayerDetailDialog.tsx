@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
 import { TournamentPlayer } from '@/lib/cricket-types';
 import { getTournamentById, SUPPORTED_TOURNAMENTS } from '@/lib/tournaments';
-import { usePlayerSchedule, useExtendedPlayer, PlayerMatchPerformance } from '@/hooks/usePlayerDetails';
+import { usePlayerSchedule, useExtendedPlayer, usePlayerMatchStats, PlayerMatchPerformance } from '@/hooks/usePlayerDetails';
 import { getPlayerAvatarUrl, getPlayerTeamForTournament, TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
@@ -149,6 +149,9 @@ export function PlayerDetailDialog({
         playerTeamShort
     );
 
+    const { currentLeagueId } = useGameStore();
+    const { data: playerStatsMap } = usePlayerMatchStats(player?.id, currentLeagueId);
+
     const teamColors = getTeamColors(player?.team || 'OTHER');
     const imageId = tournamentPlayer?.imageId || extendedData?.imageId;
 
@@ -202,11 +205,18 @@ export function PlayerDetailDialog({
         return [battingSection, fieldingSection, bowlingSection];
     }, [player?.role]);
 
-    // Combine match stats and schedule
+    // Combine schedule with actual stats from player_match_stats DB table
     const unifiedMatches = useMemo(() => {
-        if (!playerSchedule || playerSchedule.length === 0) return matchStats;
-        return playerSchedule;
-    }, [playerSchedule, matchStats]);
+        const schedule = playerSchedule && playerSchedule.length > 0 ? playerSchedule : matchStats;
+        if (!playerStatsMap || playerStatsMap.size === 0) return schedule;
+
+        // Merge DB stats into each schedule entry by cricbuzz_match_id
+        return schedule.map(match => {
+            const dbStats = playerStatsMap.get(match.matchId);
+            if (!dbStats) return match;
+            return { ...match, ...dbStats, matchId: match.matchId, matchDate: match.matchDate, opponent: match.opponent, opponentShort: match.opponentShort, venue: match.venue, result: match.result, isUpcoming: match.isUpcoming, week: (match as any).week };
+        });
+    }, [playerSchedule, matchStats, playerStatsMap]);
 
     if (!player) return null;
 
@@ -364,12 +374,14 @@ export function PlayerDetailDialog({
 
                                     {/* Data Rows */}
                                     {unifiedMatches.length > 0 ? unifiedMatches.map((matchItem, index) => {
-                                        // Try to find detailed stats for this match if it exists in matchStats
-                                        const stats = matchStats.find(s => s.matchId === matchItem.matchId) ||
-                                            (matchItem as any).runs !== undefined ? matchItem : undefined;
+                                        // Stats are merged directly into matchItem from player_match_stats
+                                        const hasStats = (matchItem as any).runs !== undefined || (matchItem as any).wickets !== undefined;
+                                        const stats = hasStats ? matchItem : undefined;
 
-                                        const hasStats = !!stats;
-                                        const fpts = hasStats ? calculateFantasyPoints(stats as PlayerMatchPerformance) : 0;
+                                        // Use DB fantasy_points if available, otherwise calculate
+                                        const fpts = hasStats
+                                            ? ((matchItem as any).fantasyPoints ?? calculateFantasyPoints(stats as PlayerMatchPerformance))
+                                            : 0;
 
                                         const matchDate = matchItem.matchDate;
                                         const opponentShort = matchItem.opponentShort;
