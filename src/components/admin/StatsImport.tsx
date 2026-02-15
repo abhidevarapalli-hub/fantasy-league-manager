@@ -43,17 +43,16 @@ import {
   type CricbuzzScorecard,
 } from '@/lib/cricbuzz-stats-service';
 import {
-  getSeriesList,
   getSeriesMatches,
   getRecentMatches,
   getMatchScorecard,
-  type CricbuzzSeries,
   type CricbuzzMatch,
 } from '@/lib/cricbuzz-api';
 import {
   livePollingService,
   type PollingStatus,
 } from '@/lib/live-polling-service';
+import { getTournamentById } from '@/lib/tournaments';
 
 interface CricketMatch {
   id: string;
@@ -76,6 +75,9 @@ export const StatsImport = () => {
   const currentLeagueId = useGameStore(state => state.currentLeagueId);
   const scoringRules = useGameStore(state => state.scoringRules);
   const schedule = useGameStore(state => state.schedule);
+  const tournamentId = useGameStore(state => state.tournamentId);
+
+  const tournament = tournamentId ? getTournamentById(tournamentId) : null;
 
   // State
   const [selectedWeek, setSelectedWeek] = useState('1');
@@ -90,10 +92,7 @@ export const StatsImport = () => {
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
 
   // Series state
-  const [seriesList, setSeriesList] = useState<CricbuzzSeries[]>([]);
-  const [selectedSeriesId, setSelectedSeriesId] = useState<string>('');
   const [seriesMatches, setSeriesMatches] = useState<CricbuzzMatch[]>([]);
-  const [isLoadingSeries, setIsLoadingSeries] = useState(false);
   const [isLoadingSeriesMatches, setIsLoadingSeriesMatches] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -300,33 +299,26 @@ export const StatsImport = () => {
     }
   };
 
-  // Load series list
-  const handleLoadSeries = async () => {
-    setIsLoadingSeries(true);
-    try {
-      const series = await getSeriesList('international');
-      setSeriesList(series);
-      toast.success(`Loaded ${series.length} series`);
-    } catch (error) {
-      console.error('Error loading series:', error);
-      toast.error('Failed to load series. Make sure the Cricbuzz proxy is configured.');
-    } finally {
-      setIsLoadingSeries(false);
-    }
+  // Load matches for the league's tournament
+  // Returns the fetched matches array (or current state if tournamentId is missing)
+  const loadTournamentMatchesCore = async (): Promise<CricbuzzMatch[]> => {
+    if (!tournamentId) return seriesMatches;
+
+    const fetched = await getSeriesMatches(tournamentId);
+    setSeriesMatches(fetched);
+    return fetched;
   };
 
-  // Load matches for selected series
-  const handleLoadSeriesMatches = async () => {
-    if (!selectedSeriesId) return;
+  const handleLoadTournamentMatches = async () => {
+    if (!tournamentId) return;
 
     setIsLoadingSeriesMatches(true);
     try {
-      const matches = await getSeriesMatches(parseInt(selectedSeriesId));
-      setSeriesMatches(matches);
-      toast.success(`Loaded ${matches.length} matches`);
+      const fetched = await loadTournamentMatchesCore();
+      toast.success(`Loaded ${fetched.length} matches for ${tournament?.shortName || 'tournament'}`);
     } catch (error) {
-      console.error('Error loading series matches:', error);
-      toast.error('Failed to load matches');
+      console.error('Error loading tournament matches:', error);
+      toast.error('Failed to load matches. Make sure the Cricbuzz proxy is configured.');
     } finally {
       setIsLoadingSeriesMatches(false);
     }
@@ -339,112 +331,126 @@ export const StatsImport = () => {
     return 'Upcoming';
   };
 
-  // Sync matches from series (completed + live, or completed only)
-  const handleSyncMatches = async (completedOnly = false) => {
-    if (!currentLeagueId || seriesMatches.length === 0) return;
+  // Core sync logic — accepts a matches list so the combined handler can pass freshly loaded matches.
+  // Returns { addedCount, updatedCount } on success.
+  const syncMatchesCore = async (
+    completedOnly: boolean,
+    matchesList: CricbuzzMatch[] = seriesMatches,
+  ): Promise<{ addedCount: number; updatedCount: number }> => {
+    if (!currentLeagueId || matchesList.length === 0) {
+      return { addedCount: 0, updatedCount: 0 };
+    }
 
-    setIsSyncing(true);
     let addedCount = 0;
     let updatedCount = 0;
 
-    try {
-      const matchesToSync = completedOnly
-        ? seriesMatches.filter(m => m.state === 'Complete')
-        : seriesMatches.filter(m => m.state === 'Complete' || m.state === 'In Progress');
+    const matchesToSync = completedOnly
+      ? matchesList.filter(m => m.state === 'Complete')
+      : matchesList.filter(m => m.state === 'Complete' || m.state === 'In Progress');
 
-      for (const match of matchesToSync) {
-        const matchState = mapMatchState(match.state);
+    for (const match of matchesToSync) {
+      const matchState = mapMatchState(match.state);
 
-        // Check if already exists in this league via league_matches
-        const { data: existingMatch } = await supabase
-          .from('cricket_matches')
+      // Check if already exists in this league via league_matches
+      const { data: existingMatch } = await supabase
+        .from('cricket_matches')
+        .select('id')
+        .eq('cricbuzz_match_id', match.matchId)
+        .maybeSingle();
+
+      if (existingMatch) {
+        // Match exists, check if it's linked to this league
+        const { data: existingLink } = await supabase
+          .from('league_matches')
           .select('id')
-          .eq('cricbuzz_match_id', match.matchId)
+          .eq('league_id', currentLeagueId)
+          .eq('match_id', existingMatch.id)
           .maybeSingle();
 
-        if (existingMatch) {
-          // Match exists, check if it's linked to this league
-          const { data: existingLink } = await supabase
-            .from('league_matches')
-            .select('id')
-            .eq('league_id', currentLeagueId)
-            .eq('match_id', existingMatch.id)
-            .maybeSingle();
-
-          if (existingLink) {
-            // Already linked — update result if changed
-            await supabase
-              .from('cricket_matches')
-              .update({
-                result: match.status || null,
-              })
-              .eq('id', existingMatch.id);
-            // Update match_state in live_match_polling
-            await supabase
-              .from('live_match_polling')
-              .upsert({
-                cricbuzz_match_id: match.matchId,
-                match_id: existingMatch.id,
-                match_state: matchState,
-              }, { onConflict: 'cricbuzz_match_id' });
-            updatedCount++;
-            continue;
-          }
-        }
-
-        // Use the upsert_league_match function to handle both cricket_matches and league_matches
-        const { data, error } = await supabase.rpc('upsert_league_match', {
-          p_league_id: currentLeagueId,
-          p_cricbuzz_match_id: match.matchId,
-          p_series_id: match.seriesId,
-          p_match_description: match.matchDesc,
-          p_team1_name: match.team1.teamName,
-          p_team2_name: match.team2.teamName,
-          p_match_date: new Date(parseInt(match.startDate)).toISOString(),
-          p_venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
-          p_result: match.status,
-          p_week: null,
-        });
-
-        if (!error && data && data.length > 0) {
+        if (existingLink) {
+          // Already linked — update result if changed
+          await supabase
+            .from('cricket_matches')
+            .update({
+              result: match.status || null,
+            })
+            .eq('id', existingMatch.id);
           // Update match_state in live_match_polling
           await supabase
             .from('live_match_polling')
             .upsert({
               cricbuzz_match_id: match.matchId,
-              match_id: data[0].out_match_id,
+              match_id: existingMatch.id,
               match_state: matchState,
             }, { onConflict: 'cricbuzz_match_id' });
-
-          if (data[0].is_new_match) {
-            addedCount++;
-          }
-
-          setMatches(prev => {
-            // Check if match already in local state
-            const exists = prev.some(m => m.cricbuzzMatchId === match.matchId);
-            if (exists) return prev;
-            return [
-              {
-                id: data[0].out_match_id,
-                leagueMatchId: data[0].out_league_match_id,
-                cricbuzzMatchId: match.matchId,
-                matchDescription: match.matchDesc,
-                team1Name: match.team1.teamName,
-                team2Name: match.team2.teamName,
-                result: match.status,
-                matchDate: new Date(parseInt(match.startDate)).toISOString(),
-                venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
-                statsImported: false,
-                week: null,
-                matchState,
-              },
-              ...prev,
-            ];
-          });
+          updatedCount++;
+          continue;
         }
       }
 
+      // Use the upsert_league_match function to handle both cricket_matches and league_matches
+      const { data, error } = await supabase.rpc('upsert_league_match', {
+        p_league_id: currentLeagueId,
+        p_cricbuzz_match_id: match.matchId,
+        p_series_id: match.seriesId,
+        p_match_description: match.matchDesc,
+        p_team1_name: match.team1.teamName,
+        p_team2_name: match.team2.teamName,
+        p_match_date: new Date(parseInt(match.startDate)).toISOString(),
+        p_venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
+        p_result: match.status,
+        p_week: null,
+      });
+
+      if (!error && data && data.length > 0) {
+        // Update match_state in live_match_polling
+        await supabase
+          .from('live_match_polling')
+          .upsert({
+            cricbuzz_match_id: match.matchId,
+            match_id: data[0].out_match_id,
+            match_state: matchState,
+          }, { onConflict: 'cricbuzz_match_id' });
+
+        if (data[0].is_new_match) {
+          addedCount++;
+        }
+
+        setMatches(prev => {
+          // Check if match already in local state
+          const exists = prev.some(m => m.cricbuzzMatchId === match.matchId);
+          if (exists) return prev;
+          return [
+            {
+              id: data[0].out_match_id,
+              leagueMatchId: data[0].out_league_match_id,
+              cricbuzzMatchId: match.matchId,
+              matchDescription: match.matchDesc,
+              team1Name: match.team1.teamName,
+              team2Name: match.team2.teamName,
+              result: match.status,
+              matchDate: new Date(parseInt(match.startDate)).toISOString(),
+              venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
+              statsImported: false,
+              week: null,
+              matchState,
+            },
+            ...prev,
+          ];
+        });
+      }
+    }
+
+    return { addedCount, updatedCount };
+  };
+
+  // Sync matches from series (completed + live, or completed only)
+  const handleSyncMatches = async (completedOnly = false) => {
+    if (!currentLeagueId || seriesMatches.length === 0) return;
+
+    setIsSyncing(true);
+    try {
+      const { addedCount, updatedCount } = await syncMatchesCore(completedOnly);
       const parts = [];
       if (addedCount > 0) parts.push(`${addedCount} new`);
       if (updatedCount > 0) parts.push(`${updatedCount} updated`);
@@ -614,15 +620,18 @@ export const StatsImport = () => {
     }
   };
 
-  // Auto-import all pending matches
-  const handleAutoImportAll = async () => {
-    const pendingMatches = matches.filter(m => !m.statsImported);
+  // Core auto-import logic. Accepts an optional matches list for the combined handler
+  // (where React state may not yet reflect newly synced matches).
+  // Returns { successCount, errorCount, skippedLive }.
+  const autoImportAllCore = async (
+    matchesList?: CricketMatch[],
+  ): Promise<{ successCount: number; errorCount: number; skippedLive: number }> => {
+    const source = matchesList ?? matches;
+    const pendingMatches = source.filter(m => !m.statsImported);
     if (pendingMatches.length === 0) {
-      toast.info('No pending matches to import');
-      return;
+      return { successCount: 0, errorCount: 0, skippedLive: 0 };
     }
 
-    setIsSyncing(true);
     let successCount = 0;
     let errorCount = 0;
     let skippedLive = 0;
@@ -701,15 +710,92 @@ export const StatsImport = () => {
       }
     }
 
-    setIsSyncing(false);
     setParsedStats([]);
     setSelectedMatch(null);
+
+    return { successCount, errorCount, skippedLive };
+  };
+
+  // Auto-import all pending matches
+  const handleAutoImportAll = async () => {
+    const pendingMatches = matches.filter(m => !m.statsImported);
+    if (pendingMatches.length === 0) {
+      toast.info('No pending matches to import');
+      return;
+    }
+
+    setIsSyncing(true);
+
+    const { successCount, errorCount, skippedLive } = await autoImportAllCore();
+
+    setIsSyncing(false);
 
     const parts = [];
     if (successCount > 0) parts.push(`${successCount} imported`);
     if (skippedLive > 0) parts.push(`${skippedLive} skipped (live)`);
     if (errorCount > 0) parts.push(`${errorCount} failed`);
     toast[errorCount > 0 && successCount === 0 ? 'error' : 'success'](parts.join(', '));
+  };
+
+  // Combined: load tournament matches, sync completed, then auto-import all
+  const handleSyncAndImportAll = async () => {
+    if (!currentLeagueId || !tournamentId) return;
+
+    setIsSyncing(true);
+    try {
+      // Step 1: Load/refresh tournament matches from Cricbuzz
+      const freshSeriesMatches = await loadTournamentMatchesCore();
+
+      // Step 2: Sync completed matches into DB
+      const { addedCount, updatedCount } = await syncMatchesCore(true, freshSeriesMatches);
+
+      // Step 3: Re-read matches from DB so auto-import sees newly synced matches
+      const { data } = await supabase
+        .from('league_cricket_matches')
+        .select('*')
+        .eq('league_id', currentLeagueId);
+
+      let freshMatches: CricketMatch[] = [];
+      if (data) {
+        freshMatches = data
+          .filter(lm => lm.id)
+          .map(lm => ({
+            id: lm.id!,
+            leagueMatchId: lm.league_match_id || '',
+            cricbuzzMatchId: lm.cricbuzz_match_id || 0,
+            matchDescription: lm.match_description || '',
+            team1Name: lm.team1_name || '',
+            team2Name: lm.team2_name || '',
+            result: lm.result || '',
+            matchDate: lm.match_date || '',
+            venue: lm.venue || '',
+            statsImported: lm.stats_imported || false,
+            week: lm.week,
+            matchState: lm.match_state as CricketMatch['matchState'],
+            pollingEnabled: lm.polling_enabled,
+          }));
+        setMatches(freshMatches);
+      }
+
+      // Step 4: Auto-import all pending completed matches
+      const { successCount, errorCount, skippedLive } = await autoImportAllCore(freshMatches);
+
+      // Build combined summary
+      const parts = [];
+      if (addedCount > 0) parts.push(`${addedCount} synced`);
+      if (updatedCount > 0) parts.push(`${updatedCount} updated`);
+      if (successCount > 0) parts.push(`${successCount} imported`);
+      if (skippedLive > 0) parts.push(`${skippedLive} skipped (live)`);
+      if (errorCount > 0) parts.push(`${errorCount} failed`);
+      toast[errorCount > 0 && successCount === 0 ? 'error' : 'success'](
+        parts.length > 0 ? parts.join(', ') : 'Everything up to date'
+      );
+    } catch (error) {
+      console.error('Error in sync & import all:', error);
+      toast.error('Sync & Import failed. Check console for details.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Save stats to database
@@ -862,7 +948,7 @@ export const StatsImport = () => {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="series">
             <Trophy className="w-4 h-4 mr-2" />
-            By Series
+            {tournament?.shortName || 'Tournament'}
           </TabsTrigger>
           <TabsTrigger value="manual">
             <Search className="w-4 h-4 mr-2" />
@@ -870,57 +956,39 @@ export const StatsImport = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Series-based import */}
+        {/* Tournament-based import */}
         <TabsContent value="series" className="space-y-4">
           <Card>
             <CardHeader className="py-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="w-4 h-4" />
-                Quick Sync from Series
+                Sync from {tournament?.shortName || 'Tournament'}
               </CardTitle>
             </CardHeader>
             <CardContent className="py-2 space-y-3">
-              {/* Load series button */}
-              {seriesList.length === 0 ? (
-                <Button
-                  onClick={handleLoadSeries}
-                  disabled={isLoadingSeries}
-                  className="w-full"
-                >
-                  {isLoadingSeries ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
-                  Load International Series
-                </Button>
+              {!tournamentId ? (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  No tournament configured for this league. Set one during league creation.
+                </p>
               ) : (
                 <>
-                  <div className="flex gap-2">
-                    <Select
-                      value={selectedSeriesId}
-                      onValueChange={setSelectedSeriesId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a series..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {seriesList.map(series => (
-                          <SelectItem key={series.id} value={series.id.toString()}>
-                            {series.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">{tournament?.name}</span>
+                      <Badge variant="outline" className="text-xs">{tournament?.type}</Badge>
+                    </div>
                     <Button
-                      onClick={handleLoadSeriesMatches}
-                      disabled={!selectedSeriesId || isLoadingSeriesMatches}
+                      size="sm"
+                      onClick={handleLoadTournamentMatches}
+                      disabled={isLoadingSeriesMatches}
                     >
                       {isLoadingSeriesMatches ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       ) : (
-                        <Search className="w-4 h-4" />
+                        <RefreshCw className="w-4 h-4 mr-2" />
                       )}
+                      {seriesMatches.length > 0 ? 'Refresh' : 'Load Matches'}
                     </Button>
                   </div>
 
@@ -929,7 +997,7 @@ export const StatsImport = () => {
                       <div className="text-sm text-muted-foreground">
                         {seriesMatches.length} matches found ({seriesMatches.filter(m => m.state === 'Complete').length} completed, {seriesMatches.filter(m => m.state === 'In Progress').length} live)
                       </div>
-                      <div className="flex items-center gap-2 justify-end">
+                      <div className="flex items-center gap-2 justify-end flex-wrap">
                         <Button
                           size="sm"
                           variant="outline"
@@ -945,6 +1013,7 @@ export const StatsImport = () => {
                         </Button>
                         <Button
                           size="sm"
+                          variant="outline"
                           onClick={() => handleSyncMatches(false)}
                           disabled={isSyncing}
                         >
@@ -954,6 +1023,18 @@ export const StatsImport = () => {
                             <Download className="w-4 h-4 mr-2" />
                           )}
                           Sync Completed + Live
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSyncAndImportAll}
+                          disabled={isSyncing}
+                        >
+                          {isSyncing ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Zap className="w-4 h-4 mr-2" />
+                          )}
+                          Sync & Import All
                         </Button>
                       </div>
                     </div>
