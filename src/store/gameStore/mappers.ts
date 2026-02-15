@@ -68,13 +68,13 @@ export const mapDbManagerWithRoster = (
   };
 };
 
-export const mapDbSchedule = (db: Tables<"schedule">): Match => ({
+export const mapDbSchedule = (db: Tables<"league_schedules">): Match => ({
   id: db.id,
   week: db.week,
-  home: db.home_manager_id || "",
-  away: db.away_manager_id || "",
-  homeScore: db.home_score ?? undefined,
-  awayScore: db.away_score ?? undefined,
+  home: db.manager1_id || "",
+  away: db.manager2_id || "",
+  homeScore: db.manager1_score ?? undefined,
+  awayScore: db.manager2_score ?? undefined,
   completed: db.is_finalized,
 });
 
@@ -85,7 +85,6 @@ export const mapDbTransaction = (db: Tables<"transactions">): Activity => ({
   managerId: db.manager_id || "system",
   description: db.description,
   players: (db.players as unknown as PlayerTransaction[] | null) || undefined,
-  managerTeamName: db.manager_team_name || undefined,
 });
 
 export const mapDbDraftPick = (db: any): DraftPick => ({

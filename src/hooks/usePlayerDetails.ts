@@ -327,7 +327,7 @@ export function useSeriesMatches(seriesId: number | null) {
             matchFormat: m.match_format || 'T20',
             startDate: new Date(m.match_date || Date.now()).getTime().toString(),
             endDate: new Date(m.match_date || Date.now()).getTime().toString(), // Placeholder
-            state: m.match_state || m.state || 'Upcoming',
+            state: m.state || 'Upcoming',
             status: m.result || '',
             team1: {
               teamId: m.team1_id || 0,
@@ -461,7 +461,7 @@ export function usePlayerMatchStats(
       if (!playerId || !leagueId) throw new Error('Player ID and League ID required');
 
       const { data, error } = await supabase
-        .from('player_match_stats')
+        .from('player_match_stats_compat')
         .select(`
           *,
           match:cricket_matches (

@@ -261,13 +261,13 @@ class LivePollingService {
     // Set up realtime subscription if not already done for this league
     if (!this.statsChannels.has(leagueId)) {
       const channel = supabase
-        .channel(`player_match_stats_${leagueId}`)
+        .channel(`league_player_match_scores_${leagueId}`)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
-            table: 'player_match_stats',
+            table: 'league_player_match_scores',
             filter: `league_id=eq.${leagueId}`,
           },
           (payload) => {
@@ -279,7 +279,7 @@ class LivePollingService {
               leagueId: data.league_id as string,
               playerId: data.player_id as string,
               fantasyPoints: data.fantasy_points as number,
-              isLiveStats: data.is_live_stats as boolean,
+              isLiveStats: data.is_live as boolean,
               liveUpdatedAt: data.live_updated_at as string | null,
             };
 
@@ -319,10 +319,10 @@ class LivePollingService {
    */
   async getLiveMatches(leagueId: string): Promise<string[]> {
     const { data, error } = await supabase
-      .from('player_match_stats')
+      .from('league_player_match_scores')
       .select('match_id')
       .eq('league_id', leagueId)
-      .eq('is_live_stats', true);
+      .eq('is_live', true);
 
     if (error || !data) return [];
 
@@ -335,11 +335,11 @@ class LivePollingService {
    */
   async hasLiveStats(leagueId: string, matchId: string): Promise<boolean> {
     const { count, error } = await supabase
-      .from('player_match_stats')
+      .from('league_player_match_scores')
       .select('id', { count: 'exact', head: true })
       .eq('league_id', leagueId)
       .eq('match_id', matchId)
-      .eq('is_live_stats', true);
+      .eq('is_live', true);
 
     return !error && (count ?? 0) > 0;
   }

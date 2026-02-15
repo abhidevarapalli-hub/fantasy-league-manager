@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Trade, DbTrade, mapDbTrade } from '@/lib/trade-types';
+import { Trade, DbTrade, DbTradePlayer, mapDbTrade } from '@/lib/trade-types';
 import { useGameStore } from '@/store/useGameStore';
 
 export const useTrades = () => {
@@ -33,28 +33,31 @@ export const useTrades = () => {
           setTimeout(() => reject(new Error('Query timeout - trades table may not exist')), 5000)
         );
 
-        const queryPromise = supabase
-          .from('trades')
-          .select('*')
-          .order('created_at', { ascending: false });
+        const queryPromise = Promise.all([
+          supabase
+            .from('trades')
+            .select('*')
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('trade_players')
+            .select('*'),
+        ]);
 
-        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+        const [tradesResult, tradePlayersResult] = await Promise.race([queryPromise, timeoutPromise]) as any;
 
         const fetchDuration = performance.now() - fetchStartTime;
 
-        if (error) {
-          // console.error('[useTrades] ❌ Error fetching trades:', error);
-          // console.warn('[useTrades] ⚠️  Trades table may not exist - using empty array');
+        if (tradesResult.error) {
           setTrades([]);
           setIsTradesInitialized(true); // Mark as initialized even on error to prevent retries
-        } else if (data) {
+        } else if (tradesResult.data) {
           const mappingStart = performance.now();
-          setTrades(data.map((t) => mapDbTrade(t as unknown as DbTrade)));
+          const allTradePlayers = (tradePlayersResult?.data || []) as DbTradePlayer[];
+          setTrades(tradesResult.data.map((t: DbTrade) => mapDbTrade(t, allTradePlayers)));
           const mappingDuration = performance.now() - mappingStart;
 
           const totalDuration = performance.now() - fetchStartTime;
-          // console.log(`[useTrades] 📊 Fetched ${data.length} trades`);
-          // console.log(`[useTrades] 🎉 Total fetch completed in ${totalDuration.toFixed(2)}ms (Fetch: ${fetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
+          void fetchDuration; void mappingDuration; void totalDuration;
 
           // Mark as initialized
           setIsTradesInitialized(true);
@@ -77,13 +80,17 @@ export const useTrades = () => {
   useEffect(() => {
     const channel = supabase
       .channel('trades-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, async (payload) => {
         if (payload.eventType === 'INSERT') {
-          setTrades((prev) => [mapDbTrade(payload.new as unknown as DbTrade), ...prev]);
+          const tradeId = (payload.new as DbTrade).id;
+          const { data: tp } = await supabase.from('trade_players').select('*').eq('trade_id', tradeId);
+          setTrades((prev) => [mapDbTrade(payload.new as unknown as DbTrade, (tp || []) as DbTradePlayer[]), ...prev]);
         } else if (payload.eventType === 'UPDATE') {
           setTrades((prev) =>
             prev.map((t) =>
-              t.id === payload.new.id ? mapDbTrade(payload.new as unknown as DbTrade) : t
+              t.id === payload.new.id
+                ? { ...t, status: (payload.new as DbTrade).status as Trade['status'] }
+                : t
             )
           );
         } else if (payload.eventType === 'DELETE') {
@@ -99,17 +106,28 @@ export const useTrades = () => {
 
   const proposeTrade = useCallback(
     async (proposerId: string, targetId: string, proposerPlayers: string[], targetPlayers: string[]) => {
-      const { error } = await supabase.from('trades').insert({
+      const { data, error } = await supabase.from('trades').insert({
         proposer_id: proposerId,
         target_id: targetId,
-        proposer_players: proposerPlayers,
-        target_players: targetPlayers,
         status: 'pending',
-      });
+      }).select('id').single();
 
-      if (error) {
+      if (error || !data) {
         console.error('Error proposing trade:', error);
         return false;
+      }
+
+      // Insert trade players into junction table
+      const tradePlayerRecords = [
+        ...proposerPlayers.map(pid => ({ trade_id: data.id, player_id: pid, side: 'proposer' })),
+        ...targetPlayers.map(pid => ({ trade_id: data.id, player_id: pid, side: 'target' })),
+      ];
+
+      if (tradePlayerRecords.length > 0) {
+        const { error: tpError } = await supabase.from('trade_players').insert(tradePlayerRecords);
+        if (tpError) {
+          console.error('Error inserting trade players:', tpError);
+        }
       }
 
       // Don't log proposed trades - only log accepted trades in Activity
@@ -157,7 +175,6 @@ export const useTrades = () => {
     await supabase.from('transactions').insert({
       type: 'trade',
       manager_id: trade.targetId,
-      manager_team_name: target?.teamName,
       description: `${target?.teamName} rejected trade proposal from ${proposer?.teamName}`,
     });
 
@@ -170,18 +187,26 @@ export const useTrades = () => {
       await supabase.from('trades').update({ status: 'countered' }).eq('id', originalTradeId);
 
       // Create new counter trade
-      const { error } = await supabase.from('trades').insert({
+      const { data, error } = await supabase.from('trades').insert({
         proposer_id: proposerId,
         target_id: targetId,
-        proposer_players: proposerPlayers,
-        target_players: targetPlayers,
         status: 'pending',
         parent_trade_id: originalTradeId,
-      });
+      }).select('id').single();
 
-      if (error) {
+      if (error || !data) {
         console.error('Error creating counter trade:', error);
         return false;
+      }
+
+      // Insert trade players into junction table
+      const tradePlayerRecords = [
+        ...proposerPlayers.map(pid => ({ trade_id: data.id, player_id: pid, side: 'proposer' })),
+        ...targetPlayers.map(pid => ({ trade_id: data.id, player_id: pid, side: 'target' })),
+      ];
+
+      if (tradePlayerRecords.length > 0) {
+        await supabase.from('trade_players').insert(tradePlayerRecords);
       }
 
       // Log the counter
@@ -193,7 +218,6 @@ export const useTrades = () => {
       await supabase.from('transactions').insert({
         type: 'trade',
         manager_id: proposerId,
-        manager_team_name: proposer?.teamName,
         description: `${proposer?.teamName} countered trade to ${target?.teamName}: ${proposerPlayerNames} for ${targetPlayerNames}`,
       });
 

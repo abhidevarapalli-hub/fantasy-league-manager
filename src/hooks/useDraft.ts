@@ -215,7 +215,6 @@ export const useDraft = () => {
         type: 'trade',
         description: `Draft finalized - All rosters cleared, ${picksByManager.size} team rosters updated with optimized Active 11`,
         manager_id: null,
-        manager_team_name: null,
         week: null,
         league_id: leagueId,
       });

@@ -299,9 +299,9 @@ const CreateLeague = () => {
             console.log('[CreateLeague] 💾 Step 5: Inserting schedule into database...');
             const step5Start = performance.now();
 
-            const { error: scheduleError } = await (supabase
-                .from('league_schedules' as any)
-                .insert(matchups) as any);
+            const { error: scheduleError } = await supabase
+                .from('league_schedules')
+                .insert(matchups);
 
             const step5Duration = performance.now() - step5Start;
             console.log(`[CreateLeague] ✅ Step 5 completed in ${step5Duration.toFixed(2)}ms`);

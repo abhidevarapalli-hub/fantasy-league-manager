@@ -513,26 +513,162 @@ export async function saveMatchStatsLive(
       return { success: false, error: 'No league players found in this match' };
     }
 
-    // Upsert stats (update if exists, insert if not)
-    const { error } = await supabase
-      .from('player_match_stats')
-      .upsert(records, {
-        onConflict: 'league_id,cricbuzz_player_id,match_id',
+    // Split writes: global stats go to match_player_stats, league-specific scores go to league_player_match_scores
+    // First, upsert global raw stats
+    const globalRecords = records.map(r => ({
+      match_id: r.match_id,
+      player_id: r.player_id,
+      cricbuzz_player_id: r.cricbuzz_player_id,
+      runs: r.runs,
+      balls_faced: r.balls_faced,
+      fours: r.fours,
+      sixes: r.sixes,
+      strike_rate: r.strike_rate,
+      is_out: r.is_out,
+      dismissal_type: r.dismissal_type,
+      overs: r.overs,
+      maidens: r.maidens,
+      runs_conceded: r.runs_conceded,
+      wickets: r.wickets,
+      economy: r.economy,
+      dots: r.dots,
+      lbw_bowled_count: r.lbw_bowled_count,
+      catches: r.catches,
+      stumpings: r.stumpings,
+      run_outs: r.run_outs,
+      is_in_playing_11: r.is_in_playing_11,
+      is_impact_player: r.is_impact_player,
+      is_man_of_match: r.is_man_of_match,
+      team_won: r.team_won,
+      is_live: r.is_live_stats,
+      live_updated_at: r.live_updated_at,
+      finalized_at: r.finalized_at,
+    }));
+
+    const { error: globalError } = await supabase
+      .from('match_player_stats')
+      .upsert(globalRecords, {
+        onConflict: 'match_id,cricbuzz_player_id',
         ignoreDuplicates: false,
       });
 
-    if (error) {
-      console.error('Error saving match stats:', error);
-      return { success: false, error: error.message };
+    if (globalError) {
+      console.error('Error saving global match stats:', globalError);
+      return { success: false, error: globalError.message };
     }
 
-    // Update cricket_matches (shared data) - match_state only
-    await supabase
-      .from('cricket_matches')
-      .update({
-        match_state: isLive ? 'Live' : 'Complete',
-      })
-      .eq('id', matchId);
+    // Fetch match_player_stats IDs for linking to league scores
+    const cricbuzzIds = records.map(r => r.cricbuzz_player_id);
+    const { data: mpsData } = await supabase
+      .from('match_player_stats')
+      .select('id, cricbuzz_player_id')
+      .eq('match_id', matchId)
+      .in('cricbuzz_player_id', cricbuzzIds);
+
+    const mpsMap = new Map<string, string>();
+    if (mpsData) {
+      for (const mps of mpsData) {
+        mpsMap.set(mps.cricbuzz_player_id, mps.id);
+      }
+    }
+
+    // Fetch active scoring version for this league
+    let { data: scoringVersionData } = await supabase
+      .from('scoring_rule_versions')
+      .select('id')
+      .eq('league_id', leagueId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    // Auto-create scoring version from league's scoring_rules if none exists
+    if (!scoringVersionData?.id) {
+      const { data: leagueData } = await supabase
+        .from('leagues')
+        .select('scoring_rules')
+        .eq('id', leagueId)
+        .single();
+
+      if (leagueData?.scoring_rules) {
+        const rulesHash = Array.from(
+          new Uint8Array(
+            await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(leagueData.scoring_rules)))
+          )
+        ).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+
+        const { data: newVersion } = await supabase
+          .from('scoring_rule_versions')
+          .insert({
+            league_id: leagueId,
+            version: 1,
+            is_active: true,
+            rules: leagueData.scoring_rules,
+            rules_hash: rulesHash,
+            description: 'Auto-created from league scoring_rules',
+          })
+          .select('id')
+          .single();
+
+        scoringVersionData = newVersion;
+      }
+    }
+
+    const scoringVersionId = scoringVersionData?.id;
+    if (!scoringVersionId) {
+      console.error('No active scoring version found for league', leagueId);
+      return { success: false, error: 'No active scoring version found for this league' };
+    }
+
+    // Then upsert league-specific scores
+    const leagueRecords = records
+      .filter(r => mpsMap.has(r.cricbuzz_player_id))
+      .map(r => ({
+        league_id: r.league_id,
+        match_id: r.match_id,
+        player_id: r.player_id,
+        match_player_stats_id: mpsMap.get(r.cricbuzz_player_id)!,
+        scoring_version_id: scoringVersionId,
+        manager_id: r.manager_id,
+        was_in_active_roster: r.was_in_active_roster,
+        week: r.week,
+        total_points: r.fantasy_points,
+        is_live: r.is_live_stats,
+        finalized_at: r.finalized_at,
+      }));
+
+    if (leagueRecords.length > 0) {
+      const { error: leagueError } = await supabase
+        .from('league_player_match_scores')
+        .upsert(leagueRecords, {
+          onConflict: 'league_id,match_id,player_id',
+          ignoreDuplicates: false,
+        });
+
+      if (leagueError) {
+        console.error('Error saving league match scores:', leagueError);
+        return { success: false, error: leagueError.message };
+      }
+    }
+
+    // Update live_match_polling for match state (match_state moved from cricket_matches)
+    if (isLive) {
+      // Get the cricbuzz_match_id for this match
+      const { data: matchData } = await supabase
+        .from('cricket_matches')
+        .select('cricbuzz_match_id')
+        .eq('id', matchId)
+        .single();
+
+      if (matchData) {
+        await supabase
+          .from('live_match_polling')
+          .upsert({
+            cricbuzz_match_id: matchData.cricbuzz_match_id,
+            match_id: matchId,
+            match_state: 'Live',
+            polling_enabled: true,
+          }, { onConflict: 'cricbuzz_match_id' });
+      }
+    }
 
     // Update league_matches (league-specific data) - stats_imported, week
     await supabase
@@ -603,11 +739,11 @@ export async function hasLiveStats(
   matchId: string
 ): Promise<boolean> {
   const { count, error } = await supabase
-    .from('player_match_stats')
+    .from('league_player_match_scores')
     .select('id', { count: 'exact', head: true })
     .eq('league_id', leagueId)
     .eq('match_id', matchId)
-    .eq('is_live_stats', true);
+    .eq('is_live', true);
 
   return !error && (count ?? 0) > 0;
 }
@@ -617,10 +753,10 @@ export async function hasLiveStats(
  */
 export async function getLiveStatsCount(leagueId: string): Promise<number> {
   const { count, error } = await supabase
-    .from('player_match_stats')
+    .from('league_player_match_scores')
     .select('id', { count: 'exact', head: true })
     .eq('league_id', leagueId)
-    .eq('is_live_stats', true);
+    .eq('is_live', true);
 
   return error ? 0 : (count ?? 0);
 }

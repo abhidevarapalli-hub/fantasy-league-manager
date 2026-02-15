@@ -143,20 +143,10 @@ export function useLiveMatches(leagueId: string | null) {
     setLoading(true);
 
     try {
-      // Get matches via league_matches junction table
+      // Get matches via league_cricket_matches view (includes match_state from live_match_polling)
       const { data, error } = await supabase
-        .from('league_matches')
-        .select(`
-          match_id,
-          match:cricket_matches (
-            id,
-            cricbuzz_match_id,
-            match_description,
-            team1_name,
-            team2_name,
-            match_state
-          )
-        `)
+        .from('league_cricket_matches')
+        .select('*')
         .eq('league_id', leagueId);
 
       if (error) {
@@ -166,7 +156,7 @@ export function useLiveMatches(leagueId: string | null) {
       }
 
       // Filter for live matches
-      const liveData = data.filter(lm => lm.match?.match_state === 'Live');
+      const liveData = (data || []).filter(m => m.match_state === 'Live');
 
       if (liveData.length === 0) {
         setLiveMatches([]);
@@ -174,9 +164,9 @@ export function useLiveMatches(leagueId: string | null) {
       }
 
       // Get last update time for each match
-      const matchIds = liveData.map(lm => lm.match!.id);
+      const matchIds = liveData.map(m => m.id!);
       const { data: statsData } = await supabase
-        .from('player_match_stats')
+        .from('player_match_stats_compat')
         .select('match_id, live_updated_at')
         .in('match_id', matchIds)
         .eq('is_live_stats', true)
@@ -186,20 +176,20 @@ export function useLiveMatches(leagueId: string | null) {
       const lastUpdateMap = new Map<string, string>();
       if (statsData) {
         for (const stat of statsData) {
-          if (!lastUpdateMap.has(stat.match_id) && stat.live_updated_at) {
+          if (stat.match_id && !lastUpdateMap.has(stat.match_id) && stat.live_updated_at) {
             lastUpdateMap.set(stat.match_id, stat.live_updated_at);
           }
         }
       }
 
-      const matches: LiveMatchInfo[] = liveData.map(lm => ({
-        matchId: lm.match!.id,
-        cricbuzzMatchId: lm.match!.cricbuzz_match_id,
-        matchDescription: lm.match!.match_description || '',
-        team1Name: lm.match!.team1_name || '',
-        team2Name: lm.match!.team2_name || '',
-        isLive: lm.match!.match_state === 'Live',
-        lastUpdatedAt: lastUpdateMap.get(lm.match!.id) || null,
+      const matches: LiveMatchInfo[] = liveData.map(m => ({
+        matchId: m.id!,
+        cricbuzzMatchId: m.cricbuzz_match_id!,
+        matchDescription: m.match_description || '',
+        team1Name: m.team1_name || '',
+        team2Name: m.team2_name || '',
+        isLive: m.match_state === 'Live',
+        lastUpdatedAt: lastUpdateMap.get(m.id!) || null,
       }));
 
       setLiveMatches(matches);
@@ -219,15 +209,15 @@ export function useLiveMatches(leagueId: string | null) {
   useEffect(() => {
     if (!leagueId) return;
 
-    // Subscribe to cricket_matches changes (shared table)
+    // Subscribe to live_match_polling changes (match_state lives here now)
     const channel = supabase
-      .channel(`cricket_matches_live_${leagueId}`)
+      .channel(`live_match_polling_${leagueId}`)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
-          table: 'cricket_matches',
+          table: 'live_match_polling',
         },
         () => {
           // Refetch when any match updates - we'll filter for our league's matches
@@ -270,7 +260,7 @@ export function useManagerLivePoints(
 
     try {
       const { data, error } = await supabase
-        .from('player_match_stats')
+        .from('player_match_stats_compat')
         .select('fantasy_points, is_live_stats')
         .eq('league_id', leagueId)
         .eq('manager_id', managerId)
@@ -347,7 +337,7 @@ export function useHasLiveStats(leagueId: string | null) {
       setLoading(true);
       try {
         const { count, error } = await supabase
-          .from('player_match_stats')
+          .from('player_match_stats_compat')
           .select('id', { count: 'exact', head: true })
           .eq('league_id', leagueId)
           .eq('is_live_stats', true);

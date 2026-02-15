@@ -1,3 +1,5 @@
+import type { Tables } from '@/integrations/supabase/types';
+
 // Types for Supabase database tables
 export interface DbPlayer {
   id: string;
@@ -20,22 +22,26 @@ export interface DbManager {
   created_at: string;
 }
 
-export interface DbSchedule {
+export interface DbLeagueSchedule {
   id: string;
+  league_id: string;
   week: number;
-  home_manager_id: string;
-  away_manager_id: string;
-  home_score: number | null;
-  away_score: number | null;
+  manager1_id: string;
+  manager2_id: string | null;
+  manager1_score: number | null;
+  manager2_score: number | null;
+  winner_id: string | null;
   is_finalized: boolean;
-  created_at: string;
+  created_at: string | null;
 }
+
+// Keep backward-compatible alias
+export type DbSchedule = DbLeagueSchedule;
 
 export interface DbTransaction {
   id: string;
   type: 'add' | 'drop' | 'trade' | 'score';
   manager_id: string | null;
-  manager_team_name: string | null;
   description: string;
   players: PlayerTransaction[] | null;
   week: number | null;
@@ -73,6 +79,7 @@ export interface Manager {
 
 export interface Match {
   id: string;
+  leagueId?: string;
   week: number;
   home: string;
   away: string;
@@ -88,7 +95,6 @@ export interface Activity {
   managerId: string;
   description: string;
   players?: PlayerTransaction[];
-  managerTeamName?: string;
 }
 
 // Mappers
@@ -113,15 +119,19 @@ export const mapDbManager = (db: DbManager): Manager => ({
   bench: [],
 });
 
-export const mapDbSchedule = (db: DbSchedule): Match => ({
+export const mapDbSchedule = (db: DbLeagueSchedule): Match => ({
   id: db.id,
+  leagueId: db.league_id,
   week: db.week,
-  home: db.home_manager_id,
-  away: db.away_manager_id,
-  homeScore: db.home_score ?? undefined,
-  awayScore: db.away_score ?? undefined,
+  home: db.manager1_id,
+  away: db.manager2_id || '',
+  homeScore: db.manager1_score ?? undefined,
+  awayScore: db.manager2_score ?? undefined,
   completed: db.is_finalized,
 });
+
+// Alias for new name
+export const mapDbLeagueSchedule = mapDbSchedule;
 
 export const mapDbTransaction = (db: DbTransaction): Activity => ({
   id: db.id,
@@ -130,7 +140,6 @@ export const mapDbTransaction = (db: DbTransaction): Activity => ({
   managerId: db.manager_id || 'system',
   description: db.description,
   players: db.players || undefined,
-  managerTeamName: db.manager_team_name || undefined,
 });
 
 // ============================================
@@ -180,47 +189,15 @@ export interface DbCricketMatch {
   created_at: string;
 }
 
-export interface DbPlayerMatchStats {
-  id: string;
-  player_id: string | null;
-  match_id: string | null;
-  cricbuzz_player_id: string;
-  // Batting
-  runs: number;
-  balls_faced: number;
-  fours: number;
-  sixes: number;
-  strike_rate: number | null;
-  is_out: boolean;
-  dismissal_type: string | null;
-  batting_position: number | null;
-  // Bowling
-  overs: number;
-  maidens: number;
-  runs_conceded: number;
-  wickets: number;
-  economy: number | null;
-  dots: number;
-  wides: number;
-  no_balls: number;
-  lbw_bowled_count: number;
-  // Fielding
-  catches: number;
-  stumpings: number;
-  run_outs: number;
-  // Fantasy context
-  manager_id: string | null;
-  was_in_active_roster: boolean;
-  week: number | null;
-  is_in_playing_11: boolean;
-  is_impact_player: boolean;
-  is_man_of_match: boolean;
-  team_won: boolean;
-  // Calculated
-  fantasy_points: number | null;
-  league_id: string | null;
-  created_at: string;
-}
+// Type alias for the compat view (replaces old player_match_stats direct interface)
+export type DbPlayerMatchStatsCompat = Tables<'player_match_stats_compat'>;
+
+// New table types
+export type DbMatchPlayerStats = Tables<'match_player_stats'>;
+export type DbLeaguePlayerMatchScores = Tables<'league_player_match_scores'>;
+
+// Keep backward compat alias — maps from compat view shape
+export type DbPlayerMatchStats = DbPlayerMatchStatsCompat;
 
 // Frontend types
 export interface CricketMatch {
@@ -351,38 +328,38 @@ export const mapDbCricketMatch = (db: DbCricketMatch): CricketMatch => ({
   statsImportedAt: db.stats_imported_at ? new Date(db.stats_imported_at) : null,
 });
 
-export const mapDbPlayerMatchStats = (db: DbPlayerMatchStats): PlayerMatchStats => ({
-  id: db.id,
+export const mapDbPlayerMatchStats = (db: DbPlayerMatchStatsCompat): PlayerMatchStats => ({
+  id: db.id ?? '',
   playerId: db.player_id,
   matchId: db.match_id,
-  cricbuzzPlayerId: db.cricbuzz_player_id,
-  runs: db.runs,
-  ballsFaced: db.balls_faced,
-  fours: db.fours,
-  sixes: db.sixes,
-  strikeRate: db.strike_rate,
-  isOut: db.is_out,
+  cricbuzzPlayerId: db.cricbuzz_player_id ?? '',
+  runs: db.runs ?? 0,
+  ballsFaced: db.balls_faced ?? 0,
+  fours: db.fours ?? 0,
+  sixes: db.sixes ?? 0,
+  strikeRate: db.strike_rate ?? null,
+  isOut: db.is_out ?? false,
   dismissalType: db.dismissal_type,
-  battingPosition: db.batting_position,
-  overs: db.overs,
-  maidens: db.maidens,
-  runsConceded: db.runs_conceded,
-  wickets: db.wickets,
-  economy: db.economy,
-  dots: db.dots,
-  wides: db.wides,
-  noBalls: db.no_balls,
-  lbwBowledCount: db.lbw_bowled_count,
-  catches: db.catches,
-  stumpings: db.stumpings,
-  runOuts: db.run_outs,
+  battingPosition: db.batting_position ?? null,
+  overs: db.overs ?? 0,
+  maidens: db.maidens ?? 0,
+  runsConceded: db.runs_conceded ?? 0,
+  wickets: db.wickets ?? 0,
+  economy: db.economy ?? null,
+  dots: db.dots ?? 0,
+  wides: db.wides ?? 0,
+  noBalls: db.no_balls ?? 0,
+  lbwBowledCount: db.lbw_bowled_count ?? 0,
+  catches: db.catches ?? 0,
+  stumpings: db.stumpings ?? 0,
+  runOuts: db.run_outs ?? 0,
   managerId: db.manager_id,
-  wasInActiveRoster: db.was_in_active_roster,
+  wasInActiveRoster: db.was_in_active_roster ?? false,
   week: db.week,
-  isInPlaying11: db.is_in_playing_11,
-  isImpactPlayer: db.is_impact_player,
-  isManOfMatch: db.is_man_of_match,
-  teamWon: db.team_won,
+  isInPlaying11: db.is_in_playing_11 ?? false,
+  isImpactPlayer: db.is_impact_player ?? false,
+  isManOfMatch: db.is_man_of_match ?? false,
+  teamWon: db.team_won ?? false,
   fantasyPoints: db.fantasy_points,
   leagueId: db.league_id,
 });

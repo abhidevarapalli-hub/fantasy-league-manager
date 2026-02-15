@@ -182,7 +182,6 @@ export const useGameStore = create<GameState>()(
         await supabase.from("transactions").insert({
           type: "add" as const,
           manager_id: managerId,
-          manager_team_name: manager.teamName,
           description,
           players: playerTransactions as any,
           league_id: currentLeagueId,
@@ -217,7 +216,6 @@ export const useGameStore = create<GameState>()(
         await supabase.from("transactions").insert({
           type: "drop" as const,
           manager_id: managerId,
-          manager_team_name: manager.teamName,
           description: `${manager.teamName} dropped ${player.name}`,
           players: [{ type: "drop", playerName: player.name, role: player.role, team: player.team }] as any,
           league_id: currentLeagueId,
@@ -310,14 +308,14 @@ export const useGameStore = create<GameState>()(
         const weekMatches = schedule.filter((m) => m.week === week);
         if (matchIndex >= weekMatches.length) return;
         const match = weekMatches[matchIndex];
-        await supabase.from("schedule").update({ home_score: homeScore, away_score: awayScore }).eq("id", match.id);
+        await supabase.from("league_schedules").update({ manager1_score: homeScore, manager2_score: awayScore }).eq("id", match.id);
       },
 
       finalizeWeekScores: async (week) => {
         const { managers, currentLeagueId } = get();
         if (!currentLeagueId) return;
 
-        const { data: freshSchedule } = await supabase.from("schedule").select("*").eq("league_id", currentLeagueId).eq("week", week);
+        const { data: freshSchedule } = await supabase.from("league_schedules").select("*").eq("league_id", currentLeagueId).eq("week", week);
         if (!freshSchedule) return;
 
         const weekMatches = freshSchedule.map(mapDbSchedule);
@@ -328,7 +326,7 @@ export const useGameStore = create<GameState>()(
         const scoreSummary: string[] = [];
 
         for (const match of weekMatches) {
-          await supabase.from("schedule").update({ is_finalized: true }).eq("id", match.id);
+          await supabase.from("league_schedules").update({ is_finalized: true }).eq("id", match.id);
           const homeManager = managers.find((m) => m.id === match.home);
           const awayManager = managers.find((m) => m.id === match.away);
           if (homeManager && awayManager) {
@@ -340,7 +338,6 @@ export const useGameStore = create<GameState>()(
         await supabase.from("transactions").insert({
           type: "score" as const,
           manager_id: null,
-          manager_team_name: null,
           description: `Week ${week} scores ${wasFinalized ? "updated" : "finalized"}:\n${scoreSummary.join("\n")}`,
           week,
           league_id: currentLeagueId,
@@ -428,7 +425,6 @@ export const useGameStore = create<GameState>()(
         await supabase.from("transactions").insert({
           type: "admin" as const,
           manager_id: null,
-          manager_team_name: null,
           description: `${player.name} (${player.team} - ${player.role}) was removed from the league`,
           league_id: currentLeagueId,
         });
@@ -471,7 +467,6 @@ export const useGameStore = create<GameState>()(
         await supabase.from("transactions").insert({
           type: "trade" as const,
           manager_id: manager1Id,
-          manager_team_name: manager1.teamName,
           description: `${manager1.teamName} traded ${player1Names} to ${manager2.teamName} for ${player2Names}`,
           league_id: currentLeagueId,
         });
@@ -493,7 +488,7 @@ export const useGameStore = create<GameState>()(
           await supabase.from("managers").update({ wins: 0, losses: 0, points: 0 }).eq("id", manager.id);
         }
         for (const match of schedule) {
-          await supabase.from("schedule").update({ home_score: null, away_score: null, is_finalized: false }).eq("id", match.id);
+          await supabase.from("league_schedules").update({ manager1_score: null, manager2_score: null, is_finalized: false }).eq("id", match.id);
         }
         await supabase.from("transactions").delete().eq("league_id", currentLeagueId);
       },
@@ -587,7 +582,6 @@ export const useGameStore = create<GameState>()(
           await supabase.from("transactions").insert({
             type: "admin" as const,
             manager_id: null,
-            manager_team_name: null,
             description: `Roster configuration updated:\n${changes.join('\n')}`,
             league_id: currentLeagueId,
           });
@@ -647,7 +641,7 @@ export const useGameStore = create<GameState>()(
             supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
             // Fetch roster entries from junction table
             supabase.from("manager_roster" as "managers").select("*").eq("league_id", leagueId),
-            supabase.from("schedule" as 'schedule').select("*").eq("league_id", leagueId).order("week").order("created_at"),
+            supabase.from("league_schedules").select("*").eq("league_id", leagueId).order("week").order("created_at"),
             supabase.from("transactions" as 'transactions').select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
             supabase.from("draft_picks").select("*").eq("league_id", leagueId).order("round").order("pick_position"),
             supabase.from("draft_order").select("*").eq("league_id", leagueId).order("position"),
@@ -664,7 +658,7 @@ export const useGameStore = create<GameState>()(
           const rosterEntries = (rosterRes.data as unknown as ManagerRosterEntry[] | null) || [];
           // Use mapDbManagerWithRoster to reconstruct rosters from junction table
           const managers = (managersRes.data as Tables<"managers">[] | null)?.map(m => mapDbManagerWithRoster(m, rosterEntries)) || [];
-          const schedule = (scheduleRes.data as Tables<"schedule">[] | null)?.map(mapDbSchedule) || [];
+          const schedule = (scheduleRes.data as Tables<"league_schedules">[] | null)?.map(mapDbSchedule) || [];
           const activities = (transactionsRes.data as Tables<"transactions">[] | null)?.map(mapDbTransaction) || [];
 
           const draftPicks = (draftPicksRes.data || []).map(mapDbDraftPick);
@@ -736,14 +730,14 @@ export const useGameStore = create<GameState>()(
               set({ managers });
             }
           })
-          .on("postgres_changes", { event: "*", schema: "public", table: "schedule", filter }, (payload) => {
+          .on("postgres_changes", { event: "*", schema: "public", table: "league_schedules", filter }, (payload) => {
             if (payload.eventType === "INSERT") {
               const existingMatch = get().schedule.find(s => s.id === payload.new.id);
               if (!existingMatch) {
-                get().addMatch(mapDbSchedule(payload.new as Tables<"schedule">));
+                get().addMatch(mapDbSchedule(payload.new as Tables<"league_schedules">));
               }
             }
-            else if (payload.eventType === "UPDATE") get().updateMatch(payload.new.id, mapDbSchedule(payload.new as Tables<"schedule">));
+            else if (payload.eventType === "UPDATE") get().updateMatch(payload.new.id, mapDbSchedule(payload.new as Tables<"league_schedules">));
             else if (payload.eventType === "DELETE") get().removeMatch(payload.old.id);
           })
           .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter }, (payload) => {

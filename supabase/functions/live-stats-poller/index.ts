@@ -589,6 +589,16 @@ serve(async (req) => {
       // Normalize scoring rules from DB format to expected format
       const rules: ScoringRules = normalizeScoringRules(scoring_rules);
 
+      // Fetch active scoring rule version for this league
+      const { data: scoringVersionData } = await supabase
+        .from('scoring_rule_versions')
+        .select('id')
+        .eq('league_id', league_id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const scoringVersionId = scoringVersionData?.id || null;
+
       // Get league players with cricbuzz_id mapping
       const { data: leaguePlayers } = await supabase
         .from('league_players')
@@ -634,8 +644,54 @@ serve(async (req) => {
 
       const week = leagueMatchData?.week || 1;
 
-      // Prepare stats records
-      const records = parsedStats
+      // Prepare global raw stats for match_player_stats (one per cricbuzz player per match)
+      const globalStatsRecords = parsedStats.map(s => ({
+        match_id,
+        cricbuzz_player_id: s.cricbuzzPlayerId.toString(),
+        player_id: cricbuzzToPlayer.get(s.cricbuzzPlayerId.toString())?.playerId || null,
+        runs: s.runs,
+        balls_faced: s.ballsFaced,
+        fours: s.fours,
+        sixes: s.sixes,
+        strike_rate: s.ballsFaced > 0 ? (s.runs / s.ballsFaced) * 100 : null,
+        is_out: s.isOut,
+        dismissal_type: s.dismissalType,
+        overs: s.overs,
+        maidens: s.maidens,
+        runs_conceded: s.runsConceded,
+        wickets: s.wickets,
+        economy: s.overs > 0 ? s.runsConceded / s.overs : null,
+        dots: s.dots,
+        lbw_bowled_count: s.lbwBowledCount,
+        catches: s.catches,
+        stumpings: s.stumpings,
+        run_outs: s.runOuts,
+        is_in_playing_11: s.isInPlaying11,
+        is_impact_player: false,
+        is_man_of_match: manOfMatch?.id === s.cricbuzzPlayerId,
+        team_won: s.teamWon,
+        is_live: !isMatchComplete,
+        live_updated_at: new Date().toISOString(),
+        finalized_at: isMatchComplete ? new Date().toISOString() : null,
+      }));
+
+      // Upsert global stats
+      if (globalStatsRecords.length > 0) {
+        const { error: globalError } = await supabase
+          .from('match_player_stats')
+          .upsert(globalStatsRecords, {
+            onConflict: 'match_id,cricbuzz_player_id',
+            ignoreDuplicates: false,
+          });
+
+        if (globalError) {
+          console.error(`Error upserting global stats for match ${match_id}:`, globalError);
+        }
+      }
+
+      // Now prepare league-specific scores for league_player_match_scores
+      // Only for players that exist in this league's player pool
+      const leagueScoreRecords = parsedStats
         .filter(s => cricbuzzToPlayer.has(s.cricbuzzPlayerId.toString()))
         .map(s => {
           const cricbuzzId = s.cricbuzzPlayerId.toString();
@@ -648,59 +704,73 @@ serve(async (req) => {
             league_id,
             match_id,
             player_id: leaguePlayer.playerId,
-            cricbuzz_player_id: cricbuzzId,
+            match_player_stats_id: '', // Will be set after global upsert resolves
+            scoring_version_id: scoringVersionId || '', // From active scoring rule version
             manager_id: ownership?.managerId || null,
             was_in_active_roster: ownership?.isActive ?? false,
             week,
-            runs: s.runs,
-            balls_faced: s.ballsFaced,
-            fours: s.fours,
-            sixes: s.sixes,
-            strike_rate: s.ballsFaced > 0 ? (s.runs / s.ballsFaced) * 100 : null,
-            is_out: s.isOut,
-            dismissal_type: s.dismissalType,
-            overs: s.overs,
-            maidens: s.maidens,
-            runs_conceded: s.runsConceded,
-            wickets: s.wickets,
-            economy: s.overs > 0 ? s.runsConceded / s.overs : null,
-            dots: s.dots,
-            lbw_bowled_count: s.lbwBowledCount,
-            catches: s.catches,
-            stumpings: s.stumpings,
-            run_outs: s.runOuts,
-            is_in_playing_11: s.isInPlaying11,
-            is_impact_player: false,
-            is_man_of_match: isManOfMatch,
-            team_won: s.teamWon,
-            fantasy_points: fantasyPoints,
-            is_live_stats: !isMatchComplete,
-            live_updated_at: new Date().toISOString(),
+            total_points: fantasyPoints,
+            is_live: !isMatchComplete,
             finalized_at: isMatchComplete ? new Date().toISOString() : null,
           };
         });
 
-      if (records.length > 0) {
-        const { error: upsertError } = await supabase
-          .from('player_match_stats')
-          .upsert(records, {
-            onConflict: 'league_id,cricbuzz_player_id,match_id',
-            ignoreDuplicates: false,
-          });
+      // For league scores, we need the match_player_stats IDs
+      // Fetch them after upsert
+      if (leagueScoreRecords.length > 0) {
+        const cricbuzzIds = leagueScoreRecords.map(r => {
+          const player = parsedStats.find(s =>
+            cricbuzzToPlayer.get(s.cricbuzzPlayerId.toString())?.playerId === r.player_id
+          );
+          return player?.cricbuzzPlayerId.toString();
+        }).filter(Boolean);
 
-        if (upsertError) {
-          console.error(`Error upserting stats for league ${league_id}:`, upsertError);
-        } else {
-          totalStatsUpserted += records.length;
+        const { data: mpsData } = await supabase
+          .from('match_player_stats')
+          .select('id, cricbuzz_player_id')
+          .eq('match_id', match_id)
+          .in('cricbuzz_player_id', cricbuzzIds as string[]);
+
+        const mpsMap = new Map<string, string>();
+        if (mpsData) {
+          for (const mps of mpsData) {
+            mpsMap.set(mps.cricbuzz_player_id, mps.id);
+          }
+        }
+
+        // Set match_player_stats_id on each record
+        const finalRecords = leagueScoreRecords
+          .map(r => {
+            const player = parsedStats.find(s =>
+              cricbuzzToPlayer.get(s.cricbuzzPlayerId.toString())?.playerId === r.player_id
+            );
+            const mpsId = player ? mpsMap.get(player.cricbuzzPlayerId.toString()) : undefined;
+            if (!mpsId) return null;
+            return { ...r, match_player_stats_id: mpsId };
+          })
+          .filter(Boolean);
+
+        if (finalRecords.length > 0) {
+          const { error: leagueError } = await supabase
+            .from('league_player_match_scores')
+            .upsert(finalRecords as typeof leagueScoreRecords, {
+              onConflict: 'league_id,match_id,player_id',
+              ignoreDuplicates: false,
+            });
+
+          if (leagueError) {
+            console.error(`Error upserting league scores for league ${league_id}:`, leagueError);
+          } else {
+            totalStatsUpserted += finalRecords.length;
+          }
         }
       }
 
-      // Update cricket_matches (shared data)
+      // Update cricket_matches result (shared data) — match_state is now on live_match_polling
       if (isMatchComplete) {
         await supabase
           .from('cricket_matches')
           .update({
-            match_state: 'Complete',
             man_of_match_id: manOfMatch?.id?.toString() || null,
             man_of_match_name: manOfMatch?.name || null,
             result: scorecard.status,
@@ -717,13 +787,10 @@ serve(async (req) => {
           .eq('league_id', league_id)
           .eq('match_id', match_id);
       } else {
-        // Update match state to Live (shared data only)
+        // Update result only (match_state handled via live_match_polling)
         await supabase
           .from('cricket_matches')
-          .update({
-            match_state: 'Live',
-            result: scorecard.status,
-          })
+          .update({ result: scorecard.status })
           .eq('id', match_id);
       }
     }

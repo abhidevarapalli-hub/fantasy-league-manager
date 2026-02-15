@@ -169,46 +169,29 @@ export const StatsImport = () => {
     if (!currentLeagueId) return;
 
     const fetchMatches = async () => {
-      // Query league_matches and join with cricket_matches for shared data
+      // Query league_cricket_matches view which joins cricket_matches + league_matches + live_match_polling
       const { data, error } = await supabase
-        .from('league_matches')
-        .select(`
-          id,
-          week,
-          stats_imported,
-          stats_imported_at,
-          match:cricket_matches (
-            id,
-            cricbuzz_match_id,
-            match_description,
-            team1_name,
-            team2_name,
-            result,
-            match_date,
-            venue,
-            match_state,
-            polling_enabled
-          )
-        `)
+        .from('league_cricket_matches')
+        .select('*')
         .eq('league_id', currentLeagueId);
 
       if (data && !error) {
         const mappedMatches = data
-          .filter(lm => lm.match) // Filter out any with null match (shouldn't happen)
+          .filter(lm => lm.id) // Filter out any with null id
           .map(lm => ({
-            id: lm.match!.id,
-            leagueMatchId: lm.id,
-            cricbuzzMatchId: lm.match!.cricbuzz_match_id,
-            matchDescription: lm.match!.match_description || '',
-            team1Name: lm.match!.team1_name || '',
-            team2Name: lm.match!.team2_name || '',
-            result: lm.match!.result || '',
-            matchDate: lm.match!.match_date || '',
-            venue: lm.match!.venue || '',
+            id: lm.id!,
+            leagueMatchId: lm.league_match_id || '',
+            cricbuzzMatchId: lm.cricbuzz_match_id || 0,
+            matchDescription: lm.match_description || '',
+            team1Name: lm.team1_name || '',
+            team2Name: lm.team2_name || '',
+            result: lm.result || '',
+            matchDate: lm.match_date || '',
+            venue: lm.venue || '',
             statsImported: lm.stats_imported || false,
             week: lm.week,
-            matchState: lm.match!.match_state as CricketMatch['matchState'],
-            pollingEnabled: lm.match!.polling_enabled,
+            matchState: lm.match_state as CricketMatch['matchState'],
+            pollingEnabled: lm.polling_enabled,
           }));
 
         // Sort by match_date descending (most recent first)
@@ -389,14 +372,21 @@ export const StatsImport = () => {
             .maybeSingle();
 
           if (existingLink) {
-            // Already linked — update match_state and result if changed
+            // Already linked — update result if changed
             await supabase
               .from('cricket_matches')
               .update({
-                match_state: matchState,
                 result: match.status || null,
               })
               .eq('id', existingMatch.id);
+            // Update match_state in live_match_polling
+            await supabase
+              .from('live_match_polling')
+              .upsert({
+                cricbuzz_match_id: match.matchId,
+                match_id: existingMatch.id,
+                match_state: matchState,
+              }, { onConflict: 'cricbuzz_match_id' });
             updatedCount++;
             continue;
           }
@@ -417,11 +407,14 @@ export const StatsImport = () => {
         });
 
         if (!error && data && data.length > 0) {
-          // Update match_state on the cricket_matches record
+          // Update match_state in live_match_polling
           await supabase
-            .from('cricket_matches')
-            .update({ match_state: matchState })
-            .eq('id', data[0].out_match_id);
+            .from('live_match_polling')
+            .upsert({
+              cricbuzz_match_id: match.matchId,
+              match_id: data[0].out_match_id,
+              match_state: matchState,
+            }, { onConflict: 'cricbuzz_match_id' });
 
           if (data[0].is_new_match) {
             addedCount++;
@@ -588,15 +581,21 @@ export const StatsImport = () => {
 
       setParsedStats(statsWithOwnership);
 
-      // Update match info and live status (shared cricket_matches data)
+      // Update match result (shared cricket_matches data) and match_state (live_match_polling)
       if (scorecard.status) {
         await supabase
           .from('cricket_matches')
-          .update({
-            result: scorecard.status,
-            match_state: isLive ? 'Live' : 'Complete',
-          })
+          .update({ result: scorecard.status })
           .eq('id', match.id);
+
+        // Update match_state in live_match_polling
+        await supabase
+          .from('live_match_polling')
+          .upsert({
+            cricbuzz_match_id: match.cricbuzzMatchId,
+            match_id: match.id,
+            match_state: isLive ? 'Live' : 'Complete',
+          }, { onConflict: 'cricbuzz_match_id' });
 
         // Update local match state with live status
         setMatches(prev =>
@@ -656,15 +655,20 @@ export const StatsImport = () => {
           continue;
         }
 
-        // Update match result in DB
+        // Update match result in DB and match_state in live_match_polling
         if (scorecard.status) {
           await supabase
             .from('cricket_matches')
-            .update({
-              result: scorecard.status,
-              match_state: 'Complete',
-            })
+            .update({ result: scorecard.status })
             .eq('id', match.id);
+
+          await supabase
+            .from('live_match_polling')
+            .upsert({
+              cricbuzz_match_id: match.cricbuzzMatchId,
+              match_id: match.id,
+              match_state: 'Complete',
+            }, { onConflict: 'cricbuzz_match_id' });
         }
 
         const weekNum = parseInt(selectedWeek);

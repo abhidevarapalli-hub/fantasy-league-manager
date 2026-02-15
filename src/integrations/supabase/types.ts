@@ -25,10 +25,9 @@ export type Database = {
           match_date: string | null
           match_description: string | null
           match_format: string | null
-          match_state: string | null
-          polling_enabled: boolean | null
+          match_week: number | null
           result: string | null
-          series_id: number | null
+          series_id: number
           state: string | null
           team1_id: number | null
           team1_name: string | null
@@ -51,10 +50,9 @@ export type Database = {
           match_date?: string | null
           match_description?: string | null
           match_format?: string | null
-          match_state?: string | null
-          polling_enabled?: boolean | null
+          match_week?: number | null
           result?: string | null
-          series_id?: number | null
+          series_id: number
           state?: string | null
           team1_id?: number | null
           team1_name?: string | null
@@ -77,10 +75,9 @@ export type Database = {
           match_date?: string | null
           match_description?: string | null
           match_format?: string | null
-          match_state?: string | null
-          polling_enabled?: boolean | null
+          match_week?: number | null
           result?: string | null
-          series_id?: number | null
+          series_id?: number
           state?: string | null
           team1_id?: number | null
           team1_name?: string | null
@@ -95,123 +92,12 @@ export type Database = {
         }
         Relationships: []
       }
-      league_matches: {
-        Row: {
-          id: string
-          league_id: string
-          match_id: string
-          week: number | null
-          stats_imported: boolean | null
-          stats_imported_at: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          league_id: string
-          match_id: string
-          week?: number | null
-          stats_imported?: boolean | null
-          stats_imported_at?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          league_id?: string
-          match_id?: string
-          week?: number | null
-          stats_imported?: boolean | null
-          stats_imported_at?: string | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_matches_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_matches_match_id_fkey"
-            columns: ["match_id"]
-            isOneToOne: false
-            referencedRelation: "cricket_matches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_matches_match_id_fkey"
-            columns: ["match_id"]
-            isOneToOne: false
-            referencedRelation: "league_cricket_matches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      league_schedules: {
-        Row: {
-          created_at: string | null
-          id: string
-          league_id: string
-          manager1_id: string
-          manager2_id: string | null
-          week: number
-          winner_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          league_id: string
-          manager1_id: string
-          manager2_id?: string | null
-          week: number
-          winner_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          league_id?: string
-          manager1_id?: string
-          manager2_id?: string | null
-          week?: number
-          winner_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_schedules_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_manager1_id_fkey"
-            columns: ["manager1_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_manager2_id_fkey"
-            columns: ["manager2_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_winner_id_fkey"
-            columns: ["winner_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       draft_order: {
         Row: {
           auto_draft_enabled: boolean | null
           created_at: string
           id: string
-          league_id: string | null
+          league_id: string
           manager_id: string | null
           position: number
         }
@@ -219,7 +105,7 @@ export type Database = {
           auto_draft_enabled?: boolean | null
           created_at?: string
           id?: string
-          league_id?: string | null
+          league_id: string
           manager_id?: string | null
           position: number
         }
@@ -227,7 +113,7 @@ export type Database = {
           auto_draft_enabled?: boolean | null
           created_at?: string
           id?: string
-          league_id?: string | null
+          league_id?: string
           manager_id?: string | null
           position?: number
         }
@@ -253,7 +139,7 @@ export type Database = {
           created_at: string
           id: string
           is_auto_draft: boolean | null
-          league_id: string | null
+          league_id: string
           manager_id: string | null
           pick_position: number
           player_id: string | null
@@ -264,7 +150,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_auto_draft?: boolean | null
-          league_id?: string | null
+          league_id: string
           manager_id?: string | null
           pick_position: number
           player_id?: string | null
@@ -275,7 +161,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_auto_draft?: boolean | null
-          league_id?: string | null
+          league_id?: string
           manager_id?: string | null
           pick_position?: number
           player_id?: string | null
@@ -321,7 +207,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_finalized: boolean
-          league_id: string | null
+          league_id: string
           paused_at: string | null
         }
         Insert: {
@@ -331,7 +217,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_finalized?: boolean
-          league_id?: string | null
+          league_id: string
           paused_at?: string | null
         }
         Update: {
@@ -341,7 +227,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_finalized?: boolean
-          league_id?: string | null
+          league_id?: string
           paused_at?: string | null
         }
         Relationships: [
@@ -360,10 +246,8 @@ export type Database = {
           id: string
           league_id: string | null
           manager1_id: string | null
-          manager1_name: string
           manager1_wins: number
           manager2_id: string | null
-          manager2_name: string
           manager2_wins: number
           updated_at: string
         }
@@ -372,10 +256,8 @@ export type Database = {
           id?: string
           league_id?: string | null
           manager1_id?: string | null
-          manager1_name: string
           manager1_wins?: number
           manager2_id?: string | null
-          manager2_name: string
           manager2_wins?: number
           updated_at?: string
         }
@@ -384,10 +266,8 @@ export type Database = {
           id?: string
           league_id?: string | null
           manager1_id?: string | null
-          manager1_name?: string
           manager1_wins?: number
           manager2_id?: string | null
-          manager2_name?: string
           manager2_wins?: number
           updated_at?: string
         }
@@ -424,7 +304,6 @@ export type Database = {
           id: string
           league_id: string | null
           manager_id: string | null
-          manager_name: string
           top_3_finishes: number
           updated_at: string
         }
@@ -436,7 +315,6 @@ export type Database = {
           id?: string
           league_id?: string | null
           manager_id?: string | null
-          manager_name: string
           top_3_finishes?: number
           updated_at?: string
         }
@@ -448,7 +326,6 @@ export type Database = {
           id?: string
           league_id?: string | null
           manager_id?: string | null
-          manager_name?: string
           top_3_finishes?: number
           updated_at?: string
         }
@@ -465,6 +342,178 @@ export type Database = {
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_matches: {
+        Row: {
+          created_at: string | null
+          id: string
+          league_id: string
+          match_id: string
+          stats_imported: boolean | null
+          stats_imported_at: string | null
+          week: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          league_id: string
+          match_id: string
+          stats_imported?: boolean | null
+          stats_imported_at?: string | null
+          week?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          league_id?: string
+          match_id?: string
+          stats_imported?: boolean | null
+          stats_imported_at?: string | null
+          week?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_matches_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_matches_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_matches_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "league_cricket_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_player_match_scores: {
+        Row: {
+          batting_points: number
+          bowling_points: number
+          common_points: number
+          computed_at: string
+          fielding_points: number
+          finalized_at: string | null
+          id: string
+          is_live: boolean
+          league_id: string
+          manager_id: string | null
+          match_id: string
+          match_player_stats_id: string
+          player_id: string
+          points_breakdown: Json
+          scoring_version_id: string
+          total_points: number
+          was_in_active_roster: boolean
+          week: number | null
+        }
+        Insert: {
+          batting_points?: number
+          bowling_points?: number
+          common_points?: number
+          computed_at?: string
+          fielding_points?: number
+          finalized_at?: string | null
+          id?: string
+          is_live?: boolean
+          league_id: string
+          manager_id?: string | null
+          match_id: string
+          match_player_stats_id: string
+          player_id: string
+          points_breakdown?: Json
+          scoring_version_id: string
+          total_points?: number
+          was_in_active_roster?: boolean
+          week?: number | null
+        }
+        Update: {
+          batting_points?: number
+          bowling_points?: number
+          common_points?: number
+          computed_at?: string
+          fielding_points?: number
+          finalized_at?: string | null
+          id?: string
+          is_live?: boolean
+          league_id?: string
+          manager_id?: string | null
+          match_id?: string
+          match_player_stats_id?: string
+          player_id?: string
+          points_breakdown?: Json
+          scoring_version_id?: string
+          total_points?: number
+          was_in_active_roster?: boolean
+          week?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_player_match_scores_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "league_cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_match_player_stats_id_fkey"
+            columns: ["match_player_stats_id"]
+            isOneToOne: false
+            referencedRelation: "match_player_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "league_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "master_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_scoring_version_id_fkey"
+            columns: ["scoring_version_id"]
+            isOneToOne: false
+            referencedRelation: "scoring_rule_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -517,6 +566,74 @@ export type Database = {
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "master_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_schedules: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_finalized: boolean
+          league_id: string
+          manager1_id: string
+          manager1_score: number | null
+          manager2_id: string | null
+          manager2_score: number | null
+          week: number
+          winner_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_finalized?: boolean
+          league_id: string
+          manager1_id: string
+          manager1_score?: number | null
+          manager2_id?: string | null
+          manager2_score?: number | null
+          week: number
+          winner_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_finalized?: boolean
+          league_id?: string
+          manager1_id?: string
+          manager1_score?: number | null
+          manager2_id?: string | null
+          manager2_score?: number | null
+          week?: number
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_schedules_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_schedules_manager1_id_fkey"
+            columns: ["manager1_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_schedules_manager2_id_fkey"
+            columns: ["manager2_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_schedules_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
             referencedColumns: ["id"]
           },
         ]
@@ -584,45 +701,63 @@ export type Database = {
       live_match_polling: {
         Row: {
           auto_enabled: boolean | null
+          circuit_opened_at: string | null
+          circuit_state: string
+          consecutive_errors: number
           created_at: string | null
           cricbuzz_match_id: number
           error_count: number | null
           id: string
           last_error: string | null
           last_polled_at: string | null
-          match_id: string | null
+          match_id: string
           match_state: string | null
+          next_poll_due_at: string | null
           poll_count: number | null
+          poll_interval_secs: number
+          poll_version: number
           polling_enabled: boolean | null
           polling_lock_until: string | null
           updated_at: string | null
         }
         Insert: {
           auto_enabled?: boolean | null
+          circuit_opened_at?: string | null
+          circuit_state?: string
+          consecutive_errors?: number
           created_at?: string | null
           cricbuzz_match_id: number
           error_count?: number | null
           id?: string
           last_error?: string | null
           last_polled_at?: string | null
-          match_id?: string | null
+          match_id: string
           match_state?: string | null
+          next_poll_due_at?: string | null
           poll_count?: number | null
+          poll_interval_secs?: number
+          poll_version?: number
           polling_enabled?: boolean | null
           polling_lock_until?: string | null
           updated_at?: string | null
         }
         Update: {
           auto_enabled?: boolean | null
+          circuit_opened_at?: string | null
+          circuit_state?: string
+          consecutive_errors?: number
           created_at?: string | null
           cricbuzz_match_id?: number
           error_count?: number | null
           id?: string
           last_error?: string | null
           last_polled_at?: string | null
-          match_id?: string | null
+          match_id?: string
           match_state?: string | null
+          next_poll_due_at?: string | null
           poll_count?: number | null
+          poll_interval_secs?: number
+          poll_version?: number
           polling_enabled?: boolean | null
           polling_lock_until?: string | null
           updated_at?: string | null
@@ -708,7 +843,7 @@ export type Database = {
           created_at: string
           id: string
           is_league_manager: boolean | null
-          league_id: string | null
+          league_id: string
           losses: number
           name: string
           points: number
@@ -720,7 +855,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_league_manager?: boolean | null
-          league_id?: string | null
+          league_id: string
           losses?: number
           name: string
           points?: number
@@ -732,7 +867,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_league_manager?: boolean | null
-          league_id?: string | null
+          league_id?: string
           losses?: number
           name?: string
           points?: number
@@ -804,31 +939,28 @@ export type Database = {
         }
         Relationships: []
       }
-      player_match_stats: {
+      match_player_stats: {
         Row: {
           balls_faced: number | null
           batting_position: number | null
           catches: number | null
           created_at: string | null
-          cricbuzz_player_id: string | null
+          cricbuzz_player_id: string
           dismissal_type: string | null
           dots: number | null
           economy: number | null
-          fantasy_points: number | null
           finalized_at: string | null
           fours: number | null
           id: string
           is_impact_player: boolean | null
           is_in_playing_11: boolean | null
-          is_live_stats: boolean | null
+          is_live: boolean | null
           is_man_of_match: boolean | null
           is_out: boolean | null
           lbw_bowled_count: number | null
-          league_id: string | null
           live_updated_at: string | null
           maidens: number | null
-          manager_id: string | null
-          match_id: string | null
+          match_id: string
           no_balls: number | null
           overs: number | null
           player_id: string | null
@@ -836,11 +968,11 @@ export type Database = {
           runs: number | null
           runs_conceded: number | null
           sixes: number | null
+          source_poll_version: number | null
           strike_rate: number | null
           stumpings: number | null
           team_won: boolean | null
-          was_in_active_roster: boolean | null
-          week: number | null
+          updated_at: string | null
           wickets: number | null
           wides: number | null
         }
@@ -849,25 +981,22 @@ export type Database = {
           batting_position?: number | null
           catches?: number | null
           created_at?: string | null
-          cricbuzz_player_id?: string | null
+          cricbuzz_player_id: string
           dismissal_type?: string | null
           dots?: number | null
           economy?: number | null
-          fantasy_points?: number | null
           finalized_at?: string | null
           fours?: number | null
           id?: string
           is_impact_player?: boolean | null
           is_in_playing_11?: boolean | null
-          is_live_stats?: boolean | null
+          is_live?: boolean | null
           is_man_of_match?: boolean | null
           is_out?: boolean | null
           lbw_bowled_count?: number | null
-          league_id?: string | null
           live_updated_at?: string | null
           maidens?: number | null
-          manager_id?: string | null
-          match_id?: string | null
+          match_id: string
           no_balls?: number | null
           overs?: number | null
           player_id?: string | null
@@ -875,11 +1004,11 @@ export type Database = {
           runs?: number | null
           runs_conceded?: number | null
           sixes?: number | null
+          source_poll_version?: number | null
           strike_rate?: number | null
           stumpings?: number | null
           team_won?: boolean | null
-          was_in_active_roster?: boolean | null
-          week?: number | null
+          updated_at?: string | null
           wickets?: number | null
           wides?: number | null
         }
@@ -888,25 +1017,22 @@ export type Database = {
           batting_position?: number | null
           catches?: number | null
           created_at?: string | null
-          cricbuzz_player_id?: string | null
+          cricbuzz_player_id?: string
           dismissal_type?: string | null
           dots?: number | null
           economy?: number | null
-          fantasy_points?: number | null
           finalized_at?: string | null
           fours?: number | null
           id?: string
           is_impact_player?: boolean | null
           is_in_playing_11?: boolean | null
-          is_live_stats?: boolean | null
+          is_live?: boolean | null
           is_man_of_match?: boolean | null
           is_out?: boolean | null
           lbw_bowled_count?: number | null
-          league_id?: string | null
           live_updated_at?: string | null
           maidens?: number | null
-          manager_id?: string | null
-          match_id?: string | null
+          match_id?: string
           no_balls?: number | null
           overs?: number | null
           player_id?: string | null
@@ -914,45 +1040,38 @@ export type Database = {
           runs?: number | null
           runs_conceded?: number | null
           sixes?: number | null
+          source_poll_version?: number | null
           strike_rate?: number | null
           stumpings?: number | null
           team_won?: boolean | null
-          was_in_active_roster?: boolean | null
-          week?: number | null
+          updated_at?: string | null
           wickets?: number | null
           wides?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "player_match_stats_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "player_match_stats_manager_id_fkey"
-            columns: ["manager_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "player_match_stats_match_id_fkey"
+            foreignKeyName: "match_player_stats_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "cricket_matches"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "player_match_stats_player_id_fkey"
+            foreignKeyName: "match_player_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "league_cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_player_stats_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "league_players"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "player_match_stats_player_id_fkey"
+            foreignKeyName: "match_player_stats_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "master_players"
@@ -984,57 +1103,43 @@ export type Database = {
         }
         Relationships: []
       }
-      schedule: {
+      scoring_rule_versions: {
         Row: {
-          away_manager_id: string | null
-          away_score: number | null
           created_at: string
-          home_manager_id: string | null
-          home_score: number | null
+          created_by: string | null
+          description: string | null
           id: string
-          is_finalized: boolean
-          league_id: string | null
-          week: number
+          is_active: boolean
+          league_id: string
+          rules: Json
+          rules_hash: string
+          version: number
         }
         Insert: {
-          away_manager_id?: string | null
-          away_score?: number | null
           created_at?: string
-          home_manager_id?: string | null
-          home_score?: number | null
+          created_by?: string | null
+          description?: string | null
           id?: string
-          is_finalized?: boolean
-          league_id?: string | null
-          week: number
+          is_active?: boolean
+          league_id: string
+          rules: Json
+          rules_hash: string
+          version: number
         }
         Update: {
-          away_manager_id?: string | null
-          away_score?: number | null
           created_at?: string
-          home_manager_id?: string | null
-          home_score?: number | null
+          created_by?: string | null
+          description?: string | null
           id?: string
-          is_finalized?: boolean
-          league_id?: string | null
-          week?: number
+          is_active?: boolean
+          league_id?: string
+          rules?: Json
+          rules_hash?: string
+          version?: number
         }
         Relationships: [
           {
-            foreignKeyName: "schedule_away_manager_id_fkey"
-            columns: ["away_manager_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "schedule_home_manager_id_fkey"
-            columns: ["home_manager_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "schedule_league_id_fkey"
+            foreignKeyName: "scoring_rule_versions_league_id_fkey"
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "leagues"
@@ -1092,37 +1197,31 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          league_id: string | null
+          league_id: string
           parent_trade_id: string | null
           proposer_id: string
-          proposer_players: string[]
           status: string
           target_id: string
-          target_players: string[]
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
-          league_id?: string | null
+          league_id: string
           parent_trade_id?: string | null
           proposer_id: string
-          proposer_players?: string[]
           status?: string
           target_id: string
-          target_players?: string[]
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
-          league_id?: string | null
+          league_id?: string
           parent_trade_id?: string | null
           proposer_id?: string
-          proposer_players?: string[]
           status?: string
           target_id?: string
-          target_players?: string[]
           updated_at?: string
         }
         Relationships: [
@@ -1163,7 +1262,6 @@ export type Database = {
           id: string
           league_id: string | null
           manager_id: string | null
-          manager_team_name: string | null
           players: Json | null
           type: string
           week: number | null
@@ -1174,7 +1272,6 @@ export type Database = {
           id?: string
           league_id?: string | null
           manager_id?: string | null
-          manager_team_name?: string | null
           players?: Json | null
           type: string
           week?: number | null
@@ -1185,7 +1282,6 @@ export type Database = {
           id?: string
           league_id?: string | null
           manager_id?: string | null
-          manager_team_name?: string | null
           players?: Json | null
           type?: string
           week?: number | null
@@ -1211,35 +1307,35 @@ export type Database = {
     Views: {
       league_cricket_matches: {
         Row: {
-          id: string | null
-          cricbuzz_match_id: number | null
-          series_id: number | null
-          match_description: string | null
-          match_format: string | null
-          match_date: string | null
-          team1_id: number | null
-          team1_name: string | null
-          team1_short: string | null
-          team1_score: string | null
-          team2_id: number | null
-          team2_name: string | null
-          team2_short: string | null
-          team2_score: string | null
-          result: string | null
-          winner_team_id: number | null
-          venue: string | null
           city: string | null
-          state: string | null
+          created_at: string | null
+          cricbuzz_match_id: number | null
+          id: string | null
+          league_id: string | null
+          league_match_id: string | null
           man_of_match_id: string | null
           man_of_match_name: string | null
-          polling_enabled: boolean | null
+          match_date: string | null
+          match_description: string | null
+          match_format: string | null
           match_state: string | null
-          created_at: string | null
-          league_id: string | null
-          week: number | null
+          polling_enabled: boolean | null
+          result: string | null
+          series_id: number | null
+          state: string | null
           stats_imported: boolean | null
           stats_imported_at: string | null
-          league_match_id: string | null
+          team1_id: number | null
+          team1_name: string | null
+          team1_score: string | null
+          team1_short: string | null
+          team2_id: number | null
+          team2_name: string | null
+          team2_score: string | null
+          team2_short: string | null
+          venue: string | null
+          week: number | null
+          winner_team_id: number | null
         }
         Relationships: [
           {
@@ -1247,35 +1343,6 @@ export type Database = {
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      fantasy_weekly_summary: {
-        Row: {
-          active_points: number | null
-          bench_points: number | null
-          league_id: string | null
-          manager_id: string | null
-          manager_name: string | null
-          players_with_stats: number | null
-          team_name: string | null
-          total_points: number | null
-          week: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "player_match_stats_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "player_match_stats_manager_id_fkey"
-            columns: ["manager_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
             referencedColumns: ["id"]
           },
         ]
@@ -1312,37 +1379,110 @@ export type Database = {
           },
         ]
       }
-      player_fantasy_performance: {
+      mv_fantasy_standings: {
         Row: {
-          avg_fantasy_points: number | null
-          ipl_team: string | null
+          active_points: number | null
           league_id: string | null
-          matches_played: number | null
-          player_id: string | null
-          player_name: string | null
-          role: string | null
-          total_dismissals: number | null
-          total_fantasy_points: number | null
-          total_runs: number | null
-          total_wickets: number | null
+          manager_id: string | null
+          team_name: string | null
+          total_points: number | null
+          week: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "player_match_stats_league_id_fkey"
+            foreignKeyName: "league_player_match_scores_league_id_fkey"
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "leagues"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "player_match_stats_player_id_fkey"
+            foreignKeyName: "league_player_match_scores_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_match_stats_compat: {
+        Row: {
+          balls_faced: number | null
+          batting_position: number | null
+          catches: number | null
+          created_at: string | null
+          cricbuzz_player_id: string | null
+          dismissal_type: string | null
+          dots: number | null
+          economy: number | null
+          fantasy_points: number | null
+          finalized_at: string | null
+          fours: number | null
+          id: string | null
+          is_impact_player: boolean | null
+          is_in_playing_11: boolean | null
+          is_live_stats: boolean | null
+          is_man_of_match: boolean | null
+          is_out: boolean | null
+          lbw_bowled_count: number | null
+          league_id: string | null
+          live_updated_at: string | null
+          maidens: number | null
+          manager_id: string | null
+          match_id: string | null
+          no_balls: number | null
+          overs: number | null
+          player_id: string | null
+          run_outs: number | null
+          runs: number | null
+          runs_conceded: number | null
+          sixes: number | null
+          strike_rate: number | null
+          stumpings: number | null
+          team_won: boolean | null
+          was_in_active_roster: boolean | null
+          week: number | null
+          wickets: number | null
+          wides: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_player_match_scores_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_player_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_player_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "league_cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_player_stats_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "league_players"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "player_match_stats_player_id_fkey"
+            foreignKeyName: "match_player_stats_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "master_players"
@@ -1412,7 +1552,7 @@ export type Database = {
         Returns: number
       }
       get_matches_to_poll: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           cricbuzz_match_id: number
           last_polled_at: string
@@ -1442,27 +1582,33 @@ export type Database = {
       }
       upsert_league_match: {
         Args: {
-          p_league_id: string
           p_cricbuzz_match_id: number
-          p_series_id?: number | null
-          p_match_description?: string | null
-          p_match_format?: string | null
-          p_match_date?: string | null
-          p_team1_name?: string | null
-          p_team2_name?: string | null
-          p_venue?: string | null
-          p_result?: string | null
-          p_week?: number | null
+          p_league_id: string
+          p_match_date?: string
+          p_match_description?: string
+          p_match_format?: string
+          p_result?: string
+          p_series_id?: number
+          p_team1_name?: string
+          p_team2_name?: string
+          p_venue?: string
+          p_week?: number
         }
         Returns: {
-          out_match_id: string
-          out_league_match_id: string
           is_new_match: boolean
+          out_league_match_id: string
+          out_match_id: string
         }[]
       }
     }
     Enums: {
+      match_state_enum: "Upcoming" | "Live" | "Complete"
       player_availability: "available" | "rostered" | "injured" | "suspended"
+      player_role_enum: "Batsman" | "Bowler" | "All Rounder" | "Wicket Keeper"
+      slot_type_enum: "active" | "bench"
+      trade_side_enum: "proposer" | "target"
+      trade_status_enum: "pending" | "accepted" | "rejected" | "countered"
+      transaction_type_enum: "add" | "drop" | "trade" | "score"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1476,121 +1622,127 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {
     Enums: {
+      match_state_enum: ["Upcoming", "Live", "Complete"],
       player_availability: ["available", "rostered", "injured", "suspended"],
+      player_role_enum: ["Batsman", "Bowler", "All Rounder", "Wicket Keeper"],
+      slot_type_enum: ["active", "bench"],
+      trade_side_enum: ["proposer", "target"],
+      trade_status_enum: ["pending", "accepted", "rejected", "countered"],
+      transaction_type_enum: ["add", "drop", "trade", "score"],
     },
   },
 } as const

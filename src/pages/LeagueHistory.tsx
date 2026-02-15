@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 
 interface HistoricalRecord {
   id: string;
-  manager_name: string;
+  manager_id: string;
   championships: number;
   top_3_finishes: number;
   historical_wins: number;
@@ -19,13 +19,14 @@ interface HistoricalRecord {
 
 interface HeadToHead {
   id: string;
-  manager1_name: string;
-  manager2_name: string;
+  manager1_id: string;
+  manager2_id: string;
   manager1_wins: number;
   manager2_wins: number;
 }
 
 interface CombinedRecord {
+  id: string;
   name: string;
   championships: number;
   top3Finishes: number;
@@ -34,8 +35,6 @@ interface CombinedRecord {
   winPct: number;
   isActive: boolean;
 }
-
-const ALL_MANAGER_NAMES = ['Abhi', 'Akash', 'Jasthi', 'Krishna', 'Krithik', 'Kush', 'Sahith', 'Santosh', 'Vamsi'];
 
 const LeagueHistory = () => {
   const managers = useGameStore(state => state.managers);
@@ -80,42 +79,57 @@ const LeagueHistory = () => {
     };
   }, []);
 
+  // Build a combined list of all manager IDs/names from active managers + historical records
+  const allManagerEntries = (() => {
+    const map = new Map<string, string>(); // id -> name
+    managers.forEach(m => map.set(m.id, m.name));
+    // Historical records reference manager_id, resolve name via managers
+    historicalRecords.forEach(r => {
+      if (r.manager_id && !map.has(r.manager_id)) {
+        const m = managers.find(mgr => mgr.id === r.manager_id);
+        map.set(r.manager_id, m?.name || r.manager_id);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  })();
+
   // Calculate current season wins from finalized matches
-  const getCurrentSeasonRecord = (managerName: string): { wins: number; losses: number } => {
-    const manager = managers.find(m => m.name === managerName);
+  const getCurrentSeasonRecord = (managerId: string): { wins: number; losses: number } => {
+    const manager = managers.find(m => m.id === managerId);
     if (!manager) return { wins: 0, losses: 0 };
     return { wins: manager.wins, losses: manager.losses };
   };
 
-  // Calculate current season H2H from finalized matches
+  // Calculate current season H2H from finalized matches (by ID)
   const getCurrentSeasonH2H = (): Map<string, Map<string, { wins: number; losses: number }>> => {
     const h2hMap = new Map<string, Map<string, { wins: number; losses: number }>>();
 
     // Initialize map for all managers
     managers.forEach(m => {
-      h2hMap.set(m.name, new Map());
+      h2hMap.set(m.id, new Map());
     });
 
     // Process finalized matches
     schedule.filter(match => match.completed).forEach(match => {
-      const homeManager = managers.find(m => m.id === match.home);
-      const awayManager = managers.find(m => m.id === match.away);
+      if (match.homeScore === undefined || match.awayScore === undefined) return;
 
-      if (!homeManager || !awayManager || match.homeScore === undefined || match.awayScore === undefined) return;
+      const homeId = match.home;
+      const awayId = match.away;
+      if (!h2hMap.has(homeId) || !h2hMap.has(awayId)) return;
 
       const homeWins = match.homeScore > match.awayScore;
 
       // Update home manager's record vs away
-      const homeVsAway = h2hMap.get(homeManager.name)?.get(awayManager.name) || { wins: 0, losses: 0 };
+      const homeVsAway = h2hMap.get(homeId)?.get(awayId) || { wins: 0, losses: 0 };
       homeVsAway.wins += homeWins ? 1 : 0;
       homeVsAway.losses += homeWins ? 0 : 1;
-      h2hMap.get(homeManager.name)?.set(awayManager.name, homeVsAway);
+      h2hMap.get(homeId)?.set(awayId, homeVsAway);
 
       // Update away manager's record vs home
-      const awayVsHome = h2hMap.get(awayManager.name)?.get(homeManager.name) || { wins: 0, losses: 0 };
+      const awayVsHome = h2hMap.get(awayId)?.get(homeId) || { wins: 0, losses: 0 };
       awayVsHome.wins += homeWins ? 0 : 1;
       awayVsHome.losses += homeWins ? 1 : 0;
-      h2hMap.get(awayManager.name)?.set(homeManager.name, awayVsHome);
+      h2hMap.get(awayId)?.set(homeId, awayVsHome);
     });
 
     return h2hMap;
@@ -123,18 +137,19 @@ const LeagueHistory = () => {
 
   // Combine historical + current season records
   const getCombinedRecords = (): CombinedRecord[] => {
-    const activeManagerNames = managers.map(m => m.name);
+    const activeManagerIds = new Set(managers.map(m => m.id));
 
-    return ALL_MANAGER_NAMES.map(name => {
-      const historical = historicalRecords.find(r => r.manager_name === name);
-      const current = getCurrentSeasonRecord(name);
-      const isActive = activeManagerNames.includes(name);
+    return allManagerEntries.map(({ id, name }) => {
+      const historical = historicalRecords.find(r => r.manager_id === id);
+      const current = getCurrentSeasonRecord(id);
+      const isActive = activeManagerIds.has(id);
 
       const totalWins = (historical?.historical_wins || 0) + current.wins;
       const totalLosses = (historical?.historical_losses || 0) + current.losses;
       const totalGames = totalWins + totalLosses;
 
       return {
+        id,
         name,
         championships: historical?.championships || 0,
         top3Finishes: historical?.top_3_finishes || 0,
@@ -151,22 +166,21 @@ const LeagueHistory = () => {
     });
   };
 
-  // Get combined H2H record (historical + current)
-  const getCombinedH2H = (manager1: string, manager2: string): { wins: number; losses: number } => {
-    if (manager1 === manager2) return { wins: 0, losses: 0 };
+  // Get combined H2H record (historical + current) by manager ID
+  const getCombinedH2H = (manager1Id: string, manager2Id: string): { wins: number; losses: number } => {
+    if (manager1Id === manager2Id) return { wins: 0, losses: 0 };
 
     // Find historical record
     let historicalWins = 0;
     let historicalLosses = 0;
 
-    // Check both orderings since we store alphabetically
     const record = headToHead.find(
-      h => (h.manager1_name === manager1 && h.manager2_name === manager2) ||
-        (h.manager1_name === manager2 && h.manager2_name === manager1)
+      h => (h.manager1_id === manager1Id && h.manager2_id === manager2Id) ||
+        (h.manager1_id === manager2Id && h.manager2_id === manager1Id)
     );
 
     if (record) {
-      if (record.manager1_name === manager1) {
+      if (record.manager1_id === manager1Id) {
         historicalWins = record.manager1_wins;
         historicalLosses = record.manager2_wins;
       } else {
@@ -177,7 +191,7 @@ const LeagueHistory = () => {
 
     // Add current season
     const currentH2H = getCurrentSeasonH2H();
-    const currentRecord = currentH2H.get(manager1)?.get(manager2) || { wins: 0, losses: 0 };
+    const currentRecord = currentH2H.get(manager1Id)?.get(manager2Id) || { wins: 0, losses: 0 };
 
     return {
       wins: historicalWins + currentRecord.wins,
@@ -292,40 +306,40 @@ const LeagueHistory = () => {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="sticky left-0 bg-muted/50 z-10 min-w-[80px]"></TableHead>
-                    {ALL_MANAGER_NAMES.map(name => (
+                    {allManagerEntries.map(entry => (
                       <TableHead
-                        key={name}
+                        key={entry.id}
                         className="text-center text-xs font-semibold min-w-[60px] px-1"
                       >
-                        {name}
+                        {entry.name}
                       </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {ALL_MANAGER_NAMES.map(rowManager => (
+                  {allManagerEntries.map(rowEntry => (
                     <TableRow
-                      key={rowManager}
-                      className={cn(rowManager === userProfile?.username && "bg-secondary/10")}
+                      key={rowEntry.id}
+                      className={cn(rowEntry.name === userProfile?.username && "bg-secondary/10")}
                     >
                       <TableCell className={cn(
                         "sticky left-0 z-10 font-semibold text-xs",
-                        rowManager === userProfile?.username ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
+                        rowEntry.name === userProfile?.username ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
                       )}>
-                        {rowManager}
+                        {rowEntry.name}
                       </TableCell>
-                      {ALL_MANAGER_NAMES.map(colManager => {
-                        if (rowManager === colManager) {
+                      {allManagerEntries.map(colEntry => {
+                        if (rowEntry.id === colEntry.id) {
                           return (
-                            <TableCell key={colManager} className="text-center text-muted-foreground">
+                            <TableCell key={colEntry.id} className="text-center text-muted-foreground">
                               —
                             </TableCell>
                           );
                         }
-                        const record = getCombinedH2H(rowManager, colManager);
+                        const record = getCombinedH2H(rowEntry.id, colEntry.id);
                         return (
                           <TableCell
-                            key={colManager}
+                            key={colEntry.id}
                             className={cn(
                               "text-center text-xs font-medium whitespace-nowrap",
                               record.wins > record.losses && "text-green-600",

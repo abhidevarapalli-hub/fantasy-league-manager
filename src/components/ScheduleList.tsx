@@ -8,8 +8,8 @@ import { MatchupDetail } from './MatchupDetail';
 
 interface HeadToHead {
   id: string;
-  manager1_name: string;
-  manager2_name: string;
+  manager1_id: string;
+  manager2_id: string;
   manager1_wins: number;
   manager2_wins: number;
 }
@@ -44,37 +44,33 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
     return match.home === loggedInManager.id || match.away === loggedInManager.id;
   };
 
-  // Get historical H2H record between two managers
-  const getHistoricalH2H = (manager1Name: string, manager2Name: string): { wins: number; losses: number } => {
+  // Get historical H2H record between two managers (by ID)
+  const getHistoricalH2H = (manager1Id: string, manager2Id: string): { wins: number; losses: number } => {
     const record = headToHead.find(
-      h => (h.manager1_name === manager1Name && h.manager2_name === manager2Name) ||
-        (h.manager1_name === manager2Name && h.manager2_name === manager1Name)
+      h => (h.manager1_id === manager1Id && h.manager2_id === manager2Id) ||
+        (h.manager1_id === manager2Id && h.manager2_id === manager1Id)
     );
 
     if (!record) return { wins: 0, losses: 0 };
 
-    if (record.manager1_name === manager1Name) {
+    if (record.manager1_id === manager1Id) {
       return { wins: record.manager1_wins, losses: record.manager2_wins };
     } else {
       return { wins: record.manager2_wins, losses: record.manager1_wins };
     }
   };
 
-  // Calculate current season H2H from completed matches
-  const getCurrentSeasonH2H = (manager1Name: string, manager2Name: string): { wins: number; losses: number } => {
+  // Calculate current season H2H from completed matches (by ID)
+  const getCurrentSeasonH2H = (manager1Id: string, manager2Id: string): { wins: number; losses: number } => {
     let wins = 0;
     let losses = 0;
 
     schedule.filter(match => match.completed).forEach(match => {
-      const homeManager = getManager(match.home);
-      const awayManager = getManager(match.away);
-
-      if (!homeManager || !awayManager) return;
       if (match.homeScore === undefined || match.awayScore === undefined) return;
 
       // Check if this match involves both managers
-      const isHome1 = homeManager.name === manager1Name && awayManager.name === manager2Name;
-      const isAway1 = awayManager.name === manager1Name && homeManager.name === manager2Name;
+      const isHome1 = match.home === manager1Id && match.away === manager2Id;
+      const isAway1 = match.away === manager1Id && match.home === manager2Id;
 
       if (isHome1) {
         if (match.homeScore > match.awayScore) wins++;
@@ -89,9 +85,9 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
   };
 
   // Combined H2H (historical + current season)
-  const getCombinedH2H = (manager1Name: string, manager2Name: string): { wins: number; losses: number } => {
-    const historical = getHistoricalH2H(manager1Name, manager2Name);
-    const current = getCurrentSeasonH2H(manager1Name, manager2Name);
+  const getCombinedH2H = (manager1Id: string, manager2Id: string): { wins: number; losses: number } => {
+    const historical = getHistoricalH2H(manager1Id, manager2Id);
+    const current = getCurrentSeasonH2H(manager1Id, manager2Id);
     return {
       wins: historical.wins + current.wins,
       losses: historical.losses + current.losses
@@ -135,7 +131,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
               const homeManager = getManager(match.home);
               const awayManager = getManager(match.away);
               const h2h = homeManager && awayManager
-                ? getCombinedH2H(homeManager.name, awayManager.name)
+                ? getCombinedH2H(homeManager.id, awayManager.id)
                 : { wins: 0, losses: 0 };
               const userPlaying = isUserMatch(match);
 
