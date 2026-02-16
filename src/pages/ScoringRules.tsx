@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Target,
   Zap,
@@ -39,6 +40,7 @@ const NumericField = ({ label, value, onChange, description, className, disabled
 
 const ScoringRules = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const scoringRules = useGameStore((state) => state.scoringRules);
   const updateScoringRules = useGameStore((state) => state.updateScoringRules);
   const gameLoading = useGameStore((state) => state.loading);
@@ -137,6 +139,8 @@ const ScoringRules = () => {
     setSaving(false);
 
     if (result.success) {
+      // Invalidate cached player match stats so dialogs show recomputed scores
+      queryClient.invalidateQueries({ queryKey: ['player-match-stats'] });
       if (result.error) {
         // Rules saved but recompute had an issue
         toast.warning(result.error);

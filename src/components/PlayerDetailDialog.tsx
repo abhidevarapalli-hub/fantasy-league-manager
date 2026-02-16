@@ -15,8 +15,8 @@ import { getTournamentById, SUPPORTED_TOURNAMENTS } from '@/lib/tournaments';
 import { usePlayerSchedule, useExtendedPlayer, usePlayerMatchStats, PlayerMatchPerformance } from '@/hooks/usePlayerDetails';
 import { getPlayerAvatarUrl, getPlayerTeamForTournament, TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
 import { getTeamColors } from '@/lib/team-colors';
-import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
 import { useGameStore } from '@/store/useGameStore';
+import { calculateFantasyPoints, type PlayerStats } from '@/lib/fantasy-points-calculator';
 
 interface PlayerDetailDialogProps {
     open: boolean;
@@ -30,48 +30,31 @@ interface PlayerDetailDialogProps {
     matchStats?: PlayerMatchPerformance[];
 }
 
-const calculateFantasyPoints = (stats: PlayerMatchPerformance) => {
-    let points = 0;
-    const rules = DEFAULT_SCORING_RULES;
-
-    // Basic points
-    points += rules.common.starting11; // Assume they started if they have stats
-
-    // Batting
-    if (stats.runs !== undefined) {
-        points += stats.runs * rules.batting.runs;
-        points += (stats.fours || 0) * rules.batting.four;
-        points += (stats.sixes || 0) * rules.batting.six;
-
-        // Milestones
-        if (stats.runs >= 100) points += 40; // Century
-        else if (stats.runs >= 50) points += 20; // Half century
-
-        // Duck
-        if (stats.runs === 0 && !stats.isNotOut) points += rules.batting.duckDismissal;
-    }
-
-    // Bowling
-    if (stats.wickets !== undefined) {
-        points += stats.wickets * rules.bowling.wickets;
-
-        // Milestones
-        if (stats.wickets >= 5) points += 40; // 5-fer
-        else if (stats.wickets >= 4) points += 30; // 4-fer
-        else if (stats.wickets >= 3) points += 20; // 3-fer
-
-        // Economy bonus (rough estimate if overs unavailable, assume 4 overs max)
-        const overs = stats.overs || 0;
-        if (overs >= 2 && stats.economy) {
-            if (stats.economy < 5) points += 20;
-            else if (stats.economy < 6) points += 10;
-        }
-
-        // Maiden
-        if (stats.maidens) points += stats.maidens * rules.bowling.maidenOver;
-    }
-
-    return points;
+// Client-side fallback for matches without league_player_match_scores rows
+const calcPoints = (stats: PlayerMatchPerformance, rules: ReturnType<typeof useGameStore.getState>['scoringRules']) => {
+    const ps: PlayerStats = {
+        runs: stats.runs ?? 0,
+        ballsFaced: stats.ballsFaced ?? 0,
+        fours: stats.fours ?? 0,
+        sixes: stats.sixes ?? 0,
+        isOut: !stats.isNotOut,
+        overs: stats.overs ?? 0,
+        maidens: stats.maidens ?? 0,
+        runsConceded: stats.runsConceded ?? 0,
+        wickets: stats.wickets ?? 0,
+        dots: 0,
+        wides: 0,
+        noBalls: 0,
+        lbwBowledCount: 0,
+        catches: stats.catches ?? 0,
+        stumpings: stats.stumpings ?? 0,
+        runOuts: stats.runOuts ?? 0,
+        isInPlaying11: true,
+        isImpactPlayer: false,
+        isManOfMatch: false,
+        teamWon: false,
+    };
+    return calculateFantasyPoints(ps, rules).total;
 };
 
 export function PlayerDetailDialog({
@@ -149,7 +132,7 @@ export function PlayerDetailDialog({
         playerTeamShort
     );
 
-    const { currentLeagueId } = useGameStore();
+    const { currentLeagueId, scoringRules } = useGameStore();
     const { data: playerStatsMap } = usePlayerMatchStats(player?.id, currentLeagueId);
 
     const teamColors = getTeamColors(player?.team || 'OTHER');
@@ -378,9 +361,9 @@ export function PlayerDetailDialog({
                                         const hasStats = (matchItem as any).runs !== undefined || (matchItem as any).wickets !== undefined;
                                         const stats = hasStats ? matchItem : undefined;
 
-                                        // Use DB fantasy_points if available, otherwise calculate
+                                        // Use DB fantasy_points if available, otherwise calculate with league rules
                                         const fpts = hasStats
-                                            ? ((matchItem as any).fantasyPoints ?? calculateFantasyPoints(stats as PlayerMatchPerformance))
+                                            ? ((matchItem as any).fantasyPoints ?? calcPoints(matchItem as PlayerMatchPerformance, scoringRules))
                                             : 0;
 
                                         const matchDate = matchItem.matchDate;
