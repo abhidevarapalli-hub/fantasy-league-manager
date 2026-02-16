@@ -62,8 +62,78 @@ Key characteristics:
 - Look for servers before starting a new server, kill old ones if a new one needs to start
 - Consider database schema changes with future scalability in mind
 
+## Local Development Setup
+
+### Prerequisites
+- Docker (via Colima or Docker Desktop)
+  - If using Colima with VZ driver, analytics is disabled in config.toml to avoid docker socket mount issues
+  - For Colima users with multiple profiles (e.g. work + personal), ensure the correct Docker context is active: `docker context use <profile>`
+- Supabase CLI (`brew install supabase/tap/supabase`)
+
+### Quick Start
+```bash
+npm run supabase:start    # Start local Postgres, Auth, Studio in Docker
+npm run dev               # Start Vite dev server (seeded data only, no API calls)
+```
+
+Or use the one-command shortcut:
+```bash
+npm run dev:full          # Starts Supabase + Vite together
+```
+
+### Live API Mode
+By default `npm run dev` uses only local seeded data. To enable Cricbuzz API calls:
+```bash
+npm run dev:live          # Vite with live API enabled
+npm run dev:full:live     # Supabase + Vite with live API enabled
+```
+Requires `VITE_RAPIDAPI_KEY` in `.env.local`. The flag `VITE_USE_LIVE_API=true` is passed as a process env var and forwarded to `import.meta.env` via `vite.config.ts` `define`.
+
+### How Environment Switching Works
+- `npm run dev` loads `.env.development` + `.env.development.local` (local Supabase)
+- `.env.development.local` (gitignored) holds secrets: `VITE_RAPIDAPI_KEY`, `VITE_RAPIDAPI_HOST`
+- `npm run build` / Vercel uses production env vars from `.env` or Vercel dashboard
+- No source code changes needed — Vite's mode-based env loading handles it
+
+### Secret Files (gitignored, must be created manually)
+- `supabase/.env` — Google OAuth credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
+- `.env.local` — RapidAPI key (`VITE_RAPIDAPI_KEY`, `VITE_RAPIDAPI_HOST`) — loaded for all Vite modes
+- See `.env.example` for a template of all environment variables
+
+### Edge Functions
+- Edge runtime is excluded from `supabase start` for faster startup
+- To test edge functions locally, run `npm run supabase:functions` separately
+- Functions: `cricbuzz-proxy`, `live-stats-poller`, `match-lifecycle-manager`, `poll-trigger`
+
+### Authentication (Google OAuth only)
+- Login is Google OAuth only — no email/password
+- Credentials go in `supabase/.env` (gitignored): `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+- Config uses `env()` substitution in `supabase/config.toml`
+- Google Cloud Console redirect URI: `http://127.0.0.1:54321/auth/v1/callback`
+- Users, profiles, and managers are created dynamically on first sign-in
+
+### Port Handling
+- Vite may bind to 8080, 8081, 8082, or 8083 depending on availability
+- All are configured as allowed redirect URLs in `supabase/config.toml`
+- `site_url` defaults to `http://localhost:8080`
+
+### Useful Commands
+- `npm run dev:live` — Start Vite with live Cricbuzz API enabled
+- `npm run dev:full:live` — Start Supabase + Vite with live API
+- `npm run supabase:reset` — Drop and recreate local DB (re-applies migrations + seed)
+- `npm run supabase:status` — Show local Supabase URLs and keys
+- `npm run supabase:stop` — Stop local Docker containers
+- `npm run supabase:functions` — Serve edge functions locally
+- Supabase Studio: http://127.0.0.1:54323
+
+### Database
+- Production: `ltelzlioeqrkekgndypl.supabase.co` (cloud)
+- Local: `127.0.0.1:54322` (Docker, via `supabase start`)
+- Migrations: `supabase/migrations/`
+- Seed data: `supabase/seed.sql`
+
 ## Don't Change
- 
+
 - Production environment variables
 
 ## Living Document

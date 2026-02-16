@@ -11,7 +11,18 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "prepare": "husky"
+    "prepare": "husky",
+    "supabase:start": "supabase start -x edge-runtime,logflare,vector",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:reset": "supabase db reset",
+    "supabase:functions": "supabase functions serve --env-file supabase/.env.local",
+    "supabase:link": "supabase link --project-ref hdffskijakgxcisxdinf",
+    "supabase:push": "supabase db push",
+    "supabase:deploy-functions": "supabase functions deploy",
+    "dev:live": "VITE_USE_LIVE_API=true vite",
+    "dev:full": "supabase start && npm run dev",
+    "dev:full:live": "supabase start && npm run dev:live"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

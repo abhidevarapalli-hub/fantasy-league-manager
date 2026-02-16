@@ -1574,6 +1574,10 @@ export type Database = {
           match_id: string
         }[]
       }
+      reenable_auto_polling: {
+        Args: { p_cricbuzz_match_id: number }
+        Returns: undefined
+      }
       record_poll_error: {
         Args: { p_cricbuzz_match_id: number; p_error_message: string }
         Returns: undefined
@@ -1589,6 +1593,14 @@ export type Database = {
       update_league_standings: {
         Args: { league_uuid: string }
         Returns: undefined
+      }
+      upsert_match_polling_state: {
+        Args: {
+          p_cricbuzz_match_id: number
+          p_match_id?: string
+          p_match_state?: string
+        }
+        Returns: string
       }
       upsert_league_match: {
         Args: {

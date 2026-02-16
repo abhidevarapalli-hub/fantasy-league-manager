@@ -3,6 +3,8 @@
  * Handles all communication with the Cricbuzz API via Supabase Edge Function proxy
  */
 
+import { isApiConfigured } from '@/integrations/cricbuzz/client';
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 interface CricbuzzApiOptions {
@@ -10,6 +12,10 @@ interface CricbuzzApiOptions {
 }
 
 async function callCricbuzzApi<T>(options: CricbuzzApiOptions): Promise<T> {
+  if (!isApiConfigured()) {
+    throw new Error('Live API is not enabled. Start the server with: npm run dev:live');
+  }
+
   const response = await fetch(
     `${SUPABASE_URL}/functions/v1/cricbuzz-proxy`,
     {

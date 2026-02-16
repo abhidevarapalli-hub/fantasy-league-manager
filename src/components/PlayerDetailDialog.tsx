@@ -353,7 +353,8 @@ export function PlayerDetailDialog({
 
                                         const matchDate = matchItem.matchDate;
                                         const opponentShort = matchItem.opponentShort;
-                                        const isUpcoming = matchItem.isUpcoming;
+                                        // If we have stats, the match is not upcoming regardless of stale state
+                                        const isUpcoming = hasStats ? false : matchItem.isUpcoming;
                                         const result = matchItem.result;
 
                                         // Week number
