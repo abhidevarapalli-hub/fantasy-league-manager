@@ -130,6 +130,23 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
 };
 
 /**
+ * Sanitize scoring rules by converting empty strings to 0 recursively.
+ * Used before saving to the database.
+ */
+export function sanitizeScoringRules(rules: ScoringRules): ScoringRules {
+  const sanitize = (obj: unknown): unknown => {
+    if (typeof obj !== 'object' || obj === null) return obj === '' ? 0 : obj;
+    if (Array.isArray(obj)) return obj.map(sanitize);
+    const newObj: Record<string, unknown> = {};
+    for (const key in obj as Record<string, unknown>) {
+      newObj[key] = sanitize((obj as Record<string, unknown>)[key]);
+    }
+    return newObj;
+  };
+  return sanitize(rules) as ScoringRules;
+}
+
+/**
  * Merge partial scoring rules with defaults
  * Ensures all required fields are present even if DB has partial data
  */
