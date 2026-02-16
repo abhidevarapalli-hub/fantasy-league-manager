@@ -44,9 +44,10 @@ export class CricbuzzApiError extends Error {
   }
 }
 
-// Check if API is configured
+// Check if API is configured — requires both live mode and a valid API key
 export function isApiConfigured(): boolean {
-  return Boolean(RAPIDAPI_KEY && RAPIDAPI_KEY !== 'your_rapidapi_key_here');
+  const liveApiEnabled = import.meta.env.VITE_USE_LIVE_API === 'true';
+  return liveApiEnabled && Boolean(RAPIDAPI_KEY && RAPIDAPI_KEY !== 'your_rapidapi_key_here');
 }
 
 /**

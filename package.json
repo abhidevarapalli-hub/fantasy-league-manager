@@ -20,7 +20,9 @@
     "supabase:link": "supabase link --project-ref hdffskijakgxcisxdinf",
     "supabase:push": "supabase db push",
     "supabase:deploy-functions": "supabase functions deploy",
-    "dev:full": "supabase start && npm run dev"
+    "dev:live": "VITE_USE_LIVE_API=true vite",
+    "dev:full": "supabase start && npm run dev",
+    "dev:full:live": "supabase start && npm run dev:live"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

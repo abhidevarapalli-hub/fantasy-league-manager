@@ -178,23 +178,27 @@ function EmptyState({ type }: { type: string }) {
   );
 }
 
-// API Not Configured Warning
+// Live API Not Enabled Info
 function ApiNotConfigured() {
   return (
-    <Card className="border-destructive/50 bg-destructive/5">
+    <Card className="border-amber-500/50 bg-amber-500/5">
       <CardContent className="flex items-start gap-4 py-6">
-        <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
-          <AlertCircle className="w-5 h-5 text-destructive" />
+        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+          <AlertCircle className="w-5 h-5 text-amber-600" />
         </div>
         <div>
-          <h3 className="font-semibold text-destructive mb-1">API Not Configured</h3>
+          <h3 className="font-semibold text-amber-700 dark:text-amber-400 mb-1">Live API Not Enabled</h3>
           <p className="text-sm text-muted-foreground mb-3">
-            To view live cricket scores, you need to configure your RapidAPI credentials.
+            By default, the dev server uses local seeded data. To fetch live cricket scores from Cricbuzz, start the server in live mode:
+          </p>
+          <pre className="bg-muted px-3 py-2 rounded text-sm mb-3"><code>npm run dev:live</code></pre>
+          <p className="text-sm text-muted-foreground mb-2">
+            You'll also need a RapidAPI key:
           </p>
           <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
             <li>Get a free API key from <a href="https://rapidapi.com/cricketapilive/api/cricbuzz-cricket" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">RapidAPI Cricbuzz Cricket</a></li>
-            <li>Add <code className="bg-muted px-1 rounded">VITE_RAPIDAPI_KEY=your_key</code> to your <code className="bg-muted px-1 rounded">.env</code> file</li>
-            <li>Restart the development server</li>
+            <li>Add <code className="bg-muted px-1 rounded">VITE_RAPIDAPI_KEY=your_key</code> to <code className="bg-muted px-1 rounded">.env.local</code></li>
+            <li>Start with <code className="bg-muted px-1 rounded">npm run dev:live</code></li>
           </ol>
         </div>
       </CardContent>

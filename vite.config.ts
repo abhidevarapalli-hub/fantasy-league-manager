@@ -27,6 +27,9 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    define: {
+      'import.meta.env.VITE_USE_LIVE_API': JSON.stringify(process.env.VITE_USE_LIVE_API || ''),
+    },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     resolve: {
       alias: {

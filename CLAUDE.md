@@ -73,13 +73,21 @@ Key characteristics:
 ### Quick Start
 ```bash
 npm run supabase:start    # Start local Postgres, Auth, Studio in Docker
-npm run dev               # Start Vite dev server (auto-connects to local Supabase)
+npm run dev               # Start Vite dev server (seeded data only, no API calls)
 ```
 
 Or use the one-command shortcut:
 ```bash
 npm run dev:full          # Starts Supabase + Vite together
 ```
+
+### Live API Mode
+By default `npm run dev` uses only local seeded data. To enable Cricbuzz API calls:
+```bash
+npm run dev:live          # Vite with live API enabled
+npm run dev:full:live     # Supabase + Vite with live API enabled
+```
+Requires `VITE_RAPIDAPI_KEY` in `.env.local`. The flag `VITE_USE_LIVE_API=true` is passed as a process env var and forwarded to `import.meta.env` via `vite.config.ts` `define`.
 
 ### How Environment Switching Works
 - `npm run dev` loads `.env.development` + `.env.development.local` (local Supabase)
@@ -89,7 +97,7 @@ npm run dev:full          # Starts Supabase + Vite together
 
 ### Secret Files (gitignored, must be created manually)
 - `supabase/.env` — Google OAuth credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
-- `.env.development.local` — RapidAPI key (`VITE_RAPIDAPI_KEY`, `VITE_RAPIDAPI_HOST`)
+- `.env.local` — RapidAPI key (`VITE_RAPIDAPI_KEY`, `VITE_RAPIDAPI_HOST`) — loaded for all Vite modes
 - See `.env.example` for a template of all environment variables
 
 ### Edge Functions
@@ -110,6 +118,8 @@ npm run dev:full          # Starts Supabase + Vite together
 - `site_url` defaults to `http://localhost:8080`
 
 ### Useful Commands
+- `npm run dev:live` — Start Vite with live Cricbuzz API enabled
+- `npm run dev:full:live` — Start Supabase + Vite with live API
 - `npm run supabase:reset` — Drop and recreate local DB (re-applies migrations + seed)
 - `npm run supabase:status` — Show local Supabase URLs and keys
 - `npm run supabase:stop` — Stop local Docker containers

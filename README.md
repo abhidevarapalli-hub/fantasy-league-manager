@@ -61,6 +61,15 @@ npm run dev:full    # starts Supabase + Vite together
 
 The app will be available at `http://localhost:8080` (or the next available port — Vite will auto-increment if 8080 is in use). It automatically connects to the local Supabase instance via `.env.development`.
 
+By default, `npm run dev` uses only local seeded data — no Cricbuzz API calls are made. To enable live cricket data from Cricbuzz, use:
+
+```bash
+npm run dev:live        # Vite dev server with live API enabled
+npm run dev:full:live   # Supabase + Vite with live API enabled
+```
+
+This requires a valid `VITE_RAPIDAPI_KEY` in `.env.local` (see step 5).
+
 ### 4. Set up Google OAuth
 
 Authentication is Google OAuth only. Create `supabase/.env` (gitignored) with your Google Cloud OAuth credentials:
@@ -74,16 +83,16 @@ The redirect URI in Google Cloud Console must be set to `http://127.0.0.1:54321/
 
 Users, profiles, and managers are created dynamically on first sign-in.
 
-### 5. Set up RapidAPI (for cricket data)
+### 5. Set up RapidAPI (for live cricket data)
 
-Create `.env.development.local` (gitignored) with your RapidAPI credentials:
+Only needed if you use `npm run dev:live`. Create `.env.local` (gitignored) with your RapidAPI credentials:
 
 ```
 VITE_RAPIDAPI_KEY=your-rapidapi-key
 VITE_RAPIDAPI_HOST=cricbuzz-cricket.p.rapidapi.com
 ```
 
-See `.env.example` for a full list of environment variables.
+`.env.local` is loaded for all Vite modes, so the key is available in both default and live modes. See `.env.example` for a full list of environment variables.
 
 ### 6. Run edge functions (optional)
 
@@ -117,14 +126,16 @@ Edit `.env` with your actual values:
 
 The app uses Vite's built-in env file hierarchy — no code changes needed:
 
-- **`npm run dev`** (mode=development) loads `.env.development` which points to `http://127.0.0.1:54321` (local Docker)
+- **`npm run dev`** (mode=development) loads `.env.development` which points to `http://127.0.0.1:54321` (local Docker). Uses seeded data only — no API calls.
+- **`npm run dev:live`** — same as `dev` but sets `VITE_USE_LIVE_API=true`, enabling Cricbuzz API calls (requires `VITE_RAPIDAPI_KEY` in `.env.local`)
 - **`npm run build`** (mode=production) uses `.env` or Vercel dashboard env vars pointing to the cloud Supabase project
 
 ## Available Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start Vite dev server (connects to local Supabase) |
+| `npm run dev` | Start Vite dev server (local Supabase, seeded data only) |
+| `npm run dev:live` | Start Vite dev server with live Cricbuzz API enabled |
 | `npm run build` | Build for production |
 | `npm run build:dev` | Build in development mode |
 | `npm run lint` | Run ESLint |
@@ -137,6 +148,7 @@ The app uses Vite's built-in env file hierarchy — no code changes needed:
 | `npm run supabase:push` | Push migrations to production (use with caution) |
 | `npm run supabase:deploy-functions` | Deploy edge functions to production |
 | `npm run dev:full` | Start local Supabase + Vite dev server |
+| `npm run dev:full:live` | Start local Supabase + Vite with live API |
 
 ## Database
 
@@ -182,7 +194,7 @@ supabase/
 | Multiple Colima profiles causing issues | Set the correct Docker context: `docker context use <profile>` |
 | Port 8080 already in use | Vite auto-increments to 8081–8083. All are configured as allowed redirect URLs in Supabase. |
 | Google OAuth redirect fails | Verify the redirect URI in Google Cloud Console is `http://127.0.0.1:54321/auth/v1/callback` |
-| Cricket data not loading | Check that `.env.development.local` has a valid `VITE_RAPIDAPI_KEY` |
+| Cricket data not loading | Ensure you're using `npm run dev:live` and `.env.local` has a valid `VITE_RAPIDAPI_KEY` |
 
 ## License
 
