@@ -62,8 +62,51 @@ Key characteristics:
 - Look for servers before starting a new server, kill old ones if a new one needs to start
 - Consider database schema changes with future scalability in mind
 
+## Local Development Setup
+
+### Prerequisites
+- Docker (via Colima or Docker Desktop)
+- Supabase CLI (`brew install supabase/tap/supabase`)
+
+### Quick Start
+```bash
+npm run supabase:start    # Start local Postgres, Auth, Studio in Docker
+npm run dev               # Start Vite dev server (auto-connects to local Supabase)
+```
+
+Or use the one-command shortcut:
+```bash
+npm run dev:full          # Starts Supabase + Vite together
+```
+
+### How Environment Switching Works
+- `npm run dev` loads `.env.development` which points to `http://127.0.0.1:54321` (local)
+- `npm run build` / Vercel uses production env vars from `.env` or Vercel dashboard
+- No source code changes needed — Vite's mode-based env loading handles it
+
+### Test Accounts (local only)
+| Email | Password | Role |
+|-------|----------|------|
+| admin@test.com | password123 | League manager |
+| player1@test.com | password123 | Regular manager |
+| player2@test.com | password123 | Regular manager |
+| player3@test.com | password123 | Regular manager |
+
+### Useful Commands
+- `npm run supabase:reset` — Drop and recreate local DB (re-applies migrations + seed)
+- `npm run supabase:status` — Show local Supabase URLs and keys
+- `npm run supabase:stop` — Stop local Docker containers
+- `npm run supabase:functions` — Serve edge functions locally
+- Supabase Studio: http://127.0.0.1:54323
+
+### Database
+- Production: `hdffskijakgxcisxdinf.supabase.co` (cloud)
+- Local: `127.0.0.1:54322` (Docker, via `supabase start`)
+- Migrations: `supabase/migrations/` (29 files)
+- Seed data: `supabase/seed.sql`
+
 ## Don't Change
- 
+
 - Production environment variables
 
 ## Living Document

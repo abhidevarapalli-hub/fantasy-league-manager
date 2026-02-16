@@ -65,36 +65,49 @@ GRANT ALL ON scoring_rules TO service_role;
 -- ============================================
 -- Step 2: Migrate data from scoring_rule_versions (active rows)
 -- ============================================
-INSERT INTO scoring_rules (league_id, rules, created_at)
-SELECT DISTINCT ON (league_id)
-  league_id,
-  rules,
-  created_at
-FROM scoring_rule_versions
-WHERE is_active = true
-ORDER BY league_id, version DESC
-ON CONFLICT (league_id) DO NOTHING;
+DO $$
+BEGIN
+  -- Only migrate if scoring_rule_versions table exists (production path)
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'scoring_rule_versions') THEN
+    INSERT INTO scoring_rules (league_id, rules, created_at)
+    SELECT DISTINCT ON (league_id)
+      league_id,
+      rules,
+      created_at
+    FROM scoring_rule_versions
+    WHERE is_active = true
+    ORDER BY league_id, version DESC
+    ON CONFLICT (league_id) DO NOTHING;
+  END IF;
 
--- Fill gaps: leagues that have scoring_rules JSONB but no scoring_rule_versions row
-INSERT INTO scoring_rules (league_id, rules)
-SELECT l.id, l.scoring_rules
-FROM leagues l
-WHERE l.scoring_rules IS NOT NULL
-  AND l.scoring_rules != '{}'::jsonb
-  AND NOT EXISTS (SELECT 1 FROM scoring_rules sr WHERE sr.league_id = l.id)
-ON CONFLICT (league_id) DO NOTHING;
+  -- Fill gaps: leagues that have scoring_rules JSONB column but no scoring_rules row
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'leagues' AND column_name = 'scoring_rules') THEN
+    EXECUTE '
+      INSERT INTO scoring_rules (league_id, rules)
+      SELECT l.id, l.scoring_rules
+      FROM leagues l
+      WHERE l.scoring_rules IS NOT NULL
+        AND l.scoring_rules != ''{}''::jsonb
+        AND NOT EXISTS (SELECT 1 FROM scoring_rules sr WHERE sr.league_id = l.id)
+      ON CONFLICT (league_id) DO NOTHING;
+    ';
+  END IF;
+END $$;
 
 -- ============================================
 -- Step 3: Drop old schema
 -- ============================================
 
--- Drop FK constraint on league_player_match_scores.scoring_version_id
-ALTER TABLE league_player_match_scores
-  DROP CONSTRAINT IF EXISTS league_player_match_scores_scoring_version_id_fkey;
-
--- Drop column scoring_version_id from league_player_match_scores
-ALTER TABLE league_player_match_scores
-  DROP COLUMN IF EXISTS scoring_version_id;
+-- Drop FK constraint and column on league_player_match_scores (may not exist on fresh installs)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'league_player_match_scores') THEN
+    ALTER TABLE league_player_match_scores
+      DROP CONSTRAINT IF EXISTS league_player_match_scores_scoring_version_id_fkey;
+    ALTER TABLE league_player_match_scores
+      DROP COLUMN IF EXISTS scoring_version_id;
+  END IF;
+END $$;
 
 -- Drop scoring_rule_versions table
 DROP TABLE IF EXISTS scoring_rule_versions;

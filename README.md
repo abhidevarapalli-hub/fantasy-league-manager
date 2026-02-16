@@ -24,21 +24,58 @@ A fantasy cricket league management application that lets you create leagues, dr
 
 - Node.js 18+ (install via [nvm](https://github.com/nvm-sh/nvm))
 - npm or bun package manager
-- [Supabase](https://supabase.com/) account and project
-- [RapidAPI](https://rapidapi.com/) account with Cricbuzz Cricket API subscription
+- Docker (via [Colima](https://github.com/abiosoft/colima) or Docker Desktop) for local Supabase
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (`brew install supabase/tap/supabase`)
+- [RapidAPI](https://rapidapi.com/) account with Cricbuzz Cricket API subscription (for production)
 
-## Getting Started
+## Getting Started (Local Development)
 
-### 1. Clone the repository
+### 1. Clone and install
 
 ```bash
 git clone <repository-url>
 cd fantasy-league-manager
+npm install
 ```
 
-### 2. Set up environment variables
+### 2. Start local Supabase
 
-Copy the example environment file and fill in your credentials:
+This spins up a full Supabase stack (Postgres, Auth, Studio) in Docker, applies all migrations, and seeds test data:
+
+```bash
+npm run supabase:start
+```
+
+### 3. Start the dev server
+
+```bash
+npm run dev
+```
+
+Or use the one-command shortcut:
+
+```bash
+npm run dev:full    # starts Supabase + Vite together
+```
+
+The app will be available at `http://localhost:8080`. It automatically connects to the local Supabase instance — no `.env` file needed for local development.
+
+### 4. Log in with a test account
+
+| Email | Password | Role |
+|-------|----------|------|
+| admin@test.com | password123 | League manager |
+| player1@test.com | password123 | Regular manager |
+| player2@test.com | password123 | Regular manager |
+| player3@test.com | password123 | Regular manager |
+
+### 5. Access Supabase Studio
+
+Open http://127.0.0.1:54323 to browse the local database, inspect tables, and run queries.
+
+## Production Setup
+
+For production builds (e.g. Vercel), copy the example env file and fill in your cloud Supabase credentials:
 
 ```bash
 cp .env.example .env
@@ -52,41 +89,43 @@ Edit `.env` with your actual values:
 - `VITE_RAPIDAPI_KEY`: Your RapidAPI key for Cricbuzz
 - `VITE_RAPIDAPI_HOST`: Cricbuzz API host (usually `cricbuzz-cricket.p.rapidapi.com`)
 
-### 3. Install dependencies
+## How Environment Switching Works
 
-```bash
-npm install
-# or
-bun install
-```
+The app uses Vite's built-in env file hierarchy — no code changes needed:
 
-### 4. Run the development server
-
-```bash
-npm run dev
-# or
-bun dev
-```
-
-The app will be available at `http://localhost:5173`
+- **`npm run dev`** (mode=development) loads `.env.development` which points to `http://127.0.0.1:54321` (local Docker)
+- **`npm run build`** (mode=production) uses `.env` or Vercel dashboard env vars pointing to the cloud Supabase project
 
 ## Available Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start development server with hot reload |
+| `npm run dev` | Start Vite dev server (connects to local Supabase) |
 | `npm run build` | Build for production |
 | `npm run build:dev` | Build in development mode |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview production build locally |
+| `npm run supabase:start` | Start local Supabase (Postgres, Auth, Studio) |
+| `npm run supabase:stop` | Stop local Supabase containers |
+| `npm run supabase:reset` | Drop and recreate local DB (re-apply migrations + seed) |
+| `npm run supabase:status` | Show local Supabase URLs and keys |
+| `npm run supabase:functions` | Serve edge functions locally |
+| `npm run supabase:push` | Push migrations to production (use with caution) |
+| `npm run supabase:deploy-functions` | Deploy edge functions to production |
+| `npm run dev:full` | Start local Supabase + Vite dev server |
 
-## Database Setup
+## Database
 
-This project uses Supabase. Database migrations are located in the `supabase/migrations/` directory. To apply migrations:
+- **Production**: Supabase cloud project
+- **Local**: Docker containers via `supabase start`
+- **Migrations**: `supabase/migrations/` (applied automatically on `supabase start` or `supabase db reset`)
+- **Seed data**: `supabase/seed.sql` (loaded after migrations during reset)
 
-1. Install the [Supabase CLI](https://supabase.com/docs/guides/cli)
-2. Link your project: `supabase link --project-ref <your-project-id>`
-3. Push migrations: `supabase db push`
+### Deploying schema changes to production
+
+```bash
+npm run supabase:push
+```
 
 ## Project Structure
 
@@ -97,7 +136,18 @@ src/
 ├── hooks/          # Custom React hooks
 ├── integrations/   # External service clients (Supabase, Cricbuzz)
 ├── lib/            # Utilities and type definitions
-└── pages/          # Page components (routes)
+├── pages/          # Page components (routes)
+└── store/          # Zustand stores
+
+supabase/
+├── config.toml     # Local Supabase configuration
+├── seed.sql        # Test data for local development
+├── migrations/     # SQL migration files
+└── functions/      # Supabase Edge Functions
+    ├── cricbuzz-proxy/
+    ├── live-stats-poller/
+    ├── match-lifecycle-manager/
+    └── poll-trigger/
 ```
 
 ## License
