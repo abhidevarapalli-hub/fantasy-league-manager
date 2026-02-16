@@ -1,0 +1,51 @@
+#!/bin/sh
+
+echo "Running pre-commit checks..."
+echo ""
+
+# 1. Lint
+echo "=> ESLint..."
+npm run lint
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "LINT FAILED. Fix ESLint errors before committing."
+  exit 1
+fi
+
+# 2. Type check (matches CI: tsc -p tsconfig.app.json --noEmit)
+echo ""
+echo "=> TypeScript type check..."
+npx tsc -p tsconfig.app.json --noEmit
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "TYPE CHECK FAILED. Fix TypeScript errors before committing."
+  exit 1
+fi
+
+# 3. Tests
+echo ""
+echo "=> Running tests..."
+npm run test:run
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "TESTS FAILED. Fix failing tests before committing."
+  exit 1
+fi
+
+# 4. Build (use placeholder env vars so the build doesn't fail on missing secrets)
+echo ""
+echo "=> Build check..."
+VITE_SUPABASE_PROJECT_ID="${VITE_SUPABASE_PROJECT_ID:-ci-placeholder}" \
+VITE_SUPABASE_PUBLISHABLE_KEY="${VITE_SUPABASE_PUBLISHABLE_KEY:-ci-placeholder}" \
+VITE_SUPABASE_URL="${VITE_SUPABASE_URL:-https://ci-placeholder.supabase.co}" \
+VITE_RAPIDAPI_KEY="${VITE_RAPIDAPI_KEY:-ci-placeholder}" \
+VITE_RAPIDAPI_HOST="${VITE_RAPIDAPI_HOST:-cricbuzz-cricket.p.rapidapi.com}" \
+npm run build
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "BUILD FAILED. Fix build errors before committing."
+  exit 1
+fi
+
+echo ""
+echo "All pre-commit checks passed!"
