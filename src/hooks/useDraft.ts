@@ -936,7 +936,7 @@ export const useDraft = () => {
       toast.error('Failed to auto-complete draft', { id: 'auto-draft-all' });
       return false;
     }
-  }, [leagueId, getPick, getDraftedPlayerIds, players, draftOrder]);
+  }, [leagueId, getPick, getDraftedPlayerIds, players, draftOrder, setDraftPicks]);
 
 
   return {

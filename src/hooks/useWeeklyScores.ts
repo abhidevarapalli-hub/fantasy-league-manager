@@ -58,10 +58,10 @@ export function useWeeklyScores(leagueId: string | null, week: number, managers:
                     manager.activeRoster.forEach(playerId => {
                         // Find all stats for this player (could be multiple if multiple matches in a week?)
                         // Typically one per match.
-                        const playerStats = statsData?.filter((s: PlayerStatRow) => s.player_id === playerId);
+                        const playerStats = statsData?.filter((s) => s.player_id === playerId);
 
                         if (playerStats && playerStats.length > 0) {
-                            playerStats.forEach((stat: PlayerStatRow) => {
+                            playerStats.forEach((stat) => {
                                 // Always calculate points on client to ensure consistency with current rules
                                 // and avoid stale DB values (e.g. old rules where Wicket=25 instead of 30)
                                 const points = calculateFantasyPoints({
