@@ -579,6 +579,33 @@ export type Database = {
         }
         Relationships: []
       }
+      lifecycle_audit_log: {
+        Row: {
+          duration_ms: number | null
+          errors: string | null
+          id: string
+          matches_activated: number | null
+          matches_checked: number | null
+          run_at: string | null
+        }
+        Insert: {
+          duration_ms?: number | null
+          errors?: string | null
+          id?: string
+          matches_activated?: number | null
+          matches_checked?: number | null
+          run_at?: string | null
+        }
+        Update: {
+          duration_ms?: number | null
+          errors?: string | null
+          id?: string
+          matches_activated?: number | null
+          matches_checked?: number | null
+          run_at?: string | null
+        }
+        Relationships: []
+      }
       live_match_polling: {
         Row: {
           auto_enabled: boolean | null
@@ -986,25 +1013,25 @@ export type Database = {
       }
       scoring_rules: {
         Row: {
+          created_at: string | null
           id: string
           league_id: string
           rules: Json
-          created_at: string
-          updated_at: string
+          updated_at: string | null
         }
         Insert: {
+          created_at?: string | null
           id?: string
           league_id: string
           rules?: Json
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
         Update: {
+          created_at?: string | null
           id?: string
           league_id?: string
           rules?: Json
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1174,12 +1201,44 @@ export type Database = {
       }
     }
     Views: {
+      fantasy_weekly_summary: {
+        Row: {
+          active_points: number | null
+          bench_points: number | null
+          league_id: string | null
+          manager_id: string | null
+          manager_name: string | null
+          players_with_stats: number | null
+          team_name: string | null
+          total_points: number | null
+          week: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_player_match_scores_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       league_cricket_matches: {
         Row: {
+          auto_enabled: boolean | null
           city: string | null
           created_at: string | null
           cricbuzz_match_id: number | null
+          error_count: number | null
           id: string | null
+          last_polled_at: string | null
           league_id: string | null
           league_match_id: string | null
           man_of_match_id: string | null
@@ -1188,6 +1247,7 @@ export type Database = {
           match_description: string | null
           match_format: string | null
           match_state: string | null
+          poll_count: number | null
           polling_enabled: boolean | null
           result: string | null
           series_id: number | null
@@ -1274,6 +1334,44 @@ export type Database = {
           },
         ]
       }
+      player_fantasy_performance: {
+        Row: {
+          avg_fantasy_points: number | null
+          ipl_team: string | null
+          league_id: string | null
+          matches_played: number | null
+          player_id: string | null
+          player_name: string | null
+          role: string | null
+          total_dismissals: number | null
+          total_fantasy_points: number | null
+          total_runs: number | null
+          total_wickets: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_player_match_scores_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "league_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "master_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_match_stats_compat: {
         Row: {
           balls_faced: number | null
@@ -1316,7 +1414,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "league_player_match_scores_league_id_fkey"
+            foreignKeyName: "league_matches_league_id_fkey"
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "leagues"
@@ -1365,12 +1463,17 @@ export type Database = {
         Args: { p_cricbuzz_match_id: number; p_lock_duration_seconds?: number }
         Returns: boolean
       }
+      batch_update_league_scores: { Args: { p_updates: Json }; Returns: number }
       disable_match_polling: {
         Args: { p_cricbuzz_match_id: number }
         Returns: undefined
       }
       enable_match_polling: {
-        Args: { p_cricbuzz_match_id: number; p_initial_state?: string }
+        Args: {
+          p_auto?: boolean
+          p_cricbuzz_match_id: number
+          p_initial_state?: string
+        }
         Returns: string
       }
       finalize_match_stats: {
@@ -1379,10 +1482,6 @@ export type Database = {
           p_man_of_match_cricbuzz_id?: string
           p_match_id: string
         }
-        Returns: number
-      }
-      batch_update_league_scores: {
-        Args: { p_updates: Json }
         Returns: number
       }
       get_fantasy_standings: {
@@ -1398,29 +1497,29 @@ export type Database = {
       get_league_match_stats_for_recompute: {
         Args: { p_league_id: string }
         Returns: {
-          score_id: string
-          player_id: string
-          match_id: string
-          runs: number
           balls_faced: number
-          fours: number
-          sixes: number
-          is_out: boolean
-          overs: number
-          maidens: number
-          runs_conceded: number
-          wickets: number
-          dots: number
-          wides: number
-          no_balls: number
-          lbw_bowled_count: number
           catches: number
-          stumpings: number
-          run_outs: number
-          is_in_playing_11: boolean
+          dots: number
+          fours: number
           is_impact_player: boolean
+          is_in_playing_11: boolean
           is_man_of_match: boolean
+          is_out: boolean
+          lbw_bowled_count: number
+          maidens: number
+          match_id: string
+          no_balls: number
+          overs: number
+          player_id: string
+          run_outs: number
+          runs: number
+          runs_conceded: number
+          score_id: string
+          sixes: number
+          stumpings: number
           team_won: boolean
+          wickets: number
+          wides: number
         }[]
       }
       get_leagues_for_cricbuzz_match: {
@@ -1464,6 +1563,16 @@ export type Database = {
       get_player_weekly_points: {
         Args: { p_league_id: string; p_player_id: string; p_week: number }
         Returns: number
+      }
+      get_upcoming_matches_to_activate: {
+        Args: { p_lookahead_minutes?: number }
+        Returns: {
+          cricbuzz_match_id: number
+          current_state: string
+          match_date: string
+          match_description: string
+          match_id: string
+        }[]
       }
       record_poll_error: {
         Args: { p_cricbuzz_match_id: number; p_error_message: string }

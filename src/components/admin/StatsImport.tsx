@@ -12,6 +12,7 @@ import {
   Radio,
   AlertCircle,
   CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,6 +70,10 @@ interface CricketMatch {
   isLive?: boolean;
   matchState?: 'Upcoming' | 'Live' | 'Complete';
   pollingEnabled?: boolean;
+  autoEnabled?: boolean;
+  lastPolledAt?: string | null;
+  pollCount?: number;
+  errorCount?: number;
 }
 
 export const StatsImport = () => {
@@ -191,6 +196,10 @@ export const StatsImport = () => {
             week: lm.week,
             matchState: lm.match_state as CricketMatch['matchState'],
             pollingEnabled: lm.polling_enabled,
+            autoEnabled: lm.auto_enabled ?? undefined,
+            lastPolledAt: lm.last_polled_at ?? undefined,
+            pollCount: lm.poll_count ?? undefined,
+            errorCount: lm.error_count ?? undefined,
           }));
 
         // Sort by match_date descending (most recent first)
@@ -226,6 +235,29 @@ export const StatsImport = () => {
       toast.error('Failed to update polling status');
     } finally {
       setIsTogglingPolling(null);
+    }
+  };
+
+  // Re-enable auto-polling for a manually disabled match
+  const handleReEnableAuto = async (cricbuzzMatchId: number) => {
+    try {
+      const success = await livePollingService.reEnableAuto(cricbuzzMatchId);
+      if (success) {
+        toast.success('Auto-polling re-enabled');
+        // Update local match state
+        setMatches(prev =>
+          prev.map(m =>
+            m.cricbuzzMatchId === cricbuzzMatchId
+              ? { ...m, autoEnabled: true }
+              : m
+          )
+        );
+        fetchPollingStatuses();
+      } else {
+        toast.error('Failed to re-enable auto-polling');
+      }
+    } catch {
+      toast.error('Failed to re-enable auto-polling');
     }
   };
 
@@ -773,6 +805,10 @@ export const StatsImport = () => {
             week: lm.week,
             matchState: lm.match_state as CricketMatch['matchState'],
             pollingEnabled: lm.polling_enabled,
+            autoEnabled: lm.auto_enabled ?? undefined,
+            lastPolledAt: lm.last_polled_at ?? undefined,
+            pollCount: lm.poll_count ?? undefined,
+            errorCount: lm.error_count ?? undefined,
           }));
         setMatches(freshMatches);
       }
@@ -1111,7 +1147,8 @@ export const StatsImport = () => {
               ) : (
                 matches.map(match => {
                   const pollingStatus = pollingStatuses.get(match.cricbuzzMatchId);
-                  const isPollingEnabled = pollingStatus?.pollingEnabled ?? false;
+                  const isPollingEnabled = pollingStatus?.pollingEnabled ?? match.pollingEnabled ?? false;
+                  const matchAutoEnabled = pollingStatus?.autoEnabled ?? match.autoEnabled ?? true;
                   const matchIsLive = match.matchState === 'Live' || match.isLive;
 
                   return (
@@ -1140,10 +1177,21 @@ export const StatsImport = () => {
                                 LIVE
                               </Badge>
                             )}
-                            {isPollingEnabled && (
+                            {isPollingEnabled && matchAutoEnabled && (
+                              <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500 border-green-500/30">
+                                <Clock className="w-3 h-3 mr-1" />
+                                Auto
+                              </Badge>
+                            )}
+                            {isPollingEnabled && !matchAutoEnabled && (
                               <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/30">
                                 <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                                Polling
+                                Manual
+                              </Badge>
+                            )}
+                            {!isPollingEnabled && !matchAutoEnabled && !match.statsImported && (
+                              <Badge variant="outline" className="text-xs bg-gray-500/10 text-gray-400 border-gray-500/30">
+                                Auto-disabled
                               </Badge>
                             )}
                           </div>
@@ -1152,20 +1200,20 @@ export const StatsImport = () => {
                               {match.result}
                             </p>
                           )}
-                          {pollingStatus && (
+                          {(pollingStatus || match.lastPolledAt || (match.pollCount ?? 0) > 0 || (match.errorCount ?? 0) > 0) && (
                             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              {pollingStatus.lastPolledAt && (
+                              {(pollingStatus?.lastPolledAt || match.lastPolledAt) && (
                                 <span>
-                                  Last poll: {new Date(pollingStatus.lastPolledAt).toLocaleTimeString()}
+                                  Last poll: {new Date((pollingStatus?.lastPolledAt || match.lastPolledAt)!).toLocaleTimeString()}
                                 </span>
                               )}
-                              {pollingStatus.pollCount > 0 && (
-                                <span>({pollingStatus.pollCount} polls)</span>
+                              {(pollingStatus?.pollCount ?? match.pollCount ?? 0) > 0 && (
+                                <span>({pollingStatus?.pollCount ?? match.pollCount} polls)</span>
                               )}
-                              {pollingStatus.errorCount > 0 && (
+                              {(pollingStatus?.errorCount ?? match.errorCount ?? 0) > 0 && (
                                 <span className="text-red-500 flex items-center gap-1">
                                   <AlertCircle className="w-3 h-3" />
-                                  {pollingStatus.errorCount} errors
+                                  {pollingStatus?.errorCount ?? match.errorCount} errors
                                 </span>
                               )}
                             </div>
@@ -1208,6 +1256,18 @@ export const StatsImport = () => {
                                   Auto
                                 </Label>
                               </div>
+                              {!matchAutoEnabled && !isPollingEnabled && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleReEnableAuto(match.cricbuzzMatchId)}
+                                  className="h-7 px-2 text-xs text-muted-foreground"
+                                  title="Re-enable automatic lifecycle polling"
+                                >
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Re-enable Auto
+                                </Button>
+                              )}
                             </div>
                           )}
                           {match.week && (

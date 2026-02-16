@@ -408,6 +408,19 @@ class LivePollingService {
   }
 
   /**
+   * Re-enable auto-polling for a match that was manually disabled
+   * Sets auto_enabled = true so the lifecycle manager can pick it up again
+   */
+  async reEnableAuto(cricbuzzMatchId: number): Promise<boolean> {
+    const { error } = await supabase
+      .from('live_match_polling')
+      .update({ auto_enabled: true })
+      .eq('cricbuzz_match_id', cricbuzzMatchId);
+
+    return !error;
+  }
+
+  /**
    * Clean up all subscriptions
    */
   cleanup() {
