@@ -132,6 +132,22 @@ Requires `VITE_RAPIDAPI_KEY` in `.env.local`. The flag `VITE_USE_LIVE_API=true` 
 - Migrations: `supabase/migrations/`
 - Seed data: `supabase/seed.sql`
 
+### Migration Deployment (CI/CD)
+
+**PR validation** — The CI workflow (`ci.yml`) includes a `migrate-check` job that spins up a local Supabase instance and runs `supabase db reset` to validate all migrations apply cleanly. This runs on every PR and push to `main`.
+
+**Production deployment** — The `deploy-migrations.yml` workflow automatically deploys migrations to production when migration files change on `main`. It can also be triggered manually via `workflow_dispatch`.
+- Validates migrations locally first, then deploys to production
+- The `deploy` job uses a GitHub `production` environment — configure [environment protection rules](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment#environment-protection-rules) to require manual approval before production deploys
+- **Never** run `supabase db push` manually — use the workflow instead
+
+**Required GitHub Actions secrets:**
+| Secret | Purpose |
+|--------|---------|
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI auth (generate at supabase.com/dashboard/account/tokens) |
+| `SUPABASE_DB_PASSWORD` | Production database password |
+| `SUPABASE_PROJECT_REF` | Production project ref (e.g. `hdffskijakgxcisxdinf`) |
+
 ## Don't Change
 
 - Production environment variables

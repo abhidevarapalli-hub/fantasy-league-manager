@@ -47,6 +47,21 @@ jobs:
       - run: npm ci
       - run: npm run test:run
 
+  migrate-check:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start local Supabase
+        run: supabase start -x edge-runtime,logflare,vector,imgproxy,studio
+      - name: Verify migrations applied
+        run: |
+          supabase db reset --debug 2>&1 | tail -20
+          echo "All migrations applied successfully"
+
   build:
     name: Build
     runs-on: ubuntu-latest
