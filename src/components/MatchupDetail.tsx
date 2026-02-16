@@ -154,6 +154,149 @@ const RosterSection = ({
     );
 };
 
+const MatchupRow = ({
+    homePlayer,
+    awayPlayer,
+    onPlayerClick
+}: {
+    homePlayer?: PlayerWithMatches;
+    awayPlayer?: PlayerWithMatches;
+    onPlayerClick: (playerId: string) => void;
+}) => {
+    // Helper to render a single player side
+    const renderPlayerSide = (playerData: PlayerWithMatches | undefined, align: 'left' | 'right') => {
+        if (!playerData) return <div className="flex-1 opacity-0">Empty</div>;
+
+        const { player, totalPoints, cricketMatches } = playerData;
+        const now = new Date();
+        // Playing: Match started (date is past) but no result yet
+        const isPlaying = cricketMatches.some(m => !m.result && m.matchDate && new Date(m.matchDate) <= now);
+        // Completed: Result exists
+        const hasPlayed = cricketMatches.some(m => !!m.result);
+
+        return (
+            <div
+                className={cn(
+                    "flex-1 flex items-center gap-2 min-w-0 cursor-pointer active:opacity-70 transition-opacity",
+                    align === 'right' ? "flex-row-reverse text-right" : "flex-row text-left"
+                )}
+                onClick={() => onPlayerClick(player.id)}
+            >
+                {/* Avatar */}
+                <div className="relative shrink-0">
+                    <LazyPlayerAvatar
+                        name={player.name}
+                        imageId={player.imageId}
+                        className="w-9 h-9 border border-border/50"
+                    />
+                    {/* Status Dot */}
+                    {(isPlaying || hasPlayed) && (
+                        <div className={cn(
+                            "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background",
+                            isPlaying ? "bg-green-500 animate-pulse" : "bg-muted-foreground"
+                        )} />
+                    )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-col overflow-hidden">
+                    <p className="text-[11px] font-bold leading-tight truncate text-foreground/90">
+                        {player.name.split(' ').slice(-1)[0]} <span className="text-[9px] font-normal text-muted-foreground opacity-70">({player.team})</span>
+                    </p>
+                    <div className={cn(
+                        "flex items-baseline gap-1 mt-0.5",
+                        align === 'right' && "justify-end"
+                    )}>
+                        <span className={cn(
+                            "text-xs font-black font-mono",
+                            totalPoints > 0 ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            {totalPoints.toFixed(1)}
+                        </span>
+                        {cricketMatches.length > 0 && (
+                            <span className="text-[9px] text-muted-foreground truncate max-w-[60px]">
+                                vs {align === 'right'
+                                    ? (cricketMatches[0]?.team1.name === player.team ? cricketMatches[0]?.team2.shortName : cricketMatches[0]?.team1.shortName)
+                                    : (cricketMatches[0]?.team1.name === player.team ? cricketMatches[0]?.team2.shortName : cricketMatches[0]?.team1.shortName)
+                                }
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const role = homePlayer?.player.role || awayPlayer?.player.role || 'Unset';
+
+    return (
+        <div className="flex items-center justify-between py-2 border-b border-border/30 last:border-0 relative">
+            {/* Left: Home Player */}
+            {renderPlayerSide(homePlayer, 'left')}
+
+            {/* Center: Position Badge */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                <div className={cn(
+                    "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter border shadow-sm min-w-[32px] text-center",
+                    role === 'Batsman' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                    role === 'Bowler' && "bg-red-500/10 text-red-500 border-red-500/20",
+                    role === 'All Rounder' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
+                    role === 'Wicket Keeper' && "bg-green-500/10 text-green-500 border-green-500/20",
+                )}>
+                    {role === 'Batsman' ? 'BAT' : role === 'Bowler' ? 'BWL' : role === 'All Rounder' ? 'AR' : 'WK'}
+                </div>
+            </div>
+
+            {/* Right: Away Player */}
+            {renderPlayerSide(awayPlayer, 'right')}
+        </div>
+    );
+};
+
+const MobileRosterSection = ({
+    title,
+    homePlayers,
+    awayPlayers,
+    onPlayerClick
+}: {
+    title: string;
+    homePlayers: PlayerWithMatches[];
+    awayPlayers: PlayerWithMatches[];
+    onPlayerClick: (playerId: string) => void;
+}) => {
+    // Sort Order: WK -> BAT -> AR -> BOWL
+    const roleOrder = ['Wicket Keeper', 'Batsman', 'All Rounder', 'Bowler'];
+    const sortParams = (p: PlayerWithMatches) => roleOrder.indexOf(p.player.role);
+
+    const sortedHome = [...homePlayers].sort((a, b) => sortParams(a) - sortParams(b));
+    const sortedAway = [...awayPlayers].sort((a, b) => sortParams(a) - sortParams(b));
+
+    const maxCount = Math.max(sortedHome.length, sortedAway.length);
+
+    if (maxCount === 0) return null;
+
+    return (
+        <div className="bg-card/30 rounded-xl border border-border/50 overflow-hidden">
+            <div className="bg-muted/40 px-3 py-1.5 border-b border-border/50 flex justify-between items-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</span>
+                <span className="text-[10px] font-mono text-muted-foreground opacity-60">
+                    {title === 'Starters' ? 'Starting XI' : 'Bench'}
+                </span>
+            </div>
+            <div className="px-2">
+                {Array.from({ length: maxCount }).map((_, i) => (
+                    <MatchupRow
+                        key={i}
+                        homePlayer={sortedHome[i]}
+                        awayPlayer={sortedAway[i]}
+                        onPlayerClick={onPlayerClick}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+};
+
 export function MatchupDetail({
     open,
     onOpenChange,
@@ -254,35 +397,54 @@ export function MatchupDetail({
 
                 {/* Roster Display */}
                 {!matchupData.loading && !matchupData.error && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                        {/* Home Team Roster */}
-                        <div className="space-y-4">
-                            <RosterSection
+                    <>
+                        {/* Mobile View: Head-to-Head Rows */}
+                        <div className="block md:hidden space-y-6 pt-4">
+                            <MobileRosterSection
                                 title="Starters"
-                                players={homeStarters}
+                                homePlayers={homeStarters}
+                                awayPlayers={awayStarters}
                                 onPlayerClick={setSelectedPlayerId}
                             />
-                            <RosterSection
+                            <MobileRosterSection
                                 title="Bench"
-                                players={homeBench}
+                                homePlayers={homeBench}
+                                awayPlayers={awayBench}
                                 onPlayerClick={setSelectedPlayerId}
                             />
                         </div>
 
-                        {/* Away Team Roster */}
-                        <div className="space-y-4">
-                            <RosterSection
-                                title="Starters"
-                                players={awayStarters}
-                                onPlayerClick={setSelectedPlayerId}
-                            />
-                            <RosterSection
-                                title="Bench"
-                                players={awayBench}
-                                onPlayerClick={setSelectedPlayerId}
-                            />
+                        {/* Desktop View: Side-by-Side Columns */}
+                        <div className="hidden md:grid grid-cols-2 gap-6 pt-4">
+                            {/* Home Team Roster */}
+                            <div className="space-y-4">
+                                <RosterSection
+                                    title="Starters"
+                                    players={homeStarters}
+                                    onPlayerClick={setSelectedPlayerId}
+                                />
+                                <RosterSection
+                                    title="Bench"
+                                    players={homeBench}
+                                    onPlayerClick={setSelectedPlayerId}
+                                />
+                            </div>
+
+                            {/* Away Team Roster */}
+                            <div className="space-y-4">
+                                <RosterSection
+                                    title="Starters"
+                                    players={awayStarters}
+                                    onPlayerClick={setSelectedPlayerId}
+                                />
+                                <RosterSection
+                                    title="Bench"
+                                    players={awayBench}
+                                    onPlayerClick={setSelectedPlayerId}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    </>
                 )}
 
                 <PlayerDetailDialog
