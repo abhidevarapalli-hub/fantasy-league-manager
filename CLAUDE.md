@@ -87,6 +87,16 @@ npm run dev:full          # Starts Supabase + Vite together
 - `npm run build` / Vercel uses production env vars from `.env` or Vercel dashboard
 - No source code changes needed — Vite's mode-based env loading handles it
 
+### Secret Files (gitignored, must be created manually)
+- `supabase/.env` — Google OAuth credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
+- `.env.development.local` — RapidAPI key (`VITE_RAPIDAPI_KEY`, `VITE_RAPIDAPI_HOST`)
+- See `.env.example` for a template of all environment variables
+
+### Edge Functions
+- Edge runtime is excluded from `supabase start` for faster startup
+- To test edge functions locally, run `npm run supabase:functions` separately
+- Functions: `cricbuzz-proxy`, `live-stats-poller`, `match-lifecycle-manager`, `poll-trigger`
+
 ### Authentication (Google OAuth only)
 - Login is Google OAuth only — no email/password
 - Credentials go in `supabase/.env` (gitignored): `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
@@ -107,9 +117,9 @@ npm run dev:full          # Starts Supabase + Vite together
 - Supabase Studio: http://127.0.0.1:54323
 
 ### Database
-- Production: `hdffskijakgxcisxdinf.supabase.co` (cloud)
+- Production: `ltelzlioeqrkekgndypl.supabase.co` (cloud)
 - Local: `127.0.0.1:54322` (Docker, via `supabase start`)
-- Migrations: `supabase/migrations/` (29 files)
+- Migrations: `supabase/migrations/`
 - Seed data: `supabase/seed.sql`
 
 ## Don't Change

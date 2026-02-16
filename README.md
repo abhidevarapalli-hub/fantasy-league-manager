@@ -59,7 +59,7 @@ Or use the one-command shortcut:
 npm run dev:full    # starts Supabase + Vite together
 ```
 
-The app will be available at `http://localhost:8080` (or the next available port — Vite will auto-increment if 8080 is in use). It automatically connects to the local Supabase instance — no `.env` file needed for local development.
+The app will be available at `http://localhost:8080` (or the next available port — Vite will auto-increment if 8080 is in use). It automatically connects to the local Supabase instance via `.env.development`.
 
 ### 4. Set up Google OAuth
 
@@ -74,7 +74,26 @@ The redirect URI in Google Cloud Console must be set to `http://127.0.0.1:54321/
 
 Users, profiles, and managers are created dynamically on first sign-in.
 
-### 5. Access Supabase Studio
+### 5. Set up RapidAPI (for cricket data)
+
+Create `.env.development.local` (gitignored) with your RapidAPI credentials:
+
+```
+VITE_RAPIDAPI_KEY=your-rapidapi-key
+VITE_RAPIDAPI_HOST=cricbuzz-cricket.p.rapidapi.com
+```
+
+See `.env.example` for a full list of environment variables.
+
+### 6. Run edge functions (optional)
+
+Edge runtime is excluded from `supabase start` for faster startup. If you need to test edge functions locally (e.g. cricbuzz-proxy, live-stats-poller):
+
+```bash
+npm run supabase:functions
+```
+
+### 7. Access Supabase Studio
 
 Open http://127.0.0.1:54323 to browse the local database, inspect tables, and run queries.
 
@@ -154,6 +173,16 @@ supabase/
     ├── match-lifecycle-manager/
     └── poll-trigger/
 ```
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `supabase start` fails with Docker errors | Ensure Docker (Colima or Docker Desktop) is running. For Colima: `colima start` |
+| Multiple Colima profiles causing issues | Set the correct Docker context: `docker context use <profile>` |
+| Port 8080 already in use | Vite auto-increments to 8081–8083. All are configured as allowed redirect URLs in Supabase. |
+| Google OAuth redirect fails | Verify the redirect URI in Google Cloud Console is `http://127.0.0.1:54321/auth/v1/callback` |
+| Cricket data not loading | Check that `.env.development.local` has a valid `VITE_RAPIDAPI_KEY` |
 
 ## License
 
