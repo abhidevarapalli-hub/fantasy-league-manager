@@ -1,18 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Match, Manager } from '@/lib/supabase-types';
 import { Calendar, Trophy } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { MatchupDetail } from './MatchupDetail';
-
-interface HeadToHead {
-  id: string;
-  manager1_id: string;
-  manager2_id: string;
-  manager1_wins: number;
-  manager2_wins: number;
-}
 
 interface ScheduleListProps {
   schedule: Match[];
@@ -21,20 +12,11 @@ interface ScheduleListProps {
 }
 
 export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListProps) => {
-  const [headToHead, setHeadToHead] = useState<HeadToHead[]>([]);
   const managerProfile = useAuthStore(state => state.managerProfile);
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
   // Find the logged-in user's manager
   const loggedInManager = managerProfile ? managers.find(m => m.id === managerProfile.id) : null;
-
-
-  useEffect(() => {
-    const fetchH2H = async () => {
-      const { data } = await supabase.from('head_to_head').select('*');
-      if (data) setHeadToHead(data);
-    };
-    fetchH2H();
-  }, []);
 
   const getManager = (id: string) => managers.find(m => m.id === id);
 
@@ -42,22 +24,6 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
   const isUserMatch = (match: Match): boolean => {
     if (!loggedInManager) return false;
     return match.home === loggedInManager.id || match.away === loggedInManager.id;
-  };
-
-  // Get historical H2H record between two managers (by ID)
-  const getHistoricalH2H = (manager1Id: string, manager2Id: string): { wins: number; losses: number } => {
-    const record = headToHead.find(
-      h => (h.manager1_id === manager1Id && h.manager2_id === manager2Id) ||
-        (h.manager1_id === manager2Id && h.manager2_id === manager1Id)
-    );
-
-    if (!record) return { wins: 0, losses: 0 };
-
-    if (record.manager1_id === manager1Id) {
-      return { wins: record.manager1_wins, losses: record.manager2_wins };
-    } else {
-      return { wins: record.manager2_wins, losses: record.manager1_wins };
-    }
   };
 
   // Calculate current season H2H from completed matches (by ID)
@@ -68,7 +34,6 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
     schedule.filter(match => match.completed).forEach(match => {
       if (match.homeScore === undefined || match.awayScore === undefined) return;
 
-      // Check if this match involves both managers
       const isHome1 = match.home === manager1Id && match.away === manager2Id;
       const isAway1 = match.away === manager1Id && match.home === manager2Id;
 
@@ -84,32 +49,16 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
     return { wins, losses };
   };
 
-  // Combined H2H (historical + current season)
-  const getCombinedH2H = (manager1Id: string, manager2Id: string): { wins: number; losses: number } => {
-    const historical = getHistoricalH2H(manager1Id, manager2Id);
-    const current = getCurrentSeasonH2H(manager1Id, manager2Id);
-    return {
-      wins: historical.wins + current.wins,
-      losses: historical.losses + current.losses
-    };
-  };
-
   const groupedByWeek = schedule.reduce((acc, match) => {
     if (!acc[match.week]) acc[match.week] = [];
     acc[match.week].push(match);
     return acc;
   }, {} as Record<number, Match[]>);
 
-  /* Add state for selected match */
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-
-  /* ... existing code ... */
-
   return (
     <div className="space-y-4">
       {Object.entries(groupedByWeek).map(([week, matches]) => (
         <div key={week} className="bg-card rounded-xl border border-border overflow-hidden">
-          {/* ... existing header ... */}
           <div className={cn(
             "flex items-center gap-2 px-4 py-2.5 border-b border-border",
             Number(week) === currentWeek ? "bg-primary/10" : "bg-muted/30"
@@ -131,7 +80,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
               const homeManager = getManager(match.home);
               const awayManager = getManager(match.away);
               const h2h = homeManager && awayManager
-                ? getCombinedH2H(homeManager.id, awayManager.id)
+                ? getCurrentSeasonH2H(homeManager.id, awayManager.id)
                 : { wins: 0, losses: 0 };
               const userPlaying = isUserMatch(match);
 
@@ -190,7 +139,7 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
                   {homeManager && awayManager && (h2h.wins > 0 || h2h.losses > 0) && (
                     <div className="mt-1 text-center">
                       <span className="text-[10px] text-muted-foreground">
-                        All-time: <span className="font-medium text-foreground">{homeManager.name}</span>
+                        Season: <span className="font-medium text-foreground">{homeManager.name}</span>
                         {' '}
                         <span className={cn(
                           "font-medium",
@@ -221,5 +170,3 @@ export const ScheduleList = ({ schedule, managers, currentWeek }: ScheduleListPr
     </div>
   );
 };
-
-
