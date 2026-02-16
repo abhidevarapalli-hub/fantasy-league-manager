@@ -103,7 +103,7 @@ export function useMatchupData(
                 const allStats = (statsData || []).map(mapDbPlayerMatchStats);
 
                 // Helper to get points (DB or Calculated)
-                const getPoints = (stat: any) => {
+                const getPoints = (stat: PlayerMatchStats) => {
                     if (stat.fantasyPoints != null && stat.fantasyPoints !== 0) return stat.fantasyPoints;
                     // Fallback to calculation
                     return calculateFantasyPoints(stat);

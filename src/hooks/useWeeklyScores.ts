@@ -3,9 +3,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { calculateFantasyPoints } from '@/lib/scoring-utils';
 import { Manager } from '@/lib/supabase-types';
 
-interface ManagerScore {
-    managerId: string;
-    score: number;
+interface PlayerStatRow {
+    fantasy_points: number | null;
+    player_id: string;
+    manager_id: string;
+    runs: number;
+    fours: number;
+    sixes: number;
+    is_out: boolean;
+    wickets: number;
+    overs: number;
+    economy: number | null;
+    maidens: number;
+    catches: number;
+    stumpings: number;
+    run_outs: number;
+    dismissal_type: string | null;
 }
 
 export function useWeeklyScores(leagueId: string | null, week: number, managers: Manager[]) {
@@ -45,13 +58,13 @@ export function useWeeklyScores(leagueId: string | null, week: number, managers:
                     manager.activeRoster.forEach(playerId => {
                         // Find all stats for this player (could be multiple if multiple matches in a week?)
                         // Typically one per match.
-                        const playerStats = statsData?.filter((s: any) => s.player_id === playerId);
+                        const playerStats = statsData?.filter((s: PlayerStatRow) => s.player_id === playerId);
 
                         if (playerStats && playerStats.length > 0) {
-                            playerStats.forEach((stat: any) => {
+                            playerStats.forEach((stat: PlayerStatRow) => {
                                 // Always calculate points on client to ensure consistency with current rules
                                 // and avoid stale DB values (e.g. old rules where Wicket=25 instead of 30)
-                                let points = calculateFantasyPoints({
+                                const points = calculateFantasyPoints({
                                     runs: stat.runs,
                                     fours: stat.fours,
                                     sixes: stat.sixes,
