@@ -20,8 +20,6 @@ import { useGameStore } from '@/store/useGameStore';
 
 /** Extended player data with optional fields from DB/API */
 interface ExtendedPlayer extends Player {
-    role: string;
-    isInternational?: boolean;
     dateOfBirth?: string;
     battingStyle?: string;
     bowlingStyle?: string;

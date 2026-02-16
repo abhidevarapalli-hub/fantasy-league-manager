@@ -174,15 +174,16 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
       const processedIds = new Set([...active, ...bench].map(p => p.id));
       const missingPlayers = pickedPlayers.filter(p => !processedIds.has(p.id));
 
+      let finalBench = bench;
       if (missingPlayers.length > 0) {
         console.warn(`[Drawer] Found ${missingPlayers.length} missing players for ${manager.teamName}, forcing to bench`, missingPlayers);
-        bench = [...bench, ...missingPlayers];
+        finalBench = [...bench, ...missingPlayers];
       }
 
       return {
         ...manager,
         activeRoster: active.map(p => p.id),
-        bench: bench.map(p => p.id)
+        bench: finalBench.map(p => p.id)
       };
     });
   }, [managers, draftPicks, players, config]);

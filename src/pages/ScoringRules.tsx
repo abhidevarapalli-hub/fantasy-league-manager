@@ -153,7 +153,7 @@ const ScoringRules = () => {
       return newObj;
     };
 
-    const sanitizedRules = sanitize(rules);
+    const sanitizedRules = sanitize(rules) as ScoringRulesType;
 
     setSaving(true);
     const result = await updateScoringRules(sanitizedRules);

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Player } from '@/lib/supabase-types';
 import { buildOptimalActive11 } from '@/lib/roster-validation';
 import { sortPlayersByPriority } from '@/lib/player-order';
+import type { TablesInsert } from '@/integrations/supabase/types';
 
 export const useDraft = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -484,11 +485,11 @@ export const useDraft = () => {
 
     // Prepare updates/inserts
     // We use upsert on (league_id, position)
-    const updates = Array.from({ length: slotsNeeded }).map((_, index) => {
+    const updates: TablesInsert<'draft_order'>[] = Array.from({ length: slotsNeeded }).map((_, index) => {
       const position = index + 1;
       const existing = draftOrder.find(o => o.position === position);
 
-      const update: Record<string, unknown> = {
+      const update: TablesInsert<'draft_order'> = {
         league_id: leagueId,
         position,
         manager_id: shuffledIds[index]
@@ -509,7 +510,7 @@ export const useDraft = () => {
       id: u.id || `temp-${u.position}`,
       leagueId: u.league_id,
       position: u.position,
-      managerId: u.manager_id,
+      managerId: u.manager_id || '',
       autoDraftEnabled: draftOrder.find(o => o.position === u.position)?.autoDraftEnabled || false
     })));
 

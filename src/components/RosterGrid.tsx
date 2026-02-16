@@ -38,7 +38,7 @@ export const RosterGrid = ({ manager, config, players, onPlayerClick, compact = 
 
         for (let i = benchPlayers.length; i < config.benchSize; i++) {
             benchSlots.push({
-                role: 'WK/BAT',
+                role: 'Any Position',
                 label: 'Reserve',
                 filled: false,
             });
