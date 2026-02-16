@@ -59,7 +59,7 @@ export const PlayerMapping = () => {
       if (leaguePlayers) {
         for (const lp of leaguePlayers) {
           if (lp.id) {
-            mappingMap.set(lp.id, lp.cricbuzz_id);
+            mappingMap.set(lp.id, lp.cricbuzz_id ? lp.cricbuzz_id.toString() : null);
           }
         }
       }

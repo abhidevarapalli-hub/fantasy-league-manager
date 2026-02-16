@@ -20,6 +20,7 @@ export const mapDbPlayer = (db: Tables<"league_players">): Player => ({
   role: db.role as Player["role"],
   isInternational: db.is_international ?? false,
   imageId: db.image_id ?? undefined,
+  cachedUrl: db.cached_image_url || null,
 });
 
 // Legacy mapper - prefer mapDbManagerWithRoster for proper roster handling

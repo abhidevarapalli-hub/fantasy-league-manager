@@ -72,6 +72,7 @@ export const RosterCell = ({ slot, isBench, onClick }: RosterCellProps) => {
                     <LazyPlayerAvatar
                         name={player.name}
                         imageId={player.imageId}
+                        cachedUrl={player.cachedUrl}
                         className="h-10 w-10 mb-1 border-2 border-white/20 shadow-sm"
                         fallbackClassName="text-[10px] font-bold bg-black/20 text-white/80"
                     />

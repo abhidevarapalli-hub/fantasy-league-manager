@@ -65,10 +65,17 @@ GRANT ALL ON scoring_rules TO service_role;
 -- ============================================
 -- Step 2: Migrate data from scoring_rule_versions (active rows)
 -- ============================================
+<<<<<<< Updated upstream
 DO $$
 BEGIN
   -- Only migrate if scoring_rule_versions table exists (production path)
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'scoring_rule_versions') THEN
+=======
+-- Wrap data migration in a block to safely handle missing source table on fresh installs
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'scoring_rule_versions') THEN
+>>>>>>> Stashed changes
     INSERT INTO scoring_rules (league_id, rules, created_at)
     SELECT DISTINCT ON (league_id)
       league_id,
@@ -79,6 +86,10 @@ BEGIN
     ORDER BY league_id, version DESC
     ON CONFLICT (league_id) DO NOTHING;
   END IF;
+<<<<<<< Updated upstream
+=======
+END $$;
+>>>>>>> Stashed changes
 
   -- Fill gaps: leagues that have scoring_rules JSONB column but no scoring_rules row
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'leagues' AND column_name = 'scoring_rules') THEN

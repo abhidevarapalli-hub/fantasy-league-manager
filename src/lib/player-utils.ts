@@ -269,8 +269,13 @@ export function getCricbuzzImageUrl(
  */
 export function getPlayerAvatarUrl(
   imageId: number | undefined,
-  size: ImageSize = 'de'
+  size: ImageSize = 'de',
+  cachedUrl?: string | null
 ): string {
+  // 1. Prefer cached URL if available
+  if (cachedUrl) return cachedUrl;
+
+  // 2. Fallback to Cricbuzz URL (proxied)
   const url = getCricbuzzImageUrl(imageId, size);
   // Return Cricbuzz URL or a default placeholder
   return url || '/placeholder.svg';

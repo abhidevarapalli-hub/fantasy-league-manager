@@ -353,7 +353,7 @@ export async function matchStatsToLeaguePlayers(
   if (leaguePlayers) {
     for (const player of leaguePlayers) {
       if (player.cricbuzz_id) {
-        cricbuzzToPlayer.set(player.cricbuzz_id, {
+        cricbuzzToPlayer.set(player.cricbuzz_id.toString(), {
           playerId: player.id!,
           playerName: player.name!,
         });

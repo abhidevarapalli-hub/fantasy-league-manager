@@ -8,6 +8,7 @@ export interface DbPlayer {
   role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper';
   is_international: boolean;
   image_id: number | null;
+  cached_image_url: string | null;
   created_at: string;
 }
 
@@ -64,6 +65,7 @@ export interface Player {
   role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper';
   isInternational: boolean;
   imageId?: number;
+  cachedUrl?: string | null;
 }
 
 export interface Manager {
@@ -107,6 +109,7 @@ export const mapDbPlayer = (db: DbPlayer): Player => ({
   role: db.role,
   isInternational: db.is_international,
   imageId: db.image_id ?? undefined,
+  cachedUrl: db.cached_image_url,
 });
 
 // Legacy mapper - rosters are now stored in manager_roster junction table

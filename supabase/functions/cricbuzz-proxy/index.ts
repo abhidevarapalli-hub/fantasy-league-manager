@@ -88,6 +88,7 @@ serve(async (req) => {
 
     // Forward request to Cricbuzz API
     const cricbuzzUrl = `https://${RAPIDAPI_HOST}${endpoint}`;
+    console.log(`Proxying request to Cricbuzz: ${cricbuzzUrl}`);
 
     const response = await fetch(cricbuzzUrl, {
       method: 'GET',

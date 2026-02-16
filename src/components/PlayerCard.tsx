@@ -87,6 +87,7 @@ export const PlayerCard = ({
       <LazyPlayerAvatar
         name={player.name}
         imageId={player.imageId}
+        cachedUrl={player.cachedUrl}
         className={cn(
           "w-10 h-10 border-2 shadow-sm shrink-0",
           teamColors.text === 'text-white' ? "border-white/20" : "border-black/10"

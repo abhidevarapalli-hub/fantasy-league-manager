@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 interface LazyPlayerAvatarProps {
   name: string;
   imageId?: number;
+  cachedUrl?: string | null;
   className?: string;
   fallbackClassName?: string;
 }
@@ -19,6 +20,7 @@ interface LazyPlayerAvatarProps {
 export function LazyPlayerAvatar({
   name,
   imageId,
+  cachedUrl,
   className,
   fallbackClassName,
 }: LazyPlayerAvatarProps) {
@@ -29,7 +31,7 @@ export function LazyPlayerAvatar({
 
   // Use Intersection Observer to detect when avatar is in viewport
   useEffect(() => {
-    if (!imageId) return; // No image to load
+    if (!imageId || cachedUrl) return; // No image to load OR already cached (eager load)
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -51,16 +53,22 @@ export function LazyPlayerAvatar({
     }
 
     return () => observer.disconnect();
-  }, [imageId]);
+  }, [imageId, cachedUrl]);
 
   const initials = getPlayerInitials(name);
-  const imageUrl = imageId ? getPlayerAvatarUrl(imageId) : null;
+  useEffect(() => {
+    if (cachedUrl && name) {
+      console.log(`using cached image for ${name}`);
+    }
+  }, [cachedUrl, name]);
+
+  const imageUrl = (imageId || cachedUrl) ? getPlayerAvatarUrl(imageId, 'de', cachedUrl) : null;
 
   // Only attempt to load image if:
-  // 1. We have an imageId
-  // 2. The avatar is visible in viewport
+  // 1. We have a cachedUrl (eager load)
+  // 2. OR we have an imageId AND the avatar is visible in viewport
   // 3. No previous error loading this image
-  const shouldLoadImage = imageId && isVisible && !imageError;
+  const shouldLoadImage = (cachedUrl || (imageId && isVisible)) && !imageError;
 
   return (
     <Avatar ref={containerRef} className={className}>
@@ -69,7 +77,7 @@ export function LazyPlayerAvatar({
           src={imageUrl!}
           alt={name}
           className="object-cover"
-          loading="lazy"
+          loading={cachedUrl ? "eager" : "lazy"}
           onLoad={() => setImageLoaded(true)}
           onError={() => setImageError(true)}
         />
