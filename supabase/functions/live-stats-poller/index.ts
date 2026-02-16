@@ -589,16 +589,6 @@ serve(async (req) => {
       // Normalize scoring rules from DB format to expected format
       const rules: ScoringRules = normalizeScoringRules(scoring_rules);
 
-      // Fetch active scoring rule version for this league
-      const { data: scoringVersionData } = await supabase
-        .from('scoring_rule_versions')
-        .select('id')
-        .eq('league_id', league_id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      const scoringVersionId = scoringVersionData?.id || null;
-
       // Get league players with cricbuzz_id mapping
       const { data: leaguePlayers } = await supabase
         .from('league_players')
@@ -705,7 +695,6 @@ serve(async (req) => {
             match_id,
             player_id: leaguePlayer.playerId,
             match_player_stats_id: '', // Will be set after global upsert resolves
-            scoring_version_id: scoringVersionId || '', // From active scoring rule version
             manager_id: ownership?.managerId || null,
             was_in_active_roster: ownership?.isActive ?? false,
             week,

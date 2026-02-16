@@ -137,7 +137,12 @@ const ScoringRules = () => {
     setSaving(false);
 
     if (result.success) {
-      toast.success('Scoring rules updated successfully');
+      if (result.error) {
+        // Rules saved but recompute had an issue
+        toast.warning(result.error);
+      } else {
+        toast.success('Scoring rules updated and points recomputed');
+      }
       setHasChanges(false);
     } else {
       toast.error(result.error || 'Failed to update scoring rules');
@@ -170,7 +175,7 @@ const ScoringRules = () => {
             className="hidden md:flex"
           >
             {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-            Save Rules
+            {saving ? 'Saving & Recomputing...' : 'Save Rules'}
           </Button>
         )
       }
@@ -622,7 +627,7 @@ const ScoringRules = () => {
             ) : (
               <Save className="w-5 h-5 mr-2" />
             )}
-            Save All Changes
+            {saving ? 'Saving & Recomputing...' : 'Save All Changes'}
           </Button>
         </div>
 

@@ -5,6 +5,7 @@ import { Tables } from '@/integrations/supabase/types';
 import { PlayerTransaction } from '@/lib/supabase-types';
 import { DEFAULT_LEAGUE_CONFIG, canAddToActive } from '@/lib/roster-validation';
 import { DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
+import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
 import { toast } from 'sonner';
 import { GameState } from './gameStore/types';
 import {
@@ -500,10 +501,13 @@ export const useGameStore = create<GameState>()(
         }
 
         try {
+          // Upsert to scoring_rules table
           const { error } = await supabase
-            .from('leagues' as any)
-            .update({ scoring_rules: rules } as Record<string, unknown>)
-            .eq('id', currentLeagueId);
+            .from('scoring_rules')
+            .upsert(
+              { league_id: currentLeagueId, rules } as any,
+              { onConflict: 'league_id' }
+            );
 
           if (error) {
             console.error('Error updating scoring rules:', error);
@@ -511,6 +515,15 @@ export const useGameStore = create<GameState>()(
           }
 
           set({ scoringRules: rules });
+
+          // Recompute all historical scores with the new rules
+          try {
+            await recomputeLeaguePoints(currentLeagueId, rules);
+          } catch (recomputeError) {
+            console.error('Error recomputing league points:', recomputeError);
+            return { success: true, error: 'Rules saved but recompute failed' };
+          }
+
           return { success: true };
         } catch (e) {
           console.error('Exception updating scoring rules:', e);
@@ -628,8 +641,18 @@ export const useGameStore = create<GameState>()(
                 minAllRounders: leagueData.min_all_rounders as number,
                 maxInternational: leagueData.max_international as number,
               },
-              scoringRules: mergeScoringRules(leagueData.scoring_rules as Record<string, unknown>),
             });
+          }
+
+          // Fetch scoring rules from scoring_rules table
+          const { data: scoringRulesData } = await supabase
+            .from('scoring_rules')
+            .select('rules')
+            .eq('league_id', leagueId)
+            .maybeSingle();
+
+          if (scoringRulesData?.rules) {
+            set({ scoringRules: mergeScoringRules(scoringRulesData.rules as Record<string, unknown>) });
           }
 
           const parallelFetchStart = performance.now();

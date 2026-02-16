@@ -9,6 +9,7 @@ import {
   canAddToActive,
 } from "@/lib/roster-validation";
 import { ScoringRules, DEFAULT_SCORING_RULES, mergeScoringRules } from "@/lib/scoring-types";
+import { recomputeLeaguePoints } from "@/lib/scoring-recompute";
 import { ManagerRosterEntry, mapDbManagerWithRoster } from "@/store/gameStore/mappers";
 
 interface DbLeague {
@@ -113,8 +114,17 @@ export const useRealtimeGame = (leagueId?: string) => {
           minAllRounders: leagueData.min_all_rounders,
           maxInternational: leagueData.max_international,
         });
-        // Merge scoring rules with defaults to handle missing/partial data
-        setScoringRules(mergeScoringRules(leagueData.scoring_rules));
+      }
+
+      // Fetch scoring rules from scoring_rules table
+      const { data: scoringRulesData } = await supabase
+        .from('scoring_rules')
+        .select('rules')
+        .eq('league_id', leagueId)
+        .maybeSingle();
+
+      if (scoringRulesData?.rules) {
+        setScoringRules(mergeScoringRules(scoringRulesData.rules as Record<string, unknown>));
       }
 
       const buildQuery = (table: string) => {
@@ -642,10 +652,12 @@ export const useRealtimeGame = (leagueId?: string) => {
   const updateScoringRules = async (newRules: ScoringRules): Promise<{ success: boolean; error?: string }> => {
     if (!leagueId) return { success: false, error: "No league selected" };
 
-    const { error } = await (supabase
-      .from("leagues" as any)
-      .update({ scoring_rules: newRules })
-      .eq("id", leagueId) as any);
+    const { error } = await supabase
+      .from('scoring_rules')
+      .upsert(
+        { league_id: leagueId, rules: newRules } as any,
+        { onConflict: 'league_id' }
+      );
 
     if (error) {
       console.error("Error updating scoring rules:", error);
@@ -653,6 +665,15 @@ export const useRealtimeGame = (leagueId?: string) => {
     }
 
     setScoringRules(newRules);
+
+    // Recompute all historical scores with the new rules
+    try {
+      await recomputeLeaguePoints(leagueId, newRules);
+    } catch (recomputeError) {
+      console.error("Error recomputing league points:", recomputeError);
+      return { success: true, error: "Rules saved but recompute failed" };
+    }
+
     return { success: true };
   };
 

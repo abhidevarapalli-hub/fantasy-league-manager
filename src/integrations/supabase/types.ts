@@ -308,7 +308,6 @@ export type Database = {
           match_player_stats_id: string
           player_id: string
           points_breakdown: Json
-          scoring_version_id: string
           total_points: number
           was_in_active_roster: boolean
           week: number | null
@@ -328,7 +327,6 @@ export type Database = {
           match_player_stats_id: string
           player_id: string
           points_breakdown?: Json
-          scoring_version_id: string
           total_points?: number
           was_in_active_roster?: boolean
           week?: number | null
@@ -348,7 +346,6 @@ export type Database = {
           match_player_stats_id?: string
           player_id?: string
           points_breakdown?: Json
-          scoring_version_id?: string
           total_points?: number
           was_in_active_roster?: boolean
           week?: number | null
@@ -401,13 +398,6 @@ export type Database = {
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "master_players"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_player_match_scores_scoring_version_id_fkey"
-            columns: ["scoring_version_id"]
-            isOneToOne: false
-            referencedRelation: "scoring_rule_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -547,7 +537,6 @@ export type Database = {
           min_bowlers: number
           min_wks: number
           name: string
-          scoring_rules: Json | null
           tournament_id: number | null
           tournament_name: string | null
           updated_at: string
@@ -566,7 +555,6 @@ export type Database = {
           min_bowlers?: number
           min_wks?: number
           name: string
-          scoring_rules?: Json | null
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
@@ -585,7 +573,6 @@ export type Database = {
           min_bowlers?: number
           min_wks?: number
           name?: string
-          scoring_rules?: Json | null
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
@@ -997,45 +984,33 @@ export type Database = {
         }
         Relationships: []
       }
-      scoring_rule_versions: {
+      scoring_rules: {
         Row: {
-          created_at: string
-          created_by: string | null
-          description: string | null
           id: string
-          is_active: boolean
           league_id: string
           rules: Json
-          rules_hash: string
-          version: number
+          created_at: string
+          updated_at: string
         }
         Insert: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
           id?: string
-          is_active?: boolean
           league_id: string
-          rules: Json
-          rules_hash: string
-          version: number
+          rules?: Json
+          created_at?: string
+          updated_at?: string
         }
         Update: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
           id?: string
-          is_active?: boolean
           league_id?: string
           rules?: Json
-          rules_hash?: string
-          version?: number
+          created_at?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "scoring_rule_versions_league_id_fkey"
+            foreignKeyName: "scoring_rules_league_id_fkey"
             columns: ["league_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "leagues"
             referencedColumns: ["id"]
           },
@@ -1406,6 +1381,10 @@ export type Database = {
         }
         Returns: number
       }
+      batch_update_league_scores: {
+        Args: { p_updates: Json }
+        Returns: number
+      }
       get_fantasy_standings: {
         Args: { p_league_id: string }
         Returns: {
@@ -1414,6 +1393,34 @@ export type Database = {
           rank: number
           team_name: string
           total_points: number
+        }[]
+      }
+      get_league_match_stats_for_recompute: {
+        Args: { p_league_id: string }
+        Returns: {
+          score_id: string
+          player_id: string
+          match_id: string
+          runs: number
+          balls_faced: number
+          fours: number
+          sixes: number
+          is_out: boolean
+          overs: number
+          maidens: number
+          runs_conceded: number
+          wickets: number
+          dots: number
+          wides: number
+          no_balls: number
+          lbw_bowled_count: number
+          catches: number
+          stumpings: number
+          run_outs: number
+          is_in_playing_11: boolean
+          is_impact_player: boolean
+          is_man_of_match: boolean
+          team_won: boolean
         }[]
       }
       get_leagues_for_cricbuzz_match: {

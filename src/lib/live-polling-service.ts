@@ -278,7 +278,7 @@ class LivePollingService {
               matchId: data.match_id as string,
               leagueId: data.league_id as string,
               playerId: data.player_id as string,
-              fantasyPoints: data.fantasy_points as number,
+              fantasyPoints: data.total_points as number,
               isLiveStats: data.is_live as boolean,
               liveUpdatedAt: data.live_updated_at as string | null,
             };
