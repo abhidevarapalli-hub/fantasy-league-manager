@@ -824,6 +824,121 @@ export const useDraft = () => {
     return () => clearInterval(timer);
   }, [draftState, getRemainingTime, managers, executeAutoPick, getCurrentPickData]);
 
+  // Auto-complete all remaining picks
+  const autoCompleteAllPicks = useCallback(async () => {
+    if (!leagueId) {
+      toast.error('No league selected');
+      return false;
+    }
+
+    try {
+      const config = useGameStore.getState().config;
+      const totalRounds = config.activeSize + config.benchSize;
+      const totalPositions = config.managerCount;
+
+      // Get all empty picks in snake draft order
+      const emptyPicks: { round: number; position: number; pickIndex: number }[] = [];
+      let pickIndex = 0;
+
+      for (let round = 1; round <= totalRounds; round++) {
+        const isEvenRound = round % 2 === 0;
+
+        // Snake draft order
+        if (isEvenRound) {
+          // Reverse order for even rounds
+          for (let pos = totalPositions; pos >= 1; pos--) {
+            const pick = getPick(round, pos);
+            if (!pick?.playerId) {
+              emptyPicks.push({ round, position: pos, pickIndex });
+            }
+            pickIndex++;
+          }
+        } else {
+          // Normal order for odd rounds
+          for (let pos = 1; pos <= totalPositions; pos++) {
+            const pick = getPick(round, pos);
+            if (!pick?.playerId) {
+              emptyPicks.push({ round, position: pos, pickIndex });
+            }
+            pickIndex++;
+          }
+        }
+      }
+
+      if (emptyPicks.length === 0) {
+        toast.info('Draft is already complete');
+        return true;
+      }
+
+      toast.loading(`Auto-drafting ${emptyPicks.length} picks...`, { id: 'auto-draft-all' });
+
+      // Get already drafted player IDs
+      const draftedIds = getDraftedPlayerIds();
+
+      // Sort all available players by priority once
+      const availablePlayers = players.filter(p => !draftedIds.includes(p.id));
+      const sortedPlayers = sortPlayersByPriority(availablePlayers);
+
+      if (sortedPlayers.length < emptyPicks.length) {
+        toast.error(`Not enough players available. Need ${emptyPicks.length}, have ${sortedPlayers.length}`, { id: 'auto-draft-all' });
+        return false;
+      }
+
+      // Prepare all picks data for batch insert
+      const picksToInsert = emptyPicks.map((emptyPick, index) => {
+        const orderItem = draftOrder.find(o => o.position === emptyPick.position);
+        const managerId = orderItem?.managerId || null;
+        const player = sortedPlayers[index]; // Use index to get unique player
+
+        return {
+          league_id: leagueId,
+          round: emptyPick.round,
+          pick_position: emptyPick.position,
+          manager_id: managerId,
+          player_id: player.id,
+          is_auto_draft: true,
+        };
+      });
+
+      // Batch insert all picks at once
+      const { data, error } = await supabase
+        .from('draft_picks')
+        .insert(picksToInsert)
+        .select();
+
+      if (error) {
+        console.error('[useDraft] Batch insert error:', error);
+        toast.error('Failed to auto-complete draft', { id: 'auto-draft-all' });
+        return false;
+      }
+
+      // Manually refresh draft picks to update UI immediately
+      if (data) {
+        const freshPicks = useGameStore.getState().draftPicks;
+        const newPicks = [...freshPicks, ...data.map(pick => ({
+          id: pick.id,
+          leagueId: pick.league_id,
+          round: pick.round,
+          pickPosition: pick.pick_position,
+          managerId: pick.manager_id,
+          playerId: pick.player_id,
+          isAutoDraft: pick.is_auto_draft,
+          createdAt: new Date(pick.created_at),
+          updatedAt: new Date(pick.updated_at),
+        }))];
+        setDraftPicks(newPicks);
+      }
+
+      toast.success(`Successfully auto-drafted ${emptyPicks.length} picks!`, { id: 'auto-draft-all' });
+      return true;
+    } catch (error) {
+      console.error('[useDraft] Auto-complete error:', error);
+      toast.error('Failed to auto-complete draft', { id: 'auto-draft-all' });
+      return false;
+    }
+  }, [leagueId, getPick, getDraftedPlayerIds, players, draftOrder]);
+
+
   return {
     draftPicks,
     draftOrder,
@@ -846,5 +961,6 @@ export const useDraft = () => {
     resetClock,
     getRemainingTime,
     executeAutoPick,
+    autoCompleteAllPicks,
   };
 };

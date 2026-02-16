@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, User, Plane, Timer, Pause, Play, RefreshCw, Shuffle, Bot, CheckCircle, AlertCircle, Flag } from 'lucide-react';
+import { X, User, Plane, Timer, Pause, Play, RefreshCw, Shuffle, Bot, CheckCircle, AlertCircle, Flag, Zap } from 'lucide-react';
 import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { useGameStore } from '@/store/useGameStore';
 import { useDraft } from '@/hooks/useDraft';
@@ -207,7 +207,9 @@ interface DraftLMControlsProps {
   onPause: () => void;
   onResume: () => void;
   onResetClock: () => void;
+  onAutoDraftAll: () => void;
   allPositionsFilled: boolean;
+  hasRemainingPicks: boolean;
 }
 
 const DraftLMControls = ({
@@ -217,7 +219,9 @@ const DraftLMControls = ({
   onPause,
   onResume,
   onResetClock,
-  allPositionsFilled
+  onAutoDraftAll,
+  allPositionsFilled,
+  hasRemainingPicks
 }: DraftLMControlsProps) => {
   if (draftState?.isFinalized) return null;
 
@@ -247,6 +251,17 @@ const DraftLMControls = ({
                 >
                   <Shuffle className="w-3.5 h-3.5" />
                   Randomize Order
+                </Button>
+              )}
+              {hasRemainingPicks && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={onAutoDraftAll}
+                  className="gap-1.5 bg-purple-600 hover:bg-purple-700"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  Auto-Draft All
                 </Button>
               )}
               <Button
@@ -336,6 +351,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     resetClock,
     getRemainingTime,
     finalizeDraft,
+    autoCompleteAllPicks,
   } = useDraft();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -370,6 +386,18 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
       setIsSubmitting(true);
       try {
         await finalizeDraft();
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const handleAutoDraftAll = async () => {
+    if (isEffectivelyReadOnly || isSubmitting) return;
+    if (window.confirm('Auto-draft all remaining picks? This will fill all empty slots with the best available players.')) {
+      setIsSubmitting(true);
+      try {
+        await autoCompleteAllPicks();
       } finally {
         setIsSubmitting(false);
       }
@@ -447,7 +475,9 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
             onPause={pauseDraft}
             onResume={resumeDraft}
             onResetClock={resetClock}
+            onAutoDraftAll={handleAutoDraftAll}
             allPositionsFilled={allPositionsFilled}
+            hasRemainingPicks={getDraftedPlayerIds().length < (config.activeSize + config.benchSize) * config.managerCount}
           />
         </div>
       )}

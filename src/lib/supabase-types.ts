@@ -183,10 +183,7 @@ export interface DbCricketMatch {
   venue: string | null;
   city: string | null;
   state: string | null;
-  league_id: string | null;
-  week: number | null;
-  stats_imported: boolean;
-  stats_imported_at: string | null;
+  match_week: number | null;
   created_at: string;
 }
 
@@ -225,10 +222,8 @@ export interface CricketMatch {
   venue: string | null;
   city: string | null;
   state: string | null;
-  leagueId: string | null;
+  // leagueId: string | null; // Removed
   week: number | null;
-  statsImported: boolean;
-  statsImportedAt: Date | null;
 }
 
 export interface PlayerMatchStats {
@@ -323,10 +318,8 @@ export const mapDbCricketMatch = (db: DbCricketMatch): CricketMatch => ({
   venue: db.venue,
   city: db.city,
   state: db.state,
-  leagueId: db.league_id,
-  week: db.week,
-  statsImported: db.stats_imported,
-  statsImportedAt: db.stats_imported_at ? new Date(db.stats_imported_at) : null,
+  // leagueId: db.league_id, // Removed as it's not in DB
+  week: db.match_week, // Mapped from match_week
 });
 
 export const mapDbPlayerMatchStats = (db: DbPlayerMatchStatsCompat): PlayerMatchStats => ({
