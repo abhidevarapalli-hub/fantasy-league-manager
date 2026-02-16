@@ -3,10 +3,23 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
 const RAPIDAPI_HOST = 'cricbuzz-cricket.p.rapidapi.com';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:54323',
+  // TODO: Add production domain before deploying
+];
+
+function getCorsHeaders(origin: string): Record<string, string> {
+  const isAllowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app');
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
+}
 
 // Types
 interface CricbuzzBatsman {
@@ -499,6 +512,8 @@ function normalizeScoringRules(dbRules: DbScoringRulesFormat | null): ScoringRul
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req.headers.get('origin') || '');
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
