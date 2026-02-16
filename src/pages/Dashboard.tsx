@@ -1,16 +1,23 @@
-import { useState, useCallback, useMemo } from 'react';
-import { RefreshCw, Calendar, Trophy, UserPlus, Copy, Check } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { RefreshCw, UserPlus, Copy, Check, ChevronDown } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useParams } from 'react-router-dom';
 import { StandingsTable } from '@/components/StandingsTable';
-import { ScheduleList } from '@/components/ScheduleList';
+import { ScheduleGrid } from '@/components/ScheduleGrid';
 import { AppLayout } from '@/components/AppLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useWeeklyScores } from '@/hooks/useWeeklyScores';
 
 const Dashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -24,8 +31,17 @@ const Dashboard = () => {
   const leagueName = useGameStore(state => state.leagueName);
   const managerProfile = useAuthStore(state => state.managerProfile);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+
+  // Initialize selected week when currentWeek loads
+  useEffect(() => {
+    if (currentWeek) {
+      setSelectedWeek(currentWeek);
+    }
+  }, [currentWeek]);
 
   // Find the logged-in user's manager ID
   const loggedInManagerId = managerProfile?.id;
@@ -56,6 +72,18 @@ const Dashboard = () => {
     return Math.max(...schedule.map(m => m.week));
   }, [schedule]);
 
+  // Fetch calculated scores for the selected week
+  const { scores: calculatedScores } = useWeeklyScores(leagueId || null, selectedWeek, managers);
+
+  // Merge calculated scores into the schedule
+  const displayMatches = useMemo(() => {
+    return schedule.map(match => ({
+      ...match,
+      homeScore: calculatedScores[match.home] ?? match.homeScore,
+      awayScore: calculatedScores[match.away] ?? match.awayScore
+    }));
+  }, [schedule, calculatedScores]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -68,7 +96,6 @@ const Dashboard = () => {
     <AppLayout
       title={leagueName}
       subtitle={`Week ${currentWeek} of ${totalWeeks}`}
-
       headerActions={
         <button
           onClick={handleRefresh}
@@ -81,71 +108,87 @@ const Dashboard = () => {
         </button>
       }
     >
-      <div className="px-4 py-4">
-        <Tabs defaultValue="standings" className="w-full">
-          <TabsList className="w-full bg-muted/50 p-1 rounded-xl mb-4">
-            <TabsTrigger
-              value="standings"
-              className="flex-1 gap-2 data-[state=active]:bg-card data-[state=active]:text-foreground rounded-lg"
-            >
-              <Trophy className="w-4 h-4" />
-              Standings
-            </TabsTrigger>
-            <TabsTrigger
-              value="schedule"
-              className="flex-1 gap-2 data-[state=active]:bg-card data-[state=active]:text-foreground rounded-lg"
-            >
-              <Calendar className="w-4 h-4" />
-              Schedule
-            </TabsTrigger>
-          </TabsList>
+      <div className="px-4 py-6 space-y-8">
 
-          <TabsContent value="standings" className="mt-0 space-y-4">
-            {isLeagueManager && hasAvailableSlots && (
-              <Card className="border-2 border-primary/20 bg-primary/5">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <UserPlus className="w-5 h-5 text-primary" />
-                    Invite Members
-                  </CardTitle>
-                  <CardDescription>
-                    Share this link to invite users to join your league
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2 bg-background/50 border border-primary/20 rounded-lg font-mono text-sm text-muted-foreground overflow-x-auto">
-                      {window.location.origin}/join/{leagueId}
-                    </div>
-                    <Button
-                      onClick={handleCopyInviteLink}
-                      variant="default"
-                      size="sm"
-                      className="shrink-0"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-4 h-4 mr-1" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4 mr-1" />
-                          Copy Link
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            <StandingsTable managers={managers} currentManagerId={currentManagerId} loggedInManagerId={loggedInManagerId} />
-          </TabsContent>
+        {/* Schedule Section */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold tracking-tight">Matchups</h2>
+            <Select
+              value={selectedWeek.toString()}
+              onValueChange={(val) => setSelectedWeek(parseInt(val))}
+            >
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder={`Week ${selectedWeek}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
+                  <SelectItem key={week} value={week.toString()}>
+                    Week {week}
+                    {week === currentWeek && " (Current)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <TabsContent value="schedule" className="mt-0">
-            <ScheduleList schedule={schedule} managers={managers} currentWeek={currentWeek} />
-          </TabsContent>
-        </Tabs>
+          <ScheduleGrid
+            matches={displayMatches}
+            managers={managers}
+            selectedWeek={selectedWeek}
+          />
+        </section>
+
+        {/* Invite Card if needed */}
+        {isLeagueManager && hasAvailableSlots && (
+          <Card className="border-2 border-primary/20 bg-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-primary" />
+                Invite Members
+              </CardTitle>
+              <CardDescription>
+                Share this link to invite users to join your league
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 px-3 py-2 bg-background/50 border border-primary/20 rounded-lg font-mono text-sm text-muted-foreground overflow-x-auto">
+                  {window.location.origin}/join/{leagueId}
+                </div>
+                <Button
+                  onClick={handleCopyInviteLink}
+                  variant="default"
+                  size="sm"
+                  className="shrink-0"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 mr-1" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-1" />
+                      Copy Link
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Standings Section */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold tracking-tight">Standings</h2>
+          <StandingsTable
+            managers={managers}
+            currentManagerId={currentManagerId}
+            loggedInManagerId={loggedInManagerId}
+          />
+        </section>
+
       </div>
     </AppLayout>
   );

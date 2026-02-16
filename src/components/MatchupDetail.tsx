@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Manager, Match } from "@/lib/supabase-types";
 import { useGameStore } from "@/store/useGameStore";
 import { useMatchupData, PlayerWithMatches } from "@/hooks/useMatchupData";
@@ -10,6 +11,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Calendar, Trophy, Clock } from "lucide-react";
 import { format } from "date-fns";
+import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
+import { PlayerDetailDialog } from "@/components/PlayerDetailDialog";
 
 interface MatchupDetailProps {
     open: boolean;
@@ -44,23 +47,39 @@ const RoleBadge = ({ role }: { role: string }) => {
     );
 };
 
-const PlayerCard = ({ playerData }: { playerData: PlayerWithMatches }) => {
+const PlayerCard = ({
+    playerData,
+    onClick
+}: {
+    playerData: PlayerWithMatches;
+    onClick: (playerId: string) => void;
+}) => {
     const { player, cricketMatches, stats, totalPoints } = playerData;
 
     return (
-        <div className="bg-card/50 border border-border rounded-lg p-3 space-y-2">
+        <div
+            className="bg-card/50 border border-border rounded-lg p-3 space-y-2 cursor-pointer hover:bg-card/80 transition-colors"
+            onClick={() => onClick(player.id)}
+        >
             {/* Player Header */}
-            <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                        <RoleBadge role={player.role} />
-                        <span className="text-xs font-medium text-muted-foreground truncate">
-                            {player.team}
-                        </span>
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <LazyPlayerAvatar
+                        name={player.name}
+                        imageId={player.imageId}
+                        className="w-10 h-10 border border-border"
+                    />
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                            <RoleBadge role={player.role} />
+                            <span className="text-xs font-medium text-muted-foreground truncate">
+                                {player.team}
+                            </span>
+                        </div>
+                        <p className="font-semibold text-sm truncate leading-tight">{player.name}</p>
                     </div>
-                    <p className="font-semibold text-sm truncate">{player.name}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                     <p className="text-lg font-bold text-primary">{totalPoints.toFixed(1)}</p>
                     <p className="text-[10px] text-muted-foreground">PTS</p>
                 </div>
@@ -108,10 +127,12 @@ const PlayerCard = ({ playerData }: { playerData: PlayerWithMatches }) => {
 
 const RosterSection = ({
     title,
-    players
+    players,
+    onPlayerClick
 }: {
     title: string;
     players: PlayerWithMatches[];
+    onPlayerClick: (playerId: string) => void;
 }) => {
     if (players.length === 0) return null;
 
@@ -122,7 +143,11 @@ const RosterSection = ({
             </h4>
             <div className="space-y-2">
                 {players.map((playerData) => (
-                    <PlayerCard key={playerData.player.id} playerData={playerData} />
+                    <PlayerCard
+                        key={playerData.player.id}
+                        playerData={playerData}
+                        onClick={onPlayerClick}
+                    />
                 ))}
             </div>
         </div>
@@ -138,9 +163,12 @@ export function MatchupDetail({
 }: MatchupDetailProps) {
     const players = useGameStore(state => state.players);
     const currentLeagueId = useGameStore(state => state.currentLeagueId);
+    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+
+    const matchWeek = Number(match.week);
 
     const matchupData = useMatchupData(
-        match.week,
+        matchWeek,
         homeManager,
         awayManager,
         players,
@@ -151,6 +179,8 @@ export function MatchupDetail({
     const homeBench = matchupData.homeRoster.filter(r => !r.isActive);
     const awayStarters = matchupData.awayRoster.filter(r => r.isActive);
     const awayBench = matchupData.awayRoster.filter(r => !r.isActive);
+
+    const selectedPlayer = players.find(p => p.id === selectedPlayerId) || null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -227,17 +257,39 @@ export function MatchupDetail({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                         {/* Home Team Roster */}
                         <div className="space-y-4">
-                            <RosterSection title="Starters" players={homeStarters} />
-                            <RosterSection title="Bench" players={homeBench} />
+                            <RosterSection
+                                title="Starters"
+                                players={homeStarters}
+                                onPlayerClick={setSelectedPlayerId}
+                            />
+                            <RosterSection
+                                title="Bench"
+                                players={homeBench}
+                                onPlayerClick={setSelectedPlayerId}
+                            />
                         </div>
 
                         {/* Away Team Roster */}
                         <div className="space-y-4">
-                            <RosterSection title="Starters" players={awayStarters} />
-                            <RosterSection title="Bench" players={awayBench} />
+                            <RosterSection
+                                title="Starters"
+                                players={awayStarters}
+                                onPlayerClick={setSelectedPlayerId}
+                            />
+                            <RosterSection
+                                title="Bench"
+                                players={awayBench}
+                                onPlayerClick={setSelectedPlayerId}
+                            />
                         </div>
                     </div>
                 )}
+
+                <PlayerDetailDialog
+                    player={selectedPlayer}
+                    open={!!selectedPlayerId}
+                    onOpenChange={(open) => !open && setSelectedPlayerId(null)}
+                />
             </DialogContent>
         </Dialog>
     );

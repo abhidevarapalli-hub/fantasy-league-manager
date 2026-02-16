@@ -40,49 +40,7 @@ interface PlayerDetailDialogProps {
     matchStats?: PlayerMatchPerformance[];
 }
 
-const calculateFantasyPoints = (stats: PlayerMatchPerformance) => {
-    let points = 0;
-    const rules = DEFAULT_SCORING_RULES;
-
-    // Basic points
-    points += rules.common.starting11; // Assume they started if they have stats
-
-    // Batting
-    if (stats.runs !== undefined) {
-        points += stats.runs * rules.batting.runs;
-        points += (stats.fours || 0) * rules.batting.four;
-        points += (stats.sixes || 0) * rules.batting.six;
-
-        // Milestones
-        if (stats.runs >= 100) points += 40; // Century
-        else if (stats.runs >= 50) points += 20; // Half century
-
-        // Duck
-        if (stats.runs === 0 && !stats.isNotOut) points += rules.batting.duckDismissal;
-    }
-
-    // Bowling
-    if (stats.wickets !== undefined) {
-        points += stats.wickets * rules.bowling.wickets;
-
-        // Milestones
-        if (stats.wickets >= 5) points += 40; // 5-fer
-        else if (stats.wickets >= 4) points += 30; // 4-fer
-        else if (stats.wickets >= 3) points += 20; // 3-fer
-
-        // Economy bonus (rough estimate if overs unavailable, assume 4 overs max)
-        const overs = stats.overs || 0;
-        if (overs >= 2 && stats.economy) {
-            if (stats.economy < 5) points += 20;
-            else if (stats.economy < 6) points += 10;
-        }
-
-        // Maiden
-        if (stats.maidens) points += stats.maidens * rules.bowling.maidenOver;
-    }
-
-    return points;
-};
+import { calculateFantasyPoints } from '@/lib/scoring-utils';
 
 export function PlayerDetailDialog({
     open,

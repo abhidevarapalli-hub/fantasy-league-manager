@@ -20,6 +20,8 @@ export interface MatchupData {
     error: string | null;
 }
 
+import { calculateFantasyPoints } from '@/lib/scoring-utils';
+
 export function useMatchupData(
     week: number,
     homeManager: Manager | undefined,
@@ -85,16 +87,27 @@ export function useMatchupData(
                 const cricketMatches = (matchesData || []).map(mapDbCricketMatch);
 
                 // Fetch player stats for this week
+                // Join with cricket_matches to filter by the match's official week
                 const { data: statsData, error: statsError } = await supabase
                     .from('player_match_stats_compat')
-                    .select('*')
+                    .select(`
+                        *,
+                        match:cricket_matches!inner(match_week)
+                    `)
                     .eq('league_id', leagueId)
-                    .eq('week', week)
+                    .eq('match.match_week', week)
                     .in('player_id', allPlayerIds);
 
                 if (statsError) throw statsError;
 
                 const allStats = (statsData || []).map(mapDbPlayerMatchStats);
+
+                // Helper to get points (DB or Calculated)
+                const getPoints = (stat: any) => {
+                    if (stat.fantasyPoints != null && stat.fantasyPoints !== 0) return stat.fantasyPoints;
+                    // Fallback to calculation
+                    return calculateFantasyPoints(stat);
+                };
 
                 // Build roster data for home manager
                 const homeRoster: PlayerWithMatches[] = homePlayerIds
@@ -103,6 +116,11 @@ export function useMatchupData(
                         if (!player) return null;
 
                         const playerStats = allStats.filter(s => s.playerId === playerId);
+                        // Update stats with calculated points if needed
+                        playerStats.forEach(s => {
+                            if (!s.fantasyPoints) s.fantasyPoints = getPoints(s);
+                        });
+
                         const totalPoints = playerStats.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
                         const isActive = homeManager.activeRoster.includes(playerId);
 
@@ -132,6 +150,11 @@ export function useMatchupData(
                         if (!player) return null;
 
                         const playerStats = allStats.filter(s => s.playerId === playerId);
+                        // Update stats with calculated points if needed
+                        playerStats.forEach(s => {
+                            if (!s.fantasyPoints) s.fantasyPoints = getPoints(s);
+                        });
+
                         const totalPoints = playerStats.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
                         const isActive = awayManager.activeRoster.includes(playerId);
 

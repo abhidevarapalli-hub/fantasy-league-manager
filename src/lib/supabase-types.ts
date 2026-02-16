@@ -7,6 +7,7 @@ export interface DbPlayer {
   team: string;
   role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper';
   is_international: boolean;
+  image_id: number | null;
   created_at: string;
 }
 
@@ -105,6 +106,7 @@ export const mapDbPlayer = (db: DbPlayer): Player => ({
   team: db.team,
   role: db.role,
   isInternational: db.is_international,
+  imageId: db.image_id ?? undefined,
 });
 
 // Legacy mapper - rosters are now stored in manager_roster junction table

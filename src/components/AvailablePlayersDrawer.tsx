@@ -248,7 +248,7 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
               <TabsTrigger value="rosters" className="text-xs h-full">Team Rosters</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="available" className="flex-1 flex flex-col overflow-hidden data-[state=active]:flex mt-2">
+            <TabsContent value="available" className="flex-1 flex-col overflow-hidden data-[state=active]:flex mt-2">
               {/* Filters Section */}
               <div className="px-4 py-2 border-b border-border space-y-2 flex-shrink-0">
                 {/* Search */}
@@ -414,7 +414,7 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
               </div>
             </TabsContent>
 
-            <TabsContent value="rosters" className="flex-1 overflow-y-auto w-full data-[state=active]:block mt-0 pb-[env(safe-area-inset-bottom)] p-4">
+            <TabsContent value="rosters" className="flex-1 overflow-y-auto w-full data-[state=active]:flex flex-col mt-0 pb-[env(safe-area-inset-bottom)] p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
                 {displayManagers.map(manager => (
                   <div key={manager.id} className="min-h-[400px] space-y-2 flex flex-col bg-card/30 rounded-xl border border-border/50 p-2">
