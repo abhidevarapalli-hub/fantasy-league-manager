@@ -378,7 +378,7 @@ const TeamView = () => {
       </Dialog>
 
       <PlayerDetailDialog
-        player={detailPlayer as any}
+        player={detailPlayer!}
         open={!!detailPlayer}
         onOpenChange={(open) => !open && setDetailPlayer(null)}
       />

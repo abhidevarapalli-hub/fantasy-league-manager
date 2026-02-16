@@ -20,10 +20,21 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { ScoringRules as ScoringRulesType } from '@/lib/scoring-types';
+import { ScoringRules as ScoringRulesType, BattingRules, BowlingRules } from '@/lib/scoring-types';
 import { cn } from '@/lib/utils';
 
-const NumericField = ({ label, value, onChange, description, className, disabled }: any) => (
+type NumericValue = string | number | '';
+
+interface NumericFieldProps {
+  label?: string;
+  value: NumericValue;
+  onChange: (val: NumericValue) => void;
+  description?: string;
+  className?: string;
+  disabled?: boolean;
+}
+
+const NumericField = ({ label, value, onChange, description, className, disabled }: NumericFieldProps) => (
   <div className={cn("space-y-2", className)}>
     {label && <Label className="text-sm font-medium">{label}</Label>}
     <Input
@@ -63,7 +74,7 @@ const ScoringRules = () => {
   }, [isLeagueManager, gameLoading]);
 
   // Generic change handlers
-  const updateNestedField = (category: keyof ScoringRulesType, field: string, value: any) => {
+  const updateNestedField = (category: keyof ScoringRulesType, field: string, value: unknown) => {
     if (!isLeagueManager) return;
     setRules(prev => ({
       ...prev,
@@ -72,7 +83,7 @@ const ScoringRules = () => {
     setHasChanges(true);
   };
 
-  const updateMilestone = (category: 'batting' | 'bowling', index: number, field: string, value: any) => {
+  const updateMilestone = (category: 'batting' | 'bowling', index: number, field: string, value: NumericValue) => {
     if (!isLeagueManager) return;
     const newMilestones = [...rules[category].milestones];
     newMilestones[index] = { ...newMilestones[index], [field]: value };
@@ -91,10 +102,14 @@ const ScoringRules = () => {
     updateNestedField(category, 'milestones', newMilestones);
   };
 
-  const updateRateBonus = (category: 'batting' | 'bowling', index: number, field: string, value: any) => {
+  const updateRateBonus = (category: 'batting' | 'bowling', index: number, field: string, value: NumericValue) => {
     if (!isLeagueManager) return;
     const fieldName = category === 'batting' ? 'strikeRateBonuses' : 'economyRateBonuses';
-    const newBonuses = [...(rules[category] as any)[fieldName]];
+    const categoryRules = rules[category];
+    const bonusArray = category === 'batting'
+      ? (categoryRules as BattingRules).strikeRateBonuses
+      : (categoryRules as BowlingRules).economyRateBonuses;
+    const newBonuses = [...bonusArray];
     newBonuses[index] = { ...newBonuses[index], [field]: value };
     updateNestedField(category, fieldName, newBonuses);
   };
@@ -105,14 +120,22 @@ const ScoringRules = () => {
     const defaultValue = category === 'batting'
       ? { minSR: 0, maxSR: 0, points: 0, minBalls: 10 }
       : { minER: 0, maxER: 0, points: 0, minOvers: 2 };
-    const newBonuses = [...(rules[category] as any)[fieldName], defaultValue];
+    const categoryRules = rules[category];
+    const bonusArray = category === 'batting'
+      ? (categoryRules as BattingRules).strikeRateBonuses
+      : (categoryRules as BowlingRules).economyRateBonuses;
+    const newBonuses = [...bonusArray, defaultValue];
     updateNestedField(category, fieldName, newBonuses);
   };
 
   const removeRateBonus = (category: 'batting' | 'bowling', index: number) => {
     if (!isLeagueManager) return;
     const fieldName = category === 'batting' ? 'strikeRateBonuses' : 'economyRateBonuses';
-    const newBonuses = (rules[category] as any)[fieldName].filter((_: any, i: number) => i !== index);
+    const categoryRules = rules[category];
+    const bonusArray = category === 'batting'
+      ? (categoryRules as BattingRules).strikeRateBonuses
+      : (categoryRules as BowlingRules).economyRateBonuses;
+    const newBonuses = bonusArray.filter((_, i) => i !== index);
     updateNestedField(category, fieldName, newBonuses);
   };
 
@@ -120,17 +143,17 @@ const ScoringRules = () => {
     if (!isLeagueManager) return;
 
     // Helper to sanitize any empty strings to 0 before saving
-    const sanitize = (obj: any): any => {
+    const sanitize = (obj: unknown): unknown => {
       if (typeof obj !== 'object' || obj === null) return obj === '' ? 0 : obj;
       if (Array.isArray(obj)) return obj.map(sanitize);
-      const newObj: any = {};
-      for (const key in obj) {
-        newObj[key] = sanitize(obj[key]);
+      const newObj: Record<string, unknown> = {};
+      for (const key in obj as Record<string, unknown>) {
+        newObj[key] = sanitize((obj as Record<string, unknown>)[key]);
       }
       return newObj;
     };
 
-    const sanitizedRules = sanitize(rules);
+    const sanitizedRules = sanitize(rules) as ScoringRulesType;
 
     setSaving(true);
     const result = await updateScoringRules(sanitizedRules);
@@ -226,28 +249,28 @@ const ScoringRules = () => {
                 <NumericField
                   label="Starting XI Presence"
                   value={rules.common?.starting11}
-                  onChange={(val: any) => updateNestedField('common', 'starting11', val)}
+                  onChange={(val: NumericValue) => updateNestedField('common', 'starting11', val)}
                   description="Awarded to every player in the starting XI"
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Match Winning Team"
                   value={rules.common?.matchWinningTeam}
-                  onChange={(val: any) => updateNestedField('common', 'matchWinningTeam', val)}
+                  onChange={(val: NumericValue) => updateNestedField('common', 'matchWinningTeam', val)}
                   description="Awarded to every player in the winning team"
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Man of the Match"
                   value={rules.common?.manOfTheMatch}
-                  onChange={(val: any) => updateNestedField('common', 'manOfTheMatch', val)}
+                  onChange={(val: NumericValue) => updateNestedField('common', 'manOfTheMatch', val)}
                   description="Bonus for being the MoTM"
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Impact Player Bonus"
                   value={rules.common?.impactPlayer}
-                  onChange={(val: any) => updateNestedField('common', 'impactPlayer', val)}
+                  onChange={(val: NumericValue) => updateNestedField('common', 'impactPlayer', val)}
                   description="Awarded for appearing as an impact player"
                   disabled={!isLeagueManager}
                 />
@@ -266,19 +289,19 @@ const ScoringRules = () => {
                 <NumericField
                   label="Run Scored"
                   value={rules.batting?.runs}
-                  onChange={(val: any) => updateNestedField('batting', 'runs', val)}
+                  onChange={(val: NumericValue) => updateNestedField('batting', 'runs', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Four Bonus"
                   value={rules.batting?.four}
-                  onChange={(val: any) => updateNestedField('batting', 'four', val)}
+                  onChange={(val: NumericValue) => updateNestedField('batting', 'four', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Six Bonus"
                   value={rules.batting?.six}
-                  onChange={(val: any) => updateNestedField('batting', 'six', val)}
+                  onChange={(val: NumericValue) => updateNestedField('batting', 'six', val)}
                   disabled={!isLeagueManager}
                 />
               </CardContent>
@@ -300,14 +323,14 @@ const ScoringRules = () => {
                     <NumericField
                       label="Runs"
                       value={ms.runs}
-                      onChange={(val: any) => updateMilestone('batting', idx, 'runs', val)}
+                      onChange={(val: NumericValue) => updateMilestone('batting', idx, 'runs', val)}
                       className="flex-1"
                       disabled={!isLeagueManager}
                     />
                     <NumericField
                       label="Points"
                       value={ms.points}
-                      onChange={(val: any) => updateMilestone('batting', idx, 'points', val)}
+                      onChange={(val: NumericValue) => updateMilestone('batting', idx, 'points', val)}
                       className="flex-1"
                       disabled={!isLeagueManager}
                     />
@@ -333,13 +356,13 @@ const ScoringRules = () => {
                 <NumericField
                   label="Duck Penalty"
                   value={rules.batting?.duckDismissal}
-                  onChange={(val: any) => updateNestedField('batting', 'duckDismissal', val)}
+                  onChange={(val: NumericValue) => updateNestedField('batting', 'duckDismissal', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Low Score Penalty (≤5 runs)"
                   value={rules.batting?.lowScoreDismissal}
-                  onChange={(val: any) => updateNestedField('batting', 'lowScoreDismissal', val)}
+                  onChange={(val: NumericValue) => updateNestedField('batting', 'lowScoreDismissal', val)}
                   disabled={!isLeagueManager}
                 />
               </CardContent>
@@ -362,19 +385,19 @@ const ScoringRules = () => {
                       <NumericField
                         label="Min SR"
                         value={sr.minSR}
-                        onChange={(val: any) => updateRateBonus('batting', idx, 'minSR', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('batting', idx, 'minSR', val)}
                         disabled={!isLeagueManager}
                       />
                       <NumericField
                         label="Max SR"
                         value={sr.maxSR}
-                        onChange={(val: any) => updateRateBonus('batting', idx, 'maxSR', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('batting', idx, 'maxSR', val)}
                         disabled={!isLeagueManager}
                       />
                       <NumericField
                         label="Points"
                         value={sr.points}
-                        onChange={(val: any) => updateRateBonus('batting', idx, 'points', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('batting', idx, 'points', val)}
                         className="font-bold"
                         disabled={!isLeagueManager}
                       />
@@ -394,14 +417,14 @@ const ScoringRules = () => {
                       <NumericField
                         label="MIN BALLS FACED"
                         value={sr.minBalls}
-                        onChange={(val: any) => updateRateBonus('batting', idx, 'minBalls', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('batting', idx, 'minBalls', val)}
                         className="text-[10px]"
                         disabled={!isLeagueManager}
                       />
                       <NumericField
                         label="MIN RUNS SCORED"
                         value={sr.minRuns}
-                        onChange={(val: any) => updateRateBonus('batting', idx, 'minRuns', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('batting', idx, 'minRuns', val)}
                         className="text-[10px]"
                         disabled={!isLeagueManager}
                       />
@@ -423,38 +446,38 @@ const ScoringRules = () => {
                 <NumericField
                   label="Points per Wicket"
                   value={rules.bowling?.wickets}
-                  onChange={(val: any) => updateNestedField('bowling', 'wickets', val)}
+                  onChange={(val: NumericValue) => updateNestedField('bowling', 'wickets', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Dot Ball Points"
                   value={rules.bowling?.dotBall}
-                  onChange={(val: any) => updateNestedField('bowling', 'dotBall', val)}
+                  onChange={(val: NumericValue) => updateNestedField('bowling', 'dotBall', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="LBW / Bowled Bonus"
                   value={rules.bowling?.lbwOrBowledBonus}
-                  onChange={(val: any) => updateNestedField('bowling', 'lbwOrBowledBonus', val)}
+                  onChange={(val: NumericValue) => updateNestedField('bowling', 'lbwOrBowledBonus', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Maiden Over Bonus"
                   value={rules.bowling?.maidenOver}
-                  onChange={(val: any) => updateNestedField('bowling', 'maidenOver', val)}
+                  onChange={(val: NumericValue) => updateNestedField('bowling', 'maidenOver', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Wide Penalty"
                   value={rules.bowling?.widePenalty}
-                  onChange={(val: any) => updateNestedField('bowling', 'widePenalty', val)}
+                  onChange={(val: NumericValue) => updateNestedField('bowling', 'widePenalty', val)}
                   className="text-destructive"
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="No Ball Penalty"
                   value={rules.bowling?.noBallPenalty}
-                  onChange={(val: any) => updateNestedField('bowling', 'noBallPenalty', val)}
+                  onChange={(val: NumericValue) => updateNestedField('bowling', 'noBallPenalty', val)}
                   className="text-destructive"
                   disabled={!isLeagueManager}
                 />
@@ -477,14 +500,14 @@ const ScoringRules = () => {
                     <NumericField
                       label="Wickets"
                       value={ms.wickets}
-                      onChange={(val: any) => updateMilestone('bowling', idx, 'wickets', val)}
+                      onChange={(val: NumericValue) => updateMilestone('bowling', idx, 'wickets', val)}
                       className="flex-1"
                       disabled={!isLeagueManager}
                     />
                     <NumericField
                       label="Points"
                       value={ms.points}
-                      onChange={(val: any) => updateMilestone('bowling', idx, 'points', val)}
+                      onChange={(val: NumericValue) => updateMilestone('bowling', idx, 'points', val)}
                       className="flex-1"
                       disabled={!isLeagueManager}
                     />
@@ -519,19 +542,19 @@ const ScoringRules = () => {
                       <NumericField
                         label="Min ER"
                         value={er.minER}
-                        onChange={(val: any) => updateRateBonus('bowling', idx, 'minER', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('bowling', idx, 'minER', val)}
                         disabled={!isLeagueManager}
                       />
                       <NumericField
                         label="Max ER"
                         value={er.maxER}
-                        onChange={(val: any) => updateRateBonus('bowling', idx, 'maxER', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('bowling', idx, 'maxER', val)}
                         disabled={!isLeagueManager}
                       />
                       <NumericField
                         label="Points"
                         value={er.points}
-                        onChange={(val: any) => updateRateBonus('bowling', idx, 'points', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('bowling', idx, 'points', val)}
                         className="font-bold"
                         disabled={!isLeagueManager}
                       />
@@ -551,7 +574,7 @@ const ScoringRules = () => {
                       <NumericField
                         label="MIN OVERS BOWLED"
                         value={er.minOvers}
-                        onChange={(val: any) => updateRateBonus('bowling', idx, 'minOvers', val)}
+                        onChange={(val: NumericValue) => updateRateBonus('bowling', idx, 'minOvers', val)}
                         className="text-[10px]"
                         description="Minimum 2 overs recommended"
                         disabled={!isLeagueManager}
@@ -573,19 +596,19 @@ const ScoringRules = () => {
                 <NumericField
                   label="Catch Points"
                   value={rules.fielding?.catch}
-                  onChange={(val: any) => updateNestedField('fielding', 'catch', val)}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'catch', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Stumping Points"
                   value={rules.fielding?.stumping}
-                  onChange={(val: any) => updateNestedField('fielding', 'stumping', val)}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'stumping', val)}
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Run Out Points"
                   value={rules.fielding?.runOut}
-                  onChange={(val: any) => updateNestedField('fielding', 'runOut', val)}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'runOut', val)}
                   disabled={!isLeagueManager}
                 />
               </CardContent>
@@ -599,14 +622,14 @@ const ScoringRules = () => {
                 <NumericField
                   label="Multi-Catch Threshold"
                   value={rules.fielding?.multiCatchBonus?.count}
-                  onChange={(val: any) => updateNestedField('fielding', 'multiCatchBonus', { ...rules.fielding?.multiCatchBonus, count: val })}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'multiCatchBonus', { ...rules.fielding?.multiCatchBonus, count: val })}
                   description="Number of catches for bonus"
                   disabled={!isLeagueManager}
                 />
                 <NumericField
                   label="Bonus Points"
                   value={rules.fielding?.multiCatchBonus?.points}
-                  onChange={(val: any) => updateNestedField('fielding', 'multiCatchBonus', { ...rules.fielding?.multiCatchBonus, points: val })}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'multiCatchBonus', { ...rules.fielding?.multiCatchBonus, points: val })}
                   description="Additional points for reaching threshold"
                   disabled={!isLeagueManager}
                 />

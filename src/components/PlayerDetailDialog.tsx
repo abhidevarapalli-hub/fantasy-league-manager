@@ -18,13 +18,23 @@ import { getTeamColors } from '@/lib/team-colors';
 import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
 import { useGameStore } from '@/store/useGameStore';
 
+/** Extended player data with optional fields from DB/API */
+interface ExtendedPlayer extends Player {
+    dateOfBirth?: string;
+    battingStyle?: string;
+    bowlingStyle?: string;
+    height?: string;
+}
+
+/** Unified match data combining schedule info with match stats */
+interface UnifiedMatchData extends PlayerMatchPerformance {
+    week?: number;
+}
+
 interface PlayerDetailDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    player: Player & {
-        role: string;
-        isInternational?: boolean;
-    };
+    player: ExtendedPlayer;
     tournamentPlayer?: TournamentPlayer | null;
     seriesId?: number | null;
     matchStats?: PlayerMatchPerformance[];
@@ -203,18 +213,18 @@ export function PlayerDetailDialog({
 
         // Default (Batsman, Wicket Keeper)
         return [battingSection, fieldingSection, bowlingSection];
-    }, [player?.role]);
+    }, [player]);
 
     // Combine schedule with actual stats from player_match_stats DB table
-    const unifiedMatches = useMemo(() => {
+    const unifiedMatches: UnifiedMatchData[] = useMemo(() => {
         const schedule = playerSchedule && playerSchedule.length > 0 ? playerSchedule : matchStats;
-        if (!playerStatsMap || playerStatsMap.size === 0) return schedule;
+        if (!playerStatsMap || playerStatsMap.size === 0) return schedule as UnifiedMatchData[];
 
         // Merge DB stats into each schedule entry by cricbuzz_match_id
         return schedule.map(match => {
             const dbStats = playerStatsMap.get(match.matchId);
             if (!dbStats) return match;
-            return { ...match, ...dbStats, matchId: match.matchId, matchDate: match.matchDate, opponent: match.opponent, opponentShort: match.opponentShort, venue: match.venue, result: match.result, isUpcoming: match.isUpcoming, week: (match as any).week };
+            return { ...match, ...dbStats, matchId: match.matchId, matchDate: match.matchDate, opponent: match.opponent, opponentShort: match.opponentShort, venue: match.venue, result: match.result, isUpcoming: match.isUpcoming, week: (match as UnifiedMatchData).week };
         });
     }, [playerSchedule, matchStats, playerStatsMap]);
 
@@ -300,25 +310,25 @@ export function PlayerDetailDialog({
                             <div className="flex flex-col">
                                 <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Born</span>
                                 <span className="text-xs md:text-sm font-semibold text-white truncate">
-                                    {(player as any).dateOfBirth || (extendedData as any)?.dob || 'N/A'}
+                                    {player.dateOfBirth || extendedData?.dob || 'N/A'}
                                 </span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Batting</span>
                                 <span className="text-xs md:text-sm font-semibold text-white">
-                                    {(player as any).battingStyle || (extendedData as any)?.battingStyle || 'N/A'}
+                                    {player.battingStyle || extendedData?.battingStyle || 'N/A'}
                                 </span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Bowling</span>
                                 <span className="text-xs md:text-sm font-semibold text-white">
-                                    {(player as any).bowlingStyle || (extendedData as any)?.bowlingStyle || 'N/A'}
+                                    {player.bowlingStyle || extendedData?.bowlingStyle || 'N/A'}
                                 </span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Height</span>
                                 <span className="text-xs md:text-sm font-semibold text-white">
-                                    {(player as any).height || (extendedData as any)?.height || 'N/A'}
+                                    {player.height || extendedData?.height || 'N/A'}
                                 </span>
                             </div>
                         </div>
@@ -375,21 +385,21 @@ export function PlayerDetailDialog({
                                     {/* Data Rows */}
                                     {unifiedMatches.length > 0 ? unifiedMatches.map((matchItem, index) => {
                                         // Stats are merged directly into matchItem from player_match_stats
-                                        const hasStats = (matchItem as any).runs !== undefined || (matchItem as any).wickets !== undefined;
+                                        const hasStats = matchItem.runs !== undefined || matchItem.wickets !== undefined;
                                         const stats = hasStats ? matchItem : undefined;
 
                                         // Use DB fantasy_points if available, otherwise calculate
                                         const fpts = hasStats
-                                            ? ((matchItem as any).fantasyPoints ?? calculateFantasyPoints(stats as PlayerMatchPerformance))
+                                            ? (matchItem.fantasyPoints ?? calculateFantasyPoints(stats as PlayerMatchPerformance))
                                             : 0;
 
                                         const matchDate = matchItem.matchDate;
                                         const opponentShort = matchItem.opponentShort;
-                                        const isUpcoming = (matchItem as any).isUpcoming;
-                                        const result = (matchItem as any).result;
+                                        const isUpcoming = matchItem.isUpcoming;
+                                        const result = matchItem.result;
 
                                         // Week number
-                                        const weekNum = (matchItem as any).week || index + 1;
+                                        const weekNum = matchItem.week || index + 1;
 
                                         return (
                                             <div
@@ -432,7 +442,7 @@ export function PlayerDetailDialog({
                                                             // Extract value safely
                                                             let val: string | number | undefined = '-';
                                                             if (hasStats && stats) {
-                                                                val = (stats as any)[col.key];
+                                                                val = (stats as unknown as Record<string, string | number | undefined>)[col.key];
 
                                                                 // Formatting
                                                                 if (val === undefined || val === null) val = '-';

@@ -152,7 +152,7 @@ export const MockDraftBoard = () => {
       }, 500);
       return () => clearTimeout(timeout);
     }
-  }, [state.isActive, isUserTurn]);
+  }, [state.isActive, state.isComplete, isUserTurn, runAutoPickLoop]);
 
   const handleStartDraft = () => {
     const position = parseInt(selectedPosition);

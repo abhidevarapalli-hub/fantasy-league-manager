@@ -87,32 +87,41 @@ export const mapDbTransaction = (db: Tables<"transactions">): Activity => ({
   players: (db.players as unknown as PlayerTransaction[] | null) || undefined,
 });
 
-export const mapDbDraftPick = (db: any): DraftPick => ({
-  id: db.id,
-  leagueId: db.league_id,
-  round: db.round,
-  pickPosition: db.pick_position,
-  managerId: db.manager_id,
-  playerId: db.player_id,
-  isAutoDraft: db.is_auto_draft,
-  createdAt: new Date(db.created_at),
-  updatedAt: new Date(db.updated_at),
-});
+export const mapDbDraftPick = (db: DbDraftPick | Tables<"draft_picks"> | Record<string, unknown>): DraftPick => {
+  const row = db as DbDraftPick;
+  return {
+    id: row.id,
+    leagueId: row.league_id,
+    round: row.round,
+    pickPosition: row.pick_position,
+    managerId: row.manager_id,
+    playerId: row.player_id,
+    isAutoDraft: row.is_auto_draft,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+};
 
-export const mapDbDraftOrder = (db: any): DraftOrder => ({
-  id: db.id,
-  leagueId: db.league_id,
-  position: db.position,
-  managerId: db.manager_id,
-  autoDraftEnabled: db.auto_draft_enabled,
-});
+export const mapDbDraftOrder = (db: DbDraftOrder | Tables<"draft_order"> | Record<string, unknown>): DraftOrder => {
+  const row = db as DbDraftOrder;
+  return {
+    id: row.id,
+    leagueId: row.league_id,
+    position: row.position,
+    managerId: row.manager_id,
+    autoDraftEnabled: row.auto_draft_enabled,
+  };
+};
 
-export const mapDbDraftState = (db: any): DraftState => ({
-  id: db.id,
-  leagueId: db.league_id,
-  isFinalized: db.is_finalized,
-  finalizedAt: db.finalized_at ? new Date(db.finalized_at) : null,
-  isActive: db.is_active,
-  currentPickStartAt: db.current_pick_start_at ? new Date(db.current_pick_start_at) : null,
-  pausedAt: db.paused_at ? new Date(db.paused_at) : null,
-});
+export const mapDbDraftState = (db: DbDraftState | Tables<"draft_state"> | Record<string, unknown>): DraftState => {
+  const row = db as DbDraftState;
+  return {
+    id: row.id,
+    leagueId: row.league_id,
+    isFinalized: row.is_finalized,
+    finalizedAt: row.finalized_at ? new Date(row.finalized_at) : null,
+    isActive: row.is_active,
+    currentPickStartAt: row.current_pick_start_at ? new Date(row.current_pick_start_at) : null,
+    pausedAt: row.paused_at ? new Date(row.paused_at) : null,
+  };
+};

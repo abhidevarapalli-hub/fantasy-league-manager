@@ -93,6 +93,7 @@ export interface Activity {
   timestamp: Date;
   type: 'add' | 'drop' | 'trade' | 'score';
   managerId: string;
+  managerTeamName?: string;
   description: string;
   players?: PlayerTransaction[];
 }

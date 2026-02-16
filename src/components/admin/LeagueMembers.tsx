@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 export const LeagueMembers = () => {
   const managers = useGameStore(state => state.managers);
   const leagueOwnerId = useGameStore(state => state.leagueOwnerId);
+  const currentLeagueId = useGameStore(state => state.currentLeagueId);
   const [removingMember, setRemovingMember] = useState<string | null>(null);
 
   const handleRemoveMember = async (managerId: string) => {
@@ -16,33 +17,31 @@ export const LeagueMembers = () => {
 
     setRemovingMember(managerId);
     try {
-      const { data: allManagers, error: fetchError } = await (supabase
-        .from('managers' as any)
+      const { data: allManagers, error: fetchError } = await supabase
+        .from('managers')
         .select('id, created_at')
-        .eq('league_id', managers[0]?.id ? (managers[0] as any).league_id : '')
-        .order('created_at', { ascending: true }) as any);
+        .eq('league_id', currentLeagueId ?? '')
+        .order('created_at', { ascending: true });
 
       if (fetchError) throw fetchError;
 
-      const managerIndex = allManagers?.findIndex((m: any) => m.id === managerId) || 0;
+      const managerIndex = allManagers?.findIndex((m) => m.id === managerId) || 0;
       const placeholderIndex = managerIndex + 1;
 
-      const { error: updateError } = await (supabase
-        .from('managers' as any)
+      const { error: updateError } = await supabase
+        .from('managers')
         .update({
           user_id: null,
           name: `Manager ${placeholderIndex}`,
           team_name: `Empty Team ${placeholderIndex}`,
-          roster: [],
-          bench: []
         })
-        .eq('id', managerId) as any);
+        .eq('id', managerId);
 
       if (updateError) throw updateError;
 
       toast.success('Member removed successfully');
-    } catch (error: any) {
-      toast.error(`Failed to remove member: ${error.message}`);
+    } catch (error: unknown) {
+      toast.error(`Failed to remove member: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setRemovingMember(null);
     }
@@ -62,7 +61,7 @@ export const LeagueMembers = () => {
 
       <div className="space-y-3">
         {activeMembers.map(manager => {
-          const isOwner = (manager as any).user_id === leagueOwnerId;
+          const isOwner = manager.userId === leagueOwnerId;
 
           return (
             <div

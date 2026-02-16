@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSeedDatabase } from '@/hooks/useSeedDatabase';
 import { SUPPORTED_TOURNAMENTS, type Tournament } from '@/lib/tournaments';
@@ -105,8 +106,8 @@ const CreateLeague = () => {
 
             // Try to create league with tournament fields first
             // Fall back to without them if the migration hasn't been applied yet
-            let league: any;
-            let leagueError: any;
+            let league: Tables<"leagues"> | null;
+            let leagueError: { message: string; details?: string; hint?: string; code?: string } | null;
 
             const baseLeagueData = {
                 name: leagueName,
@@ -123,24 +124,24 @@ const CreateLeague = () => {
             };
 
             // First try with tournament fields
-            const resultWithTournament = await (supabase
-                .from('leagues' as any)
+            const resultWithTournament = await supabase
+                .from('leagues')
                 .insert({
                     ...baseLeagueData,
                     tournament_id: selectedTournament.id,
                     tournament_name: selectedTournament.name
                 })
                 .select()
-                .single() as any);
+                .single();
 
             if (resultWithTournament.error?.message?.includes('tournament_id')) {
                 // Migration not applied yet, try without tournament fields
                 console.warn('[CreateLeague] ⚠️ Tournament columns not found, creating without them');
-                const resultWithoutTournament = await (supabase
-                    .from('leagues' as any)
+                const resultWithoutTournament = await supabase
+                    .from('leagues')
                     .insert(baseLeagueData)
                     .select()
-                    .single() as any);
+                    .single();
                 league = resultWithoutTournament.data;
                 leagueError = resultWithoutTournament.error;
             } else {
@@ -154,6 +155,10 @@ const CreateLeague = () => {
             if (leagueError) {
                 console.error('[CreateLeague] ❌ Error creating league:', leagueError);
                 throw leagueError;
+            }
+
+            if (!league) {
+                throw new Error('League creation returned no data');
             }
 
             // 2. Create the creator's manager record
@@ -198,7 +203,7 @@ const CreateLeague = () => {
                 });
             }
 
-            let allManagers: any[] = [];
+            let allManagers: (Tables<"managers"> | null)[] = [];
             if (placeholders.length > 0) {
                 const { data: createdPlaceholders, error: placeholderError } = await supabase
                     .from('managers')
@@ -211,21 +216,21 @@ const CreateLeague = () => {
                 }
 
                 // Fetch the creator manager we just made to get its real ID
-                const { data: creatorManager } = await (supabase
-                    .from('managers' as any)
+                const { data: creatorManager } = await supabase
+                    .from('managers')
                     .select('*')
                     .eq('league_id', league.id)
                     .eq('user_id', user.id)
-                    .single() as any);
+                    .single();
 
-                allManagers = [creatorManager, ...createdPlaceholders];
+                allManagers = [creatorManager, ...(createdPlaceholders || [])];
             } else {
-                const { data: creatorManager } = await (supabase
-                    .from('managers' as any)
+                const { data: creatorManager } = await supabase
+                    .from('managers')
                     .select('*')
                     .eq('league_id', league.id)
                     .eq('user_id', user.id)
-                    .single() as any);
+                    .single();
                 allManagers = [creatorManager];
             }
 
@@ -236,13 +241,22 @@ const CreateLeague = () => {
             console.log('[CreateLeague] 📅 Step 4: Generating schedule...');
             const step4Start = performance.now();
 
-            const managerIds = allManagers.map(m => m.id);
+            const managerIds = allManagers.filter((m): m is Tables<"managers"> => m !== null).map(m => m.id);
             const numTeams = managerIds.length;
             const weeks = selectedTournament.type === 'international' ? 5 : 7;
-            const matchups: any[] = [];
+            interface ScheduleMatchup {
+                league_id: string;
+                week: number;
+                manager1_id: string;
+                manager2_id: string;
+                manager1_score: number;
+                manager2_score: number;
+                is_finalized: boolean;
+            }
+            const matchups: ScheduleMatchup[] = [];
 
             // Helper to shuffle array
-            const shuffle = (array: any[]) => {
+            const shuffle = <T,>(array: T[]): T[] => {
                 for (let i = array.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [array[i], array[j]] = [array[j], array[i]];
@@ -250,11 +264,11 @@ const CreateLeague = () => {
                 return array;
             };
 
-            const shuffledIds = shuffle([...managerIds]);
+            const shuffledIds: (string | null)[] = shuffle([...managerIds]);
             if (numTeams % 2 !== 0) shuffledIds.push(null); // Add BYE if odd
 
             const n = shuffledIds.length;
-            const rounds: any[][] = [];
+            const rounds: (string | null)[][][] = [];
 
             // Generate all possible rounds for a full round-robin
             for (let r = 0; r < n - 1; r++) {
@@ -337,10 +351,11 @@ const CreateLeague = () => {
 
             toast.success("League created successfully!");
             navigate(`/${league.id}`);
-        } catch (error: any) {
+        } catch (error: unknown) {
             const duration = performance.now() - overallStartTime;
             console.error(`[CreateLeague] ❌ Error after ${duration.toFixed(2)}ms:`, error);
-            toast.error(`Error: ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            toast.error(`Error: ${message}`);
         } finally {
             setLoading(false);
         }

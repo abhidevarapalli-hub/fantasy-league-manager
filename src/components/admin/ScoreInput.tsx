@@ -27,7 +27,7 @@ export const ScoreInput = () => {
       };
     });
     setMatchScores(initialScores);
-  }, [selectedWeek, schedule]);
+  }, [selectedWeek, schedule, weekMatches]);
 
   const allScoresEntered = weekMatches.every((_, idx) =>
     matchScores[idx]?.home && matchScores[idx]?.away

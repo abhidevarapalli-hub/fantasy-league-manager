@@ -356,7 +356,7 @@ export const useSeedDatabase = () => {
     if (!leagueId) return false;
     setSeeding(true);
     try {
-      await supabase.from("manager_roster" as any).delete().eq("league_id", leagueId);
+      await supabase.from("manager_roster").delete().eq("league_id", leagueId);
       await supabase.from("league_player_pool").delete().eq("league_id", leagueId);
       await seedDatabase(leagueId);
       return true;
@@ -447,7 +447,7 @@ export const useSeedDatabase = () => {
           60000,
           `API timeout`
         );
-      } catch (apiError: any) {
+      } catch (apiError: unknown) {
         console.error("[Seed] API fetch failed:", apiError);
         return await seedDatabase(leagueId);
       }
@@ -459,7 +459,18 @@ export const useSeedDatabase = () => {
       console.log(`[useSeedDatabase] 📥 Processing ${teamsWithPlayers.length} teams...`);
 
       // Flatten all players
-      const allPlayers: any[] = [];
+      interface SeedPlayer {
+        cricbuzz_id: string | null;
+        name: string;
+        primary_role: string;
+        is_international: boolean;
+        image_id: number | undefined;
+        batting_style: string | undefined;
+        bowling_style: string | undefined;
+        teams: string[];
+        team_code: string;
+      }
+      const allPlayers: SeedPlayer[] = [];
 
       for (const { team, players } of teamsWithPlayers) {
         const teamCode = getTeamCode(team.teamName);
@@ -550,7 +561,7 @@ export const useSeedDatabase = () => {
 
       return true;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[useSeedDatabase] ❌ Error seeding from tournament:`, error);
       return await seedDatabase(leagueId);
     } finally {
@@ -561,7 +572,7 @@ export const useSeedDatabase = () => {
   const reseedFromTournament = useCallback(async (leagueId: string, tournamentId: number) => {
     setSeeding(true);
     try {
-      await supabase.from("manager_roster" as any).delete().eq("league_id", leagueId);
+      await supabase.from("manager_roster").delete().eq("league_id", leagueId);
       await supabase.from("league_player_pool").delete().eq("league_id", leagueId);
       const result = await seedFromTournament(leagueId, tournamentId, true);
 

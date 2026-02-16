@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Player } from '@/lib/supabase-types';
 import { buildOptimalActive11 } from '@/lib/roster-validation';
 import { sortPlayersByPriority } from '@/lib/player-order';
+import type { TablesInsert } from '@/integrations/supabase/types';
 
 export const useDraft = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -81,7 +82,7 @@ export const useDraft = () => {
     };
 
     init();
-  }, [leagueId]);
+  }, [leagueId, setDraftState]);
 
   // Real-time updates are handled globally by useGameStore via LeagueLayout
 
@@ -131,7 +132,7 @@ export const useDraft = () => {
       toast.error('Failed to assign manager');
       console.error(error);
     }
-  }, [draftOrder]);
+  }, [draftOrder, setDraftOrder]);
 
   // Finalize draft - clear all rosters first, then insert into junction table with optimal Active 11
   const finalizeDraft = useCallback(async () => {
@@ -199,8 +200,8 @@ export const useDraft = () => {
 
         if (rosterEntries.length > 0) {
           const { error } = await supabase
-            .from('manager_roster' as 'managers')
-            .insert(rosterEntries as any);
+            .from('manager_roster')
+            .insert(rosterEntries);
 
           if (error) {
             console.error('Failed to insert manager roster:', error);
@@ -246,8 +247,8 @@ export const useDraft = () => {
         }));
 
         const { error: scheduleError } = await supabase
-          .from('league_schedules' as 'transactions')
-          .insert(scheduleRows as any);
+          .from('league_schedules')
+          .insert(scheduleRows);
 
         if (scheduleError) {
           console.error('Failed to save schedule:', scheduleError);
@@ -407,7 +408,7 @@ export const useDraft = () => {
           .eq('id', draftState.id);
       }
     }
-  }, [draftOrder, getPick, draftState, finalizeDraft, leagueId]);
+  }, [draftOrder, getPick, draftState, finalizeDraft, leagueId, setDraftPicks, setDraftState]);
 
   // Clear a pick
   const clearPick = useCallback(async (round: number, position: number) => {
@@ -469,7 +470,7 @@ export const useDraft = () => {
       console.error('Failed to reset draft:', error);
       toast.error('Failed to reset draft');
     }
-  }, [leagueId, draftState]);
+  }, [leagueId, draftState, setDraftPicks, setDraftState]);
 
   // Randomize draft order and auto-assign all managers
   const randomizeDraftOrder = useCallback(async () => {
@@ -484,11 +485,11 @@ export const useDraft = () => {
 
     // Prepare updates/inserts
     // We use upsert on (league_id, position)
-    const updates = Array.from({ length: slotsNeeded }).map((_, index) => {
+    const updates: TablesInsert<'draft_order'>[] = Array.from({ length: slotsNeeded }).map((_, index) => {
       const position = index + 1;
       const existing = draftOrder.find(o => o.position === position);
 
-      const update: any = {
+      const update: TablesInsert<'draft_order'> = {
         league_id: leagueId,
         position,
         manager_id: shuffledIds[index]
@@ -509,7 +510,7 @@ export const useDraft = () => {
       id: u.id || `temp-${u.position}`,
       leagueId: u.league_id,
       position: u.position,
-      managerId: u.manager_id,
+      managerId: u.manager_id || '',
       autoDraftEnabled: draftOrder.find(o => o.position === u.position)?.autoDraftEnabled || false
     })));
 
@@ -524,7 +525,7 @@ export const useDraft = () => {
       console.error('Failed to randomize order:', error);
       toast.error('Failed to randomize order. Please try again.');
     }
-  }, [draftOrder, managers, leagueId]);
+  }, [draftOrder, managers, leagueId, setDraftOrder]);
 
   // Toggle auto-draft for a manager
   const toggleAutoDraft = useCallback(async (managerId: string, enabled: boolean) => {
@@ -549,7 +550,7 @@ export const useDraft = () => {
       toast.error('Failed to toggle auto-draft');
       console.error(error);
     }
-  }, [draftOrder]);
+  }, [draftOrder, setDraftOrder]);
 
   // Start draft
   const startDraft = useCallback(async () => {
@@ -606,7 +607,7 @@ export const useDraft = () => {
       console.log('[useDraft] ✅ Draft state successfully updated to active');
       toast.success('Draft started!');
     }
-  }, [draftState, draftOrder, managers]);
+  }, [draftState, draftOrder, managers, setDraftState]);
 
   // Pause draft
   const pauseDraft = useCallback(async () => {
@@ -639,7 +640,7 @@ export const useDraft = () => {
         pausedAt: null
       });
     }
-  }, [draftState]);
+  }, [draftState, setDraftState]);
 
   // Resume draft
   const resumeDraft = useCallback(async () => {
@@ -681,7 +682,7 @@ export const useDraft = () => {
         pausedAt: draftState.pausedAt
       });
     }
-  }, [draftState]);
+  }, [draftState, setDraftState]);
 
   // Reset clock for current pick
   const resetClock = useCallback(async () => {

@@ -34,11 +34,11 @@ const ProfileSetup = () => {
         }
         setChecking(true);
         try {
-            const { data, error } = await (supabase
-                .from("profiles" as any)
+            const { data, error } = await supabase
+                .from("profiles")
                 .select("username")
                 .eq("username", val.toLowerCase())
-                .maybeSingle() as any);
+                .maybeSingle();
 
             if (!error) {
                 setAvailable(!data);
@@ -73,8 +73,8 @@ const ProfileSetup = () => {
             } else {
                 navigate("/leagues");
             }
-        } catch (error: any) {
-            toast.error(error.message);
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : 'An unexpected error occurred');
         } finally {
             setLoading(false);
         }

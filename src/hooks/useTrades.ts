@@ -9,6 +9,7 @@ export const useTrades = () => {
   const managers = useGameStore(state => state.managers);
   const players = useGameStore(state => state.players);
   const executeTrade = useGameStore(state => state.executeTrade);
+  const currentLeagueId = useGameStore(state => state.currentLeagueId);
   const isTradesInitialized = useGameStore(state => state.isTradesInitialized);
   const setIsTradesInitialized = useGameStore(state => state.setIsTradesInitialized);
 
@@ -43,7 +44,10 @@ export const useTrades = () => {
             .select('*'),
         ]);
 
-        const [tradesResult, tradePlayersResult] = await Promise.race([queryPromise, timeoutPromise]) as any;
+        const [tradesResult, tradePlayersResult] = await Promise.race([queryPromise, timeoutPromise]) as [
+          { data: DbTrade[] | null; error: { message: string } | null },
+          { data: DbTradePlayer[] | null; error: { message: string } | null }
+        ];
 
         const fetchDuration = performance.now() - fetchStartTime;
 
@@ -62,7 +66,7 @@ export const useTrades = () => {
           // Mark as initialized
           setIsTradesInitialized(true);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         const duration = performance.now() - fetchStartTime;
         // console.error(`[useTrades] ❌ Fatal error fetching trades (${duration.toFixed(2)}ms):`, error.message || error);
         // console.warn('[useTrades] ⚠️  Using empty trades array - trades table may not exist in database');
@@ -106,9 +110,14 @@ export const useTrades = () => {
 
   const proposeTrade = useCallback(
     async (proposerId: string, targetId: string, proposerPlayers: string[], targetPlayers: string[]) => {
+      if (!currentLeagueId) {
+        console.error('Error proposing trade: no league selected');
+        return false;
+      }
       const { data, error } = await supabase.from('trades').insert({
         proposer_id: proposerId,
         target_id: targetId,
+        league_id: currentLeagueId,
         status: 'pending',
       }).select('id').single();
 
@@ -133,7 +142,7 @@ export const useTrades = () => {
       // Don't log proposed trades - only log accepted trades in Activity
       return true;
     },
-    [managers, players]
+    [currentLeagueId]
   );
 
   const acceptTrade = useCallback(
@@ -183,6 +192,11 @@ export const useTrades = () => {
 
   const counterTrade = useCallback(
     async (originalTradeId: string, proposerId: string, targetId: string, proposerPlayers: string[], targetPlayers: string[]) => {
+      if (!currentLeagueId) {
+        console.error('Error creating counter trade: no league selected');
+        return false;
+      }
+
       // Mark original trade as countered
       await supabase.from('trades').update({ status: 'countered' }).eq('id', originalTradeId);
 
@@ -190,6 +204,7 @@ export const useTrades = () => {
       const { data, error } = await supabase.from('trades').insert({
         proposer_id: proposerId,
         target_id: targetId,
+        league_id: currentLeagueId,
         status: 'pending',
         parent_trade_id: originalTradeId,
       }).select('id').single();
@@ -223,7 +238,7 @@ export const useTrades = () => {
 
       return true;
     },
-    [managers, players]
+    [currentLeagueId, managers, players]
   );
 
   const getPendingTradesForManager = useCallback(

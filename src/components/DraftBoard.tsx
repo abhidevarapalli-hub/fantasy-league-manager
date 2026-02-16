@@ -4,6 +4,7 @@ import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { useGameStore } from '@/store/useGameStore';
 import { useDraft } from '@/hooks/useDraft';
 import type { Manager, Player } from '@/lib/supabase-types';
+import type { DraftState } from '@/lib/draft-types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -200,7 +201,7 @@ const DraftTimer = ({ getRemainingTime, isActive, isPaused }: { getRemainingTime
 };
 
 interface DraftLMControlsProps {
-  draftState: any;
+  draftState: DraftState | null;
   onRandomize: () => void;
   onStart: () => void;
   onPause: () => void;
