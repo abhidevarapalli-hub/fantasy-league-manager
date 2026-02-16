@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { UserPlus, Users, ArrowLeft, AlertCircle } from 'lucide-react';
+import { UserPlus, Users, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -152,8 +152,11 @@ const JoinLeague = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center p-4">
-                <div className="text-muted-foreground">Loading...</div>
+            <div className="min-h-screen bg-background flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
+                <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground text-sm">Loading league details...</p>
+                </div>
             </div>
         );
     }
