@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { PlayerCard } from '@/components/PlayerCard';
 import { cn } from '@/lib/utils';
 import { sortPlayersByPriority } from '@/lib/player-order';
-import { usePlayerFilters } from '@/hooks/usePlayerFilters';
+import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
 import { getTeamFilterColors, getTeamColors, getTeamPillStyles } from '@/lib/team-colors';
 
 const ROLE_AND_NATIONALITY_COLORS = {
@@ -82,7 +82,7 @@ export const DraftPickDialog = ({
       setSelectedRole('All');
       setSelectedNationality('All');
     }
-  }, [open, currentPlayerId]);
+  }, [open, currentPlayerId, setSearchQuery, setSelectedNationality, setSelectedRole, setSelectedTeam]);
 
   const selectedPlayer = useMemo(() => {
     return players.find(p => p.id === selectedPlayerId) || null;
@@ -178,7 +178,7 @@ export const DraftPickDialog = ({
                   {['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'].map((role) => (
                     <button
                       key={role}
-                      onClick={() => setSelectedRole(role as any)}
+                      onClick={() => setSelectedRole(role as RoleFilter)}
                       className={cn(
                         "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
                         selectedRole === role
@@ -199,7 +199,7 @@ export const DraftPickDialog = ({
                   {['All', 'Domestic', 'International'].map((nationality) => (
                     <button
                       key={nationality}
-                      onClick={() => setSelectedNationality(nationality as any)}
+                      onClick={() => setSelectedNationality(nationality as NationalityFilter)}
                       className={cn(
                         "px-2 py-1 text-[10px] font-medium rounded-full border transition-all whitespace-nowrap",
                         selectedNationality === nationality

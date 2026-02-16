@@ -36,10 +36,10 @@ interface AuthState {
     setIsLoading: (loading: boolean) => void;
 
     // Actions
-    signOut: () => Promise<{ error: any }>;
+    signOut: () => Promise<{ error: Error | null }>;
     selectManager: (managerName: string, leagueId?: string) => Promise<void>;
     fetchManagerProfile: (name?: string, leagueId?: string) => Promise<void>;
-    updateUsername: (username: string) => Promise<{ error: any }>;
+    updateUsername: (username: string) => Promise<{ error: Error | null }>;
     refreshProfile: () => Promise<void>;
 
     // Computed
@@ -82,7 +82,7 @@ export const useAuthStore = create<AuthState>()(
                 if (!user) return;
 
                 try {
-                    const query = supabase.from('managers' as any).select('*').eq('name', managerName);
+                    const query = supabase.from('managers').select('*').eq('name', managerName);
                     if (leagueId) query.eq('league_id', leagueId);
 
                     const { data, error } = await query.maybeSingle();
@@ -102,7 +102,7 @@ export const useAuthStore = create<AuthState>()(
                 }
 
                 try {
-                    let query = supabase.from('managers' as any).select('*');
+                    let query = supabase.from('managers').select('*');
 
                     if (name) {
                         query = query.eq('name', name);
@@ -132,7 +132,7 @@ export const useAuthStore = create<AuthState>()(
                 if (!user) return { error: new Error('No user logged in') };
 
                 const { error } = await supabase
-                    .from('profiles' as any)
+                    .from('profiles')
                     .update({ username })
                     .eq('id', user.id);
 
@@ -154,7 +154,7 @@ export const useAuthStore = create<AuthState>()(
 
                 try {
                     const { data, error } = await supabase
-                        .from('profiles' as any)
+                        .from('profiles')
                         .select('*')
                         .eq('id', currentUser.id)
                         .maybeSingle();
@@ -166,7 +166,7 @@ export const useAuthStore = create<AuthState>()(
                     } else {
                         // Create profile if it doesn't exist
                         const { data: newProfile } = await supabase
-                            .from('profiles' as any)
+                            .from('profiles')
                             .insert({ id: currentUser.id })
                             .select()
                             .maybeSingle();
@@ -229,7 +229,7 @@ export const useAuthStore = create<AuthState>()(
                             set({ userProfile: null, managerProfile: null });
                         }
                     });
-                } catch (error: any) {
+                } catch (error: unknown) {
                     console.error('Error initializing auth:', error);
                 } finally {
                     set({ isLoading: false });

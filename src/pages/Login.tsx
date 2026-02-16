@@ -28,7 +28,7 @@ const Login = () => {
     if (user && leagueId && !managerProfile && !authLoading) {
       fetchManagerProfile(undefined, leagueId);
     }
-  }, [user, leagueId, managerProfile, authLoading]);
+  }, [user, leagueId, managerProfile, authLoading, fetchManagerProfile]);
 
   useEffect(() => {
     // If fully authenticated and has a profile for this context, go to dashboard
@@ -59,8 +59,8 @@ const Login = () => {
         }
       });
       if (error) throw error;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     }
   };
 

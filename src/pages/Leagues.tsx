@@ -6,8 +6,12 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useGameStore } from '@/store/useGameStore';
 import { useNavigate } from 'react-router-dom';
 import { PlusCircle, Loader2, ChevronRight, Trash2, UserCircle, LogOut, Users } from 'lucide-react';
+import type { Tables } from '@/integrations/supabase/types';
 
 import { toast } from 'sonner';
+
+type ManagerRow = Tables<"managers">;
+type LeagueRow = Tables<"leagues">;
 
 interface League {
     id: string;
@@ -47,10 +51,10 @@ const Leagues = () => {
             // const managersStartTime = performance.now();
             // console.log('[Leagues] 👥 Fetching managers for user...');
 
-            const { data: managerData, error: managerError } = await (supabase
-                .from('managers' as any)
+            const { data: managerData, error: managerError } = await supabase
+                .from('managers')
                 .select('league_id')
-                .eq('user_id', user.id) as any);
+                .eq('user_id', user.id);
 
             // const managersDuration = performance.now() - managersStartTime;
             // console.log(`[Leagues] ✅ Managers fetch completed in ${managersDuration.toFixed(2)}ms (${managerData?.length || 0} managers)`);
@@ -61,7 +65,7 @@ const Leagues = () => {
             }
 
             // Get unique league IDs and filter out nulls
-            const leagueIds = (managerData?.map((m: any) => m.league_id) || [])
+            const leagueIds = (managerData?.map((m: Pick<ManagerRow, 'league_id'>) => m.league_id) || [])
                 .filter((id: string | null) => id !== null);
 
             // console.log(`[Leagues] 🎯 Found ${leagueIds.length} unique league IDs`);
@@ -78,10 +82,10 @@ const Leagues = () => {
             // const leaguesStartTime = performance.now();
             // console.log('[Leagues] 🏆 Fetching league details...');
 
-            const { data: leaguesData, error: leaguesError } = await (supabase
-                .from('leagues' as any)
+            const { data: leaguesData, error: leaguesError } = await supabase
+                .from('leagues')
                 .select('*')
-                .in('id', leagueIds) as any);
+                .in('id', leagueIds);
 
             // const leaguesDuration = performance.now() - leaguesStartTime;
             // console.log(`[Leagues] ✅ Leagues fetch completed in ${leaguesDuration.toFixed(2)}ms (${leaguesData?.length || 0} leagues)`);
@@ -96,10 +100,10 @@ const Leagues = () => {
             // const statsStartTime = performance.now();
             // console.log('[Leagues] 📊 Fetching league stats...');
 
-            const { data: allManagers, error: allManagersError } = await (supabase
-                .from('managers' as any)
+            const { data: allManagers, error: allManagersError } = await supabase
+                .from('managers')
                 .select('league_id, name, is_league_manager, user_id')
-                .in('league_id', leagueIds) as any);
+                .in('league_id', leagueIds);
 
             // const statsDuration = performance.now() - statsStartTime;
 
@@ -108,15 +112,15 @@ const Leagues = () => {
             }
 
             // Process stats
-            const processedLeagues = (leaguesData || []).map((league: any) => {
-                const leagueManagers = allManagers?.filter((m: any) => m.league_id === league.id) || [];
+            const processedLeagues = (leaguesData || []).map((league: LeagueRow) => {
+                const leagueManagers = allManagers?.filter((m) => m.league_id === league.id) || [];
 
                 // Find LM
-                const lm = leagueManagers.find((m: any) => m.is_league_manager);
+                const lm = leagueManagers.find((m) => m.is_league_manager);
 
                 // Count active (non-placeholder) managers
                 // A manager is active if they have a user_id associated
-                const activeCount = leagueManagers.filter((m: any) => m.user_id !== null).length;
+                const activeCount = leagueManagers.filter((m) => m.user_id !== null).length;
 
                 return {
                     ...league,
@@ -133,15 +137,16 @@ const Leagues = () => {
 
             // Mark as initialized
             setIsLeaguesInitialized(true);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // const duration = performance.now() - fetchStartTime;
             // console.error(`[Leagues] ❌ Error in fetchLeagues after ${duration.toFixed(2)}ms:`, error.message);
-            console.error(`[Leagues] ❌ Error in fetchLeagues:`, error.message);
+            const message = error instanceof Error ? error.message : String(error);
+            console.error(`[Leagues] ❌ Error in fetchLeagues:`, message);
             toast.error("Failed to load leagues. Please check your database connection.");
         } finally {
             setLoading(false);
         }
-    }, [user, isLoading, isLeaguesInitialized, setIsLeaguesInitialized]);
+    }, [user, setIsLeaguesInitialized]);
 
     useEffect(() => {
         if (user && user.id) {
@@ -163,17 +168,18 @@ const Leagues = () => {
         if (!confirm('Are you sure you want to delete this league? All associated data will be lost.')) return;
 
         try {
-            const { error } = await (supabase
-                .from('leagues' as any)
+            const { error } = await supabase
+                .from('leagues')
                 .delete()
-                .eq('id', leagueId) as any);
+                .eq('id', leagueId);
 
             if (error) throw error;
 
             setLeagues(leagues.filter(l => l.id !== leagueId));
             toast.success('League deleted successfully');
-        } catch (error: any) {
-            toast.error(`Error deleting league: ${error.message}`);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            toast.error(`Error deleting league: ${message}`);
         }
     };
 

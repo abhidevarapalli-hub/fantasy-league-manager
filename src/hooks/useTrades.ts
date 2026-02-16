@@ -43,7 +43,10 @@ export const useTrades = () => {
             .select('*'),
         ]);
 
-        const [tradesResult, tradePlayersResult] = await Promise.race([queryPromise, timeoutPromise]) as any;
+        const [tradesResult, tradePlayersResult] = await Promise.race([queryPromise, timeoutPromise]) as [
+          { data: DbTrade[] | null; error: { message: string } | null },
+          { data: DbTradePlayer[] | null; error: { message: string } | null }
+        ];
 
         const fetchDuration = performance.now() - fetchStartTime;
 
@@ -62,7 +65,7 @@ export const useTrades = () => {
           // Mark as initialized
           setIsTradesInitialized(true);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         const duration = performance.now() - fetchStartTime;
         // console.error(`[useTrades] ❌ Fatal error fetching trades (${duration.toFixed(2)}ms):`, error.message || error);
         // console.warn('[useTrades] ⚠️  Using empty trades array - trades table may not exist in database');
@@ -133,7 +136,7 @@ export const useTrades = () => {
       // Don't log proposed trades - only log accepted trades in Activity
       return true;
     },
-    [managers, players]
+    []
   );
 
   const acceptTrade = useCallback(

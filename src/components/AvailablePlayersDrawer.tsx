@@ -32,6 +32,19 @@ const roleAbbreviations: Record<string, string> = {
   'All': 'All',
 };
 
+interface DebugInfo {
+  picks: number;
+  resolved: number;
+  active: number;
+  bench: number;
+  cfgActive: number;
+  cfgBench: number;
+}
+
+interface ManagerWithDebug {
+  _debugInfo?: DebugInfo;
+}
+
 interface AvailablePlayersDrawerProps {
   draftedPlayerIds: string[];
   onSelectPlayer?: (playerId: string) => void;
@@ -139,7 +152,7 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
         .filter((p): p is Player => p !== undefined);
 
       // Distribute into Active and Bench using the validation logic
-      let { active, bench } = buildOptimalActive11(pickedPlayers, config);
+      const { active, bench } = buildOptimalActive11(pickedPlayers, config);
 
       if (manager.teamName === 'Run') {
         console.log(`[Drawer Debug] Picks=${managerPicks.length}, Resolved=${pickedPlayers.length}`);
@@ -147,7 +160,7 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
         console.log(`[Drawer] Config: ActiveSize=${config.activeSize}, BenchSize=${config.benchSize}`);
 
         // Debug attachment
-        (manager as any)._debugInfo = {
+        (manager as unknown as ManagerWithDebug)._debugInfo = {
           picks: managerPicks.length,
           resolved: pickedPlayers.length,
           active: active.length,
@@ -407,14 +420,14 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
                     <div className="flex justify-between items-center py-1 border-b px-1">
                       <h3 className="font-bold text-sm truncate max-w-[70%]">
                         {manager.teamName}
-                        {(manager as any)._debugInfo && (
+                        {(manager as unknown as ManagerWithDebug)._debugInfo && (
                           <span className="text-[10px] ml-2 text-yellow-500 font-mono">
-                            P:{(manager as any)._debugInfo.picks}/
-                            R:{(manager as any)._debugInfo.resolved}
-                            Activ:{(manager as any)._debugInfo.active}/
-                            ActCfg:{(manager as any)._debugInfo.cfgActive}
-                            Bnch:{(manager as any)._debugInfo.bench}/
-                            BnchCfg:{(manager as any)._debugInfo.cfgBench}
+                            P:{(manager as unknown as ManagerWithDebug)._debugInfo.picks}/
+                            R:{(manager as unknown as ManagerWithDebug)._debugInfo.resolved}
+                            Activ:{(manager as unknown as ManagerWithDebug)._debugInfo.active}/
+                            ActCfg:{(manager as unknown as ManagerWithDebug)._debugInfo.cfgActive}
+                            Bnch:{(manager as unknown as ManagerWithDebug)._debugInfo.bench}/
+                            BnchCfg:{(manager as unknown as ManagerWithDebug)._debugInfo.cfgBench}
                           </span>
                         )}
                       </h3>

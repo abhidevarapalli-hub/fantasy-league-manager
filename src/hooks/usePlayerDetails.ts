@@ -4,6 +4,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { Tables } from '@/integrations/supabase/types';
 import {
   fetchPlayerInfo,
   fetchPlayerBattingStats,
@@ -57,7 +58,7 @@ export interface PlayerDetails {
  * Transform API rankings object to array format
  * Note: New API response structure already returns array, so we just pass it through or return empty
  */
-function transformRankings(apiRankings: any): RankingEntry[] {
+function transformRankings(apiRankings: unknown): RankingEntry[] {
   if (Array.isArray(apiRankings)) {
     return apiRankings as RankingEntry[];
   }
@@ -320,7 +321,7 @@ export function useSeriesMatches(seriesId: number | null) {
         };
 
         // Map DB structure to API structure to maintain compatibility
-        return data.map((m: any) => ({
+        return data.map((m: Tables<"cricket_matches">) => ({
           matchInfo: {
             matchId: m.cricbuzz_match_id,
             matchDesc: m.match_description || '',

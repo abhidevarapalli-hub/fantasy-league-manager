@@ -31,11 +31,11 @@ const JoinLeague = () => {
 
             try {
                 // Fetch league details
-                const { data: league, error: leagueError } = await (supabase
-                    .from('leagues' as any)
+                const { data: league, error: leagueError } = await supabase
+                    .from('leagues')
                     .select('name')
                     .eq('id', leagueId)
-                    .single() as any);
+                    .single();
 
 
                 if (leagueError) {
@@ -48,12 +48,12 @@ const JoinLeague = () => {
                 setLeagueName(league.name);
 
                 // Check if user is already a manager in this league
-                const { data: existingManager } = await (supabase
-                    .from('managers' as any)
+                const { data: existingManager } = await supabase
+                    .from('managers')
                     .select('id')
                     .eq('league_id', leagueId)
                     .eq('user_id', user.id)
-                    .maybeSingle() as any);
+                    .maybeSingle();
 
 
                 if (existingManager) {
@@ -63,10 +63,10 @@ const JoinLeague = () => {
                 }
 
                 // Check if there are available slots
-                const { data: managers, error: managersError } = await (supabase
-                    .from('managers' as any)
+                const { data: managers, error: managersError } = await supabase
+                    .from('managers')
                     .select('id, user_id')
-                    .eq('league_id', leagueId) as any);
+                    .eq('league_id', leagueId);
 
 
                 if (managersError) {
@@ -75,7 +75,7 @@ const JoinLeague = () => {
                     return;
                 }
 
-                const availableSlots = managers?.filter((m: any) => m.user_id === null) || [];
+                const availableSlots = managers?.filter((m) => m.user_id === null) || [];
 
                 setIsFull(availableSlots.length === 0);
 
@@ -106,13 +106,13 @@ const JoinLeague = () => {
         setJoining(true);
         try {
             // Find the first available manager slot
-            const { data: availableManagers, error: fetchError } = await (supabase
-                .from('managers' as any)
+            const { data: availableManagers, error: fetchError } = await supabase
+                .from('managers')
                 .select('id, name')
                 .eq('league_id', leagueId)
                 .is('user_id', null)
                 .order('created_at', { ascending: true })
-                .limit(1) as any);
+                .limit(1);
 
             if (fetchError) throw fetchError;
 
@@ -125,14 +125,14 @@ const JoinLeague = () => {
             const managerToUpdate = availableManagers[0];
 
             // Update the manager record with user's information
-            const { error: updateError } = await (supabase
-                .from('managers' as any)
+            const { error: updateError } = await supabase
+                .from('managers')
                 .update({
                     user_id: user.id,
                     name: userProfile.username,
                     team_name: teamName.trim()
                 })
-                .eq('id', managerToUpdate.id) as any);
+                .eq('id', managerToUpdate.id);
 
             if (updateError) throw updateError;
 
@@ -141,9 +141,10 @@ const JoinLeague = () => {
             // Navigate to the league dashboard
             navigate(`/${leagueId}`);
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error joining league:', error);
-            toast.error(`Failed to join league: ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            toast.error(`Failed to join league: ${message}`);
         } finally {
             setJoining(false);
         }

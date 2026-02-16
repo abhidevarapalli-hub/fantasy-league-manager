@@ -387,8 +387,15 @@ function extractManOfMatch(scorecard: CricbuzzScorecard): { id: number; name: st
 // Normalize scoring rules from DB format to expected format
 // DB format uses: matchBonuses, batting.duck, batting.milestones as flat object, etc.
 // Expected format uses: common, batting.duckDismissal, batting.milestones as array, etc.
-// deno-lint-ignore no-explicit-any
-function normalizeScoringRules(dbRules: any): ScoringRules {
+interface DbScoringRulesFormat {
+  common?: ScoringRules['common'];
+  matchBonuses?: Record<string, number>;
+  batting?: Record<string, unknown>;
+  bowling?: Record<string, unknown>;
+  fielding?: Record<string, unknown>;
+}
+
+function normalizeScoringRules(dbRules: DbScoringRulesFormat | null): ScoringRules {
   const defaults: ScoringRules = {
     common: { starting11: 5, matchWinningTeam: 5, impactPlayer: 5, impactPlayerWinBonus: 5, manOfTheMatch: 50 },
     batting: {
@@ -424,8 +431,7 @@ function normalizeScoringRules(dbRules: any): ScoringRules {
   if (dbRules.common) return dbRules;
 
   // Convert from DB format (matchBonuses, flat milestones, different field names)
-  // deno-lint-ignore no-explicit-any
-  function normalizeBattingMilestones(milestones: any): { runs: number; points: number }[] {
+  function normalizeBattingMilestones(milestones: unknown): { runs: number; points: number }[] {
     if (Array.isArray(milestones)) return milestones;
     if (!milestones || typeof milestones !== 'object') return defaults.batting.milestones;
     const result: { runs: number; points: number }[] = [];
@@ -437,8 +443,7 @@ function normalizeScoringRules(dbRules: any): ScoringRules {
     return result.length > 0 ? result : defaults.batting.milestones;
   }
 
-  // deno-lint-ignore no-explicit-any
-  function normalizeWicketMilestones(milestones: any): { wickets: number; points: number }[] {
+  function normalizeWicketMilestones(milestones: unknown): { wickets: number; points: number }[] {
     if (Array.isArray(milestones)) return milestones;
     if (!milestones || typeof milestones !== 'object') return defaults.bowling.milestones;
     const result: { wickets: number; points: number }[] = [];
@@ -466,8 +471,7 @@ function normalizeScoringRules(dbRules: any): ScoringRules {
       duckDismissal: dbRules.batting?.duck ?? defaults.batting.duckDismissal,
       lowScoreDismissal: dbRules.batting?.lowScore ?? defaults.batting.lowScoreDismissal,
       strikeRateBonuses: (dbRules.batting?.strikeRateBonuses || defaults.batting.strikeRateBonuses).map(
-        // deno-lint-ignore no-explicit-any
-        (b: any) => ({ minSR: b.minSR, maxSR: b.maxSR, points: b.points, minBalls: b.minBalls, minRuns: b.minRuns })
+        (b: { minSR: number; maxSR: number; points: number; minBalls?: number; minRuns?: number }) => ({ minSR: b.minSR, maxSR: b.maxSR, points: b.points, minBalls: b.minBalls, minRuns: b.minRuns })
       ),
     },
     bowling: {
@@ -479,8 +483,7 @@ function normalizeScoringRules(dbRules: any): ScoringRules {
       noBallPenalty: dbRules.bowling?.noBalls ?? defaults.bowling.noBallPenalty,
       maidenOver: dbRules.bowling?.maidens ?? defaults.bowling.maidenOver,
       economyRateBonuses: (dbRules.bowling?.economyBonuses || defaults.bowling.economyRateBonuses).map(
-        // deno-lint-ignore no-explicit-any
-        (b: any) => ({ minER: b.minER, maxER: b.maxER, points: b.points, minOvers: b.minOvers })
+        (b: { minER: number; maxER: number; points: number; minOvers?: number }) => ({ minER: b.minER, maxER: b.maxER, points: b.points, minOvers: b.minOvers })
       ),
     },
     fielding: {
@@ -805,7 +808,8 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Live stats poller error:', error);
 
     // Try to record the error
@@ -818,7 +822,7 @@ serve(async (req) => {
 
         await supabase.rpc('record_poll_error', {
           p_cricbuzz_match_id: body.cricbuzz_match_id,
-          p_error_message: error.message,
+          p_error_message: errorMessage,
         });
       }
     } catch (e) {
@@ -826,7 +830,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ error: 'Polling failed', details: error.message }),
+      JSON.stringify({ error: 'Polling failed', details: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
+import { Tables, Json } from '@/integrations/supabase/types';
 import { PlayerTransaction } from '@/lib/supabase-types';
 import { DEFAULT_LEAGUE_CONFIG, canAddToActive } from '@/lib/roster-validation';
 import { DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
@@ -140,7 +140,7 @@ export const useGameStore = create<GameState>()(
           if (manager.activeRoster.includes(dropPlayerId)) newActiveCount--;
           if (manager.bench.includes(dropPlayerId)) newBenchCount--;
           // Delete from junction table
-          await supabase.from("manager_roster" as "managers").delete().eq("player_id", dropPlayerId).eq("league_id", currentLeagueId);
+          await supabase.from("manager_roster").delete().eq("player_id", dropPlayerId).eq("league_id", currentLeagueId);
         }
 
         const activeNotFull = newActiveCount < config.activeSize;
@@ -157,13 +157,13 @@ export const useGameStore = create<GameState>()(
         }
 
         // Insert into junction table
-        const { error } = await supabase.from("manager_roster" as "managers").insert({
+        const { error } = await supabase.from("manager_roster").insert({
           manager_id: managerId,
           player_id: playerId,
           league_id: currentLeagueId,
           slot_type: slotType,
           position: slotType === 'active' ? newActiveCount : newBenchCount,
-        } as any);
+        });
 
         if (error) {
           toast.error(`Failed to add player: ${error.message}`);
@@ -184,7 +184,7 @@ export const useGameStore = create<GameState>()(
           type: "add" as const,
           manager_id: managerId,
           description,
-          players: playerTransactions as any,
+          players: playerTransactions as unknown as Json,
           league_id: currentLeagueId,
         });
 
@@ -204,7 +204,7 @@ export const useGameStore = create<GameState>()(
 
         // Delete from junction table
         const { error } = await supabase
-          .from("manager_roster" as "managers")
+          .from("manager_roster")
           .delete()
           .eq("player_id", playerId)
           .eq("league_id", currentLeagueId);
@@ -218,7 +218,7 @@ export const useGameStore = create<GameState>()(
           type: "drop" as const,
           manager_id: managerId,
           description: `${manager.teamName} dropped ${player.name}`,
-          players: [{ type: "drop", playerName: player.name, role: player.role, team: player.team }] as any,
+          players: [{ type: "drop", playerName: player.name, role: player.role, team: player.team }] as unknown as Json,
           league_id: currentLeagueId,
         });
 
@@ -240,8 +240,8 @@ export const useGameStore = create<GameState>()(
 
         // Update slot_type in junction table
         const { error } = await supabase
-          .from("manager_roster" as "managers")
-          .update({ slot_type: 'active', position: manager.activeRoster.length } as any)
+          .from("manager_roster")
+          .update({ slot_type: 'active', position: manager.activeRoster.length })
           .eq("player_id", playerId)
           .eq("league_id", currentLeagueId);
 
@@ -261,8 +261,8 @@ export const useGameStore = create<GameState>()(
 
         // Update slot_type in junction table
         const { error } = await supabase
-          .from("manager_roster" as "managers")
-          .update({ slot_type: 'bench', position: manager.bench.length } as any)
+          .from("manager_roster")
+          .update({ slot_type: 'bench', position: manager.bench.length })
           .eq("player_id", playerId)
           .eq("league_id", currentLeagueId);
 
@@ -287,13 +287,13 @@ export const useGameStore = create<GameState>()(
         // Swap slot_types in junction table
         const [update1, update2] = await Promise.all([
           supabase
-            .from("manager_roster" as "managers")
-            .update({ slot_type: player1InActive ? 'bench' : 'active' } as any)
+            .from("manager_roster")
+            .update({ slot_type: player1InActive ? 'bench' : 'active' })
             .eq("player_id", player1Id)
             .eq("league_id", currentLeagueId),
           supabase
-            .from("manager_roster" as "managers")
-            .update({ slot_type: player2InActive ? 'bench' : 'active' } as any)
+            .from("manager_roster")
+            .update({ slot_type: player2InActive ? 'bench' : 'active' })
             .eq("player_id", player2Id)
             .eq("league_id", currentLeagueId),
         ]);
@@ -406,7 +406,7 @@ export const useGameStore = create<GameState>()(
 
         // Remove from manager_roster junction table (cascade handles this for us, but we do it explicitly)
         await supabase
-          .from("manager_roster" as "managers")
+          .from("manager_roster")
           .delete()
           .eq("player_id", playerId)
           .eq("league_id", currentLeagueId);
@@ -444,8 +444,8 @@ export const useGameStore = create<GameState>()(
         const trade1to2 = players1.map(playerId => {
           const wasActive = manager1.activeRoster.includes(playerId);
           return supabase
-            .from("manager_roster" as "managers")
-            .update({ manager_id: manager2Id, slot_type: wasActive ? 'active' : 'bench' } as any)
+            .from("manager_roster")
+            .update({ manager_id: manager2Id, slot_type: wasActive ? 'active' : 'bench' })
             .eq("player_id", playerId)
             .eq("league_id", currentLeagueId);
         });
@@ -454,8 +454,8 @@ export const useGameStore = create<GameState>()(
         const trade2to1 = players2.map(playerId => {
           const wasActive = manager2.activeRoster.includes(playerId);
           return supabase
-            .from("manager_roster" as "managers")
-            .update({ manager_id: manager1Id, slot_type: wasActive ? 'active' : 'bench' } as any)
+            .from("manager_roster")
+            .update({ manager_id: manager1Id, slot_type: wasActive ? 'active' : 'bench' })
             .eq("player_id", playerId)
             .eq("league_id", currentLeagueId);
         });
@@ -481,7 +481,7 @@ export const useGameStore = create<GameState>()(
 
         // Delete all roster entries for this league from junction table
         await supabase
-          .from("manager_roster" as "managers")
+          .from("manager_roster")
           .delete()
           .eq("league_id", currentLeagueId);
 
@@ -505,7 +505,7 @@ export const useGameStore = create<GameState>()(
           const { error } = await supabase
             .from('scoring_rules')
             .upsert(
-              { league_id: currentLeagueId, rules } as any,
+              { league_id: currentLeagueId, rules: rules as unknown as Json },
               { onConflict: 'league_id' }
             );
 
@@ -582,7 +582,7 @@ export const useGameStore = create<GameState>()(
 
           // Update the database
           const { error } = await supabase
-            .from('leagues' as 'leagues')
+            .from('leagues' as const)
             .update(dbUpdate)
             .eq('id', currentLeagueId);
 
@@ -620,7 +620,7 @@ export const useGameStore = create<GameState>()(
 
         try {
           const leagueConfigStart = performance.now();
-          const { data: leagueDataRaw } = await supabase.from("leagues" as 'leagues').select("*").eq("id", leagueId).single();
+          const { data: leagueDataRaw } = await supabase.from("leagues").select("*").eq("id", leagueId).single();
           const leagueData = leagueDataRaw as Record<string, unknown> | null;
           const leagueConfigDuration = performance.now() - leagueConfigStart;
           // console.log(`[useGameStore] ⚙️  League config fetched in ${leagueConfigDuration.toFixed(2)}ms`);
@@ -661,11 +661,11 @@ export const useGameStore = create<GameState>()(
           const [playersRes, managersRes, rosterRes, scheduleRes, transactionsRes, draftPicksRes, draftOrderRes, draftStateRes] = await Promise.all([
             // Query the league_players view which joins master_players + league_player_pool
             supabase.from("league_players").select("*").eq("league_id", leagueId).order("name"),
-            supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
+            supabase.from("managers").select("*").eq("league_id", leagueId).order("name"),
             // Fetch roster entries from junction table
-            supabase.from("manager_roster" as "managers").select("*").eq("league_id", leagueId),
+            supabase.from("manager_roster").select("*").eq("league_id", leagueId),
             supabase.from("league_schedules").select("*").eq("league_id", leagueId).order("week").order("created_at"),
-            supabase.from("transactions" as 'transactions').select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
+            supabase.from("transactions").select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
             supabase.from("draft_picks").select("*").eq("league_id", leagueId).order("round").order("pick_position"),
             supabase.from("draft_order").select("*").eq("league_id", leagueId).order("position"),
             supabase.from("draft_state").select("*").eq("league_id", leagueId).maybeSingle(),
@@ -744,8 +744,8 @@ export const useGameStore = create<GameState>()(
           .on("postgres_changes", { event: "*", schema: "public", table: "manager_roster", filter }, async () => {
             // Refetch managers with their rosters when junction table changes
             const [managersRes, rosterRes] = await Promise.all([
-              supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
-              supabase.from("manager_roster" as "managers").select("*").eq("league_id", leagueId),
+              supabase.from("managers").select("*").eq("league_id", leagueId).order("name"),
+              supabase.from("manager_roster").select("*").eq("league_id", leagueId),
             ]);
             if (managersRes.data && rosterRes.data) {
               const rosterEntries = rosterRes.data as unknown as ManagerRosterEntry[];

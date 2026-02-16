@@ -14,7 +14,7 @@ serve(async (req) => {
   const startTime = Date.now();
   let matchesChecked = 0;
   let matchesActivated = 0;
-  let errors: string[] = [];
+  const errors: string[] = [];
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Tables } from "@/integrations/supabase/types";
+import { Tables, TablesInsert } from "@/integrations/supabase/types";
+import type { Json } from "@/integrations/supabase/types";
 import { Player, Manager, Match, Activity, PlayerTransaction } from "@/lib/supabase-types";
 import {
   DEFAULT_LEAGUE_CONFIG,
@@ -11,21 +12,6 @@ import {
 import { ScoringRules, DEFAULT_SCORING_RULES, mergeScoringRules } from "@/lib/scoring-types";
 import { recomputeLeaguePoints } from "@/lib/scoring-recompute";
 import { ManagerRosterEntry, mapDbManagerWithRoster } from "@/store/gameStore/mappers";
-
-interface DbLeague {
-  id: string;
-  name: string;
-  league_manager_id: string;
-  manager_count: number;
-  active_size: number;
-  bench_size: number;
-  min_batsmen: number;
-  max_batsmen: number;
-  min_bowlers: number;
-  min_wks: number;
-  min_all_rounders: number;
-  max_international: number;
-}
 
 // Helper to map DB rows to frontend types
 // Uses league_players view which joins master_players + league_player_pool
@@ -94,11 +80,11 @@ export const useRealtimeGame = (leagueId?: string) => {
     setLoading(true);
     try {
       // Fetch League Config first
-      const { data: leagueData } = await (supabase
-        .from("leagues" as any)
+      const { data: leagueData } = await supabase
+        .from("leagues")
         .select("*")
         .eq("id", leagueId)
-        .single() as any);
+        .single();
 
       if (leagueData) {
         setLeagueName(leagueData.name);
@@ -127,26 +113,29 @@ export const useRealtimeGame = (leagueId?: string) => {
         setScoringRules(mergeScoringRules(scoringRulesData.rules as Record<string, unknown>));
       }
 
-      const buildQuery = (table: string) => {
-        return supabase.from(table as any).select("*").eq("league_id", leagueId);
-      };
-
       const [playersRes, managersRes, rosterRes, scheduleRes, transactionsRes] = await Promise.all([
         supabase.from("league_players").select("*").eq("league_id", leagueId).order("name"),
-        (buildQuery("managers") as any).order("name"),
+        supabase.from("managers").select("*").eq("league_id", leagueId).order("name"),
         // Fetch roster entries from junction table
-        supabase.from("manager_roster" as "managers").select("*").eq("league_id", leagueId),
-        (buildQuery("league_schedules") as any).order("week").order("created_at"),
-        (buildQuery("transactions") as any).order("created_at", { ascending: false }).limit(50),
+        supabase.from("manager_roster").select("*").eq("league_id", leagueId),
+        supabase.from("league_schedules").select("*").eq("league_id", leagueId).order("week").order("created_at"),
+        supabase.from("transactions").select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
       ]);
 
-      const rosterEntries = (rosterRes.data as unknown as ManagerRosterEntry[] | null) || [];
+      const rosterEntries: ManagerRosterEntry[] = (rosterRes.data || []).map(r => ({
+        id: r.id,
+        manager_id: r.manager_id,
+        player_id: r.player_id,
+        league_id: r.league_id,
+        slot_type: r.slot_type as 'active' | 'bench',
+        position: r.position,
+      }));
 
       if (playersRes.data) {
         setPlayers((playersRes.data as Tables<"league_players">[]).map(mapDbPlayer));
       }
       if (managersRes.data) {
-        const mappedManagers = managersRes.data.map((m: Tables<"managers">) => mapDbManagerWithRoster(m, rosterEntries));
+        const mappedManagers = managersRes.data.map(m => mapDbManagerWithRoster(m, rosterEntries));
         setManagers(mappedManagers);
         if (mappedManagers.length > 0 && !currentManagerId) {
           setCurrentManagerId(mappedManagers[0].id);
@@ -213,12 +202,19 @@ export const useRealtimeGame = (leagueId?: string) => {
       .on("postgres_changes", { event: "*", schema: "public", table: "manager_roster", filter }, async () => {
         // Refetch managers with their rosters when junction table changes
         const [managersRes, rosterRes] = await Promise.all([
-          supabase.from("managers" as 'managers').select("*").eq("league_id", leagueId).order("name"),
-          supabase.from("manager_roster" as "managers").select("*").eq("league_id", leagueId),
+          supabase.from("managers").select("*").eq("league_id", leagueId).order("name"),
+          supabase.from("manager_roster").select("*").eq("league_id", leagueId),
         ]);
         if (managersRes.data && rosterRes.data) {
-          const rosterEntries = rosterRes.data as unknown as ManagerRosterEntry[];
-          const mappedManagers = (managersRes.data as Tables<"managers">[]).map(m => mapDbManagerWithRoster(m, rosterEntries));
+          const rosterEntries: ManagerRosterEntry[] = rosterRes.data.map(r => ({
+            id: r.id,
+            manager_id: r.manager_id,
+            player_id: r.player_id,
+            league_id: r.league_id,
+            slot_type: r.slot_type as 'active' | 'bench',
+            position: r.position,
+          }));
+          const mappedManagers = managersRes.data.map(m => mapDbManagerWithRoster(m, rosterEntries));
           setManagers(mappedManagers);
         }
       })
@@ -294,7 +290,7 @@ export const useRealtimeGame = (leagueId?: string) => {
       if (manager.activeRoster.includes(dropPlayerId)) newActiveCount--;
       if (manager.bench.includes(dropPlayerId)) newBenchCount--;
       // Delete from junction table
-      await supabase.from("manager_roster" as "managers").delete().eq("player_id", dropPlayerId).eq("league_id", leagueId);
+      await supabase.from("manager_roster").delete().eq("player_id", dropPlayerId).eq("league_id", leagueId);
     }
 
     const activeNotFull = newActiveCount < config.activeSize;
@@ -311,13 +307,14 @@ export const useRealtimeGame = (leagueId?: string) => {
     }
 
     // Insert into junction table
-    const { error: updateError } = await supabase.from("manager_roster" as "managers").insert({
+    const rosterInsert: TablesInsert<"manager_roster"> = {
       manager_id: managerId,
       player_id: playerId,
       league_id: leagueId,
       slot_type: slotType,
       position: slotType === 'active' ? newActiveCount : newBenchCount,
-    } as any);
+    };
+    const { error: updateError } = await supabase.from("manager_roster").insert(rosterInsert);
 
     if (updateError) {
       console.error("Error updating manager:", updateError);
@@ -345,13 +342,13 @@ export const useRealtimeGame = (leagueId?: string) => {
       description = `${manager.teamName} dropped ${dropPlayer.name}, added ${player.name}`;
     }
 
-    await (supabase.from("transactions").insert({
-      type: "add" as any,
+    await supabase.from("transactions").insert({
+      type: "add",
       manager_id: managerId,
       description,
-      players: playerTransactions as any,
+      players: playerTransactions as unknown as Json,
       league_id: leagueId,
-    }) as any);
+    });
   };
 
   const dropPlayerOnly = async (managerId: string, playerId: string) => {
@@ -362,7 +359,7 @@ export const useRealtimeGame = (leagueId?: string) => {
 
     // Delete from junction table
     const { error: updateError } = await supabase
-      .from("manager_roster" as "managers")
+      .from("manager_roster")
       .delete()
       .eq("player_id", playerId)
       .eq("league_id", leagueId);
@@ -379,13 +376,13 @@ export const useRealtimeGame = (leagueId?: string) => {
       team: player.team,
     };
 
-    await (supabase.from("transactions").insert({
-      type: "drop" as any,
+    await supabase.from("transactions").insert({
+      type: "drop",
       manager_id: managerId,
       description: `${manager.teamName} dropped ${player.name}`,
-      players: [playerTx] as any,
+      players: [playerTx] as unknown as Json,
       league_id: leagueId,
-    }) as any);
+    });
   };
 
   const moveToActive = async (managerId: string, playerId: string): Promise<{ success: boolean; error?: string }> => {
@@ -409,8 +406,8 @@ export const useRealtimeGame = (leagueId?: string) => {
 
     // Update slot_type in junction table
     const { error } = await supabase
-      .from("manager_roster" as "managers")
-      .update({ slot_type: 'active', position: manager.activeRoster.length } as any)
+      .from("manager_roster")
+      .update({ slot_type: 'active', position: manager.activeRoster.length })
       .eq("player_id", playerId)
       .eq("league_id", leagueId);
 
@@ -429,8 +426,8 @@ export const useRealtimeGame = (leagueId?: string) => {
 
     // Update slot_type in junction table
     const { error } = await supabase
-      .from("manager_roster" as "managers")
-      .update({ slot_type: 'bench', position: manager.bench.length } as any)
+      .from("manager_roster")
+      .update({ slot_type: 'bench', position: manager.bench.length })
       .eq("player_id", playerId)
       .eq("league_id", leagueId);
 
@@ -458,13 +455,13 @@ export const useRealtimeGame = (leagueId?: string) => {
     // Swap slot_types in junction table
     const [update1, update2] = await Promise.all([
       supabase
-        .from("manager_roster" as "managers")
-        .update({ slot_type: player1InActive ? 'bench' : 'active' } as any)
+        .from("manager_roster")
+        .update({ slot_type: player1InActive ? 'bench' : 'active' })
         .eq("player_id", player1Id)
         .eq("league_id", leagueId),
       supabase
-        .from("manager_roster" as "managers")
-        .update({ slot_type: player2InActive ? 'bench' : 'active' } as any)
+        .from("manager_roster")
+        .update({ slot_type: player2InActive ? 'bench' : 'active' })
         .eq("player_id", player2Id)
         .eq("league_id", leagueId),
     ]);
@@ -514,13 +511,13 @@ export const useRealtimeGame = (leagueId?: string) => {
 
     await recalculateAllStandings();
 
-    await (supabase.from("transactions").insert({
-      type: "score" as any,
+    await supabase.from("transactions").insert({
+      type: "score",
       manager_id: null,
       description: `Week ${week} scores ${wasFinalized ? "updated" : "finalized"}:\n${scoreSummary.join("\n")}`,
       week,
       league_id: leagueId,
-    }) as any);
+    });
   };
 
   const recalculateAllStandings = async () => {
@@ -596,8 +593,8 @@ export const useRealtimeGame = (leagueId?: string) => {
     const trade1to2 = players1.map(playerId => {
       const wasActive = manager1.activeRoster.includes(playerId);
       return supabase
-        .from("manager_roster" as "managers")
-        .update({ manager_id: manager2Id, slot_type: wasActive ? 'active' : 'bench' } as any)
+        .from("manager_roster")
+        .update({ manager_id: manager2Id, slot_type: wasActive ? 'active' : 'bench' })
         .eq("player_id", playerId)
         .eq("league_id", leagueId);
     });
@@ -606,8 +603,8 @@ export const useRealtimeGame = (leagueId?: string) => {
     const trade2to1 = players2.map(playerId => {
       const wasActive = manager2.activeRoster.includes(playerId);
       return supabase
-        .from("manager_roster" as "managers")
-        .update({ manager_id: manager1Id, slot_type: wasActive ? 'active' : 'bench' } as any)
+        .from("manager_roster")
+        .update({ manager_id: manager1Id, slot_type: wasActive ? 'active' : 'bench' })
         .eq("player_id", playerId)
         .eq("league_id", leagueId);
     });
@@ -617,12 +614,12 @@ export const useRealtimeGame = (leagueId?: string) => {
     const player1Names = players1.map((id) => players.find((p) => p.id === id)?.name).join(", ");
     const player2Names = players2.map((id) => players.find((p) => p.id === id)?.name).join(", ");
 
-    await (supabase.from("transactions").insert({
-      type: "trade" as any,
+    await supabase.from("transactions").insert({
+      type: "trade",
       manager_id: manager1Id,
       description: `${manager1.teamName} traded ${player1Names} to ${manager2.teamName} for ${player2Names}`,
       league_id: leagueId,
-    }) as any);
+    });
   };
 
   const resetLeague = async () => {
@@ -630,7 +627,7 @@ export const useRealtimeGame = (leagueId?: string) => {
 
     // Delete all roster entries for this league from junction table
     await supabase
-      .from("manager_roster" as "managers")
+      .from("manager_roster")
       .delete()
       .eq("league_id", leagueId);
 
@@ -655,7 +652,7 @@ export const useRealtimeGame = (leagueId?: string) => {
     const { error } = await supabase
       .from('scoring_rules')
       .upsert(
-        { league_id: leagueId, rules: newRules } as any,
+        { league_id: leagueId, rules: newRules as unknown as Json },
         { onConflict: 'league_id' }
       );
 

@@ -11,7 +11,7 @@ import { RosterManagementDialog } from '@/components/RosterManagementDialog';
 import { TradeDialog } from '@/components/TradeDialog';
 import { Player, Manager } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
-import { usePlayerFilters } from '@/hooks/usePlayerFilters';
+import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
 import { getTeamPillStyles } from '@/lib/team-colors';
 
 const ROLE_AND_NATIONALITY_FILTERS = {
@@ -201,7 +201,7 @@ const Players = () => {
                 {['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'].map((role) => (
                   <button
                     key={role}
-                    onClick={() => setSelectedRole(role as any)}
+                    onClick={() => setSelectedRole(role as RoleFilter)}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
                       selectedRole === role
@@ -222,7 +222,7 @@ const Players = () => {
                 {['All', 'Domestic', 'International'].map((nationality) => (
                   <button
                     key={nationality}
-                    onClick={() => setSelectedNationality(nationality as any)}
+                    onClick={() => setSelectedNationality(nationality as NationalityFilter)}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
                       selectedNationality === nationality

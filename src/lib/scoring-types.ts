@@ -133,7 +133,7 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
  * Merge partial scoring rules with defaults
  * Ensures all required fields are present even if DB has partial data
  */
-export function mergeScoringRules(partial?: any | null): ScoringRules {
+export function mergeScoringRules(partial?: Record<string, unknown> | null): ScoringRules {
   if (!partial) {
     return DEFAULT_SCORING_RULES;
   }
