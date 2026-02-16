@@ -15,6 +15,7 @@ import {
   LeagueMembers,
   DangerZone,
   RosterConfig,
+  WhatsAppSettings,
 } from '@/components/admin';
 
 const Admin = () => {
@@ -54,6 +55,7 @@ const Admin = () => {
         <RosterManagement />
         <TradeHub />
         <LeagueMembers />
+        <WhatsAppSettings />
         <DangerZone />
       </div>
     </AppLayout>
