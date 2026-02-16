@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { supabase } from '@/integrations/supabase/client';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,90 +6,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Trophy, Medal, TrendingUp, Calendar, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface HistoricalRecord {
-  id: string;
-  manager_id: string;
-  championships: number;
-  top_3_finishes: number;
-  historical_wins: number;
-  historical_losses: number;
-}
-
-interface HeadToHead {
-  id: string;
-  manager1_id: string;
-  manager2_id: string;
-  manager1_wins: number;
-  manager2_wins: number;
-}
-
 interface CombinedRecord {
   id: string;
   name: string;
-  championships: number;
-  top3Finishes: number;
   totalWins: number;
   totalLosses: number;
   winPct: number;
-  isActive: boolean;
 }
 
 const LeagueHistory = () => {
   const managers = useGameStore(state => state.managers);
   const schedule = useGameStore(state => state.schedule);
   const userProfile = useAuthStore(state => state.userProfile);
-  const [historicalRecords, setHistoricalRecords] = useState<HistoricalRecord[]>([]);
-  const [headToHead, setHeadToHead] = useState<HeadToHead[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const [recordsRes, h2hRes] = await Promise.all([
-        supabase.from('historical_records').select('*'),
-        supabase.from('head_to_head').select('*')
-      ]);
-
-      if (recordsRes.data) setHistoricalRecords(recordsRes.data);
-      if (h2hRes.data) setHeadToHead(h2hRes.data);
-      setLoading(false);
-    };
-
-    fetchData();
-
-    // Subscribe to realtime updates
-    const recordsChannel = supabase
-      .channel('historical_records_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'historical_records' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    const h2hChannel = supabase
-      .channel('head_to_head_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'head_to_head' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(recordsChannel);
-      supabase.removeChannel(h2hChannel);
-    };
-  }, []);
-
-  // Build a combined list of all manager IDs/names from active managers + historical records
-  const allManagerEntries = (() => {
-    const map = new Map<string, string>(); // id -> name
-    managers.forEach(m => map.set(m.id, m.name));
-    // Historical records reference manager_id, resolve name via managers
-    historicalRecords.forEach(r => {
-      if (r.manager_id && !map.has(r.manager_id)) {
-        const m = managers.find(mgr => mgr.id === r.manager_id);
-        map.set(r.manager_id, m?.name || r.manager_id);
-      }
-    });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  })();
 
   // Calculate current season wins from finalized matches
   const getCurrentSeasonRecord = (managerId: string): { wins: number; losses: number } => {
@@ -135,82 +61,33 @@ const LeagueHistory = () => {
     return h2hMap;
   };
 
-  // Combine historical + current season records
-  const getCombinedRecords = (): CombinedRecord[] => {
-    const activeManagerIds = new Set(managers.map(m => m.id));
-
-    return allManagerEntries.map(({ id, name }) => {
-      const historical = historicalRecords.find(r => r.manager_id === id);
-      const current = getCurrentSeasonRecord(id);
-      const isActive = activeManagerIds.has(id);
-
-      const totalWins = (historical?.historical_wins || 0) + current.wins;
-      const totalLosses = (historical?.historical_losses || 0) + current.losses;
-      const totalGames = totalWins + totalLosses;
+  const getRecords = (): CombinedRecord[] => {
+    return managers.map(m => {
+      const current = getCurrentSeasonRecord(m.id);
+      const totalGames = current.wins + current.losses;
 
       return {
-        id,
-        name,
-        championships: historical?.championships || 0,
-        top3Finishes: historical?.top_3_finishes || 0,
-        totalWins,
-        totalLosses,
-        winPct: totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0,
-        isActive
+        id: m.id,
+        name: m.name,
+        totalWins: current.wins,
+        totalLosses: current.losses,
+        winPct: totalGames > 0 ? Math.round((current.wins / totalGames) * 100) : 0,
       };
     }).sort((a, b) => {
-      // Sort by championships desc, then top 3 desc, then win % desc
-      if (b.championships !== a.championships) return b.championships - a.championships;
-      if (b.top3Finishes !== a.top3Finishes) return b.top3Finishes - a.top3Finishes;
       return b.winPct - a.winPct;
     });
   };
 
-  // Get combined H2H record (historical + current) by manager ID
-  const getCombinedH2H = (manager1Id: string, manager2Id: string): { wins: number; losses: number } => {
+  const getH2H = (manager1Id: string, manager2Id: string): { wins: number; losses: number } => {
     if (manager1Id === manager2Id) return { wins: 0, losses: 0 };
-
-    // Find historical record
-    let historicalWins = 0;
-    let historicalLosses = 0;
-
-    const record = headToHead.find(
-      h => (h.manager1_id === manager1Id && h.manager2_id === manager2Id) ||
-        (h.manager1_id === manager2Id && h.manager2_id === manager1Id)
-    );
-
-    if (record) {
-      if (record.manager1_id === manager1Id) {
-        historicalWins = record.manager1_wins;
-        historicalLosses = record.manager2_wins;
-      } else {
-        historicalWins = record.manager2_wins;
-        historicalLosses = record.manager1_wins;
-      }
-    }
-
-    // Add current season
     const currentH2H = getCurrentSeasonH2H();
-    const currentRecord = currentH2H.get(manager1Id)?.get(manager2Id) || { wins: 0, losses: 0 };
-
-    return {
-      wins: historicalWins + currentRecord.wins,
-      losses: historicalLosses + currentRecord.losses
-    };
+    return currentH2H.get(manager1Id)?.get(manager2Id) || { wins: 0, losses: 0 };
   };
 
-  const combinedRecords = getCombinedRecords();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
+  const records = getRecords();
 
   return (
-    <AppLayout title="League History" subtitle="All-time records across seasons">
+    <AppLayout title="League History" subtitle="Season records">
       <div className="px-4 py-4">
         <Tabs defaultValue="overall" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -229,18 +106,6 @@ const LeagueHistory = () => {
                     <TableHead>Manager</TableHead>
                     <TableHead className="text-center">
                       <div className="flex flex-col items-center">
-                        <Trophy className="w-4 h-4 text-yellow-500" />
-                        <span className="text-[10px]">Champs</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <div className="flex flex-col items-center">
-                        <Medal className="w-4 h-4 text-amber-600" />
-                        <span className="text-[10px]">Top 3</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <div className="flex flex-col items-center">
                         <TrendingUp className="w-4 h-4" />
                         <span className="text-[10px]">Win %</span>
                       </div>
@@ -254,11 +119,10 @@ const LeagueHistory = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {combinedRecords.map((record, index) => (
+                  {records.map((record, index) => (
                     <TableRow
-                      key={record.name}
+                      key={record.id}
                       className={cn(
-                        !record.isActive && "opacity-60",
                         record.name === userProfile?.username && "bg-secondary/10 border-l-2 border-l-secondary"
                       )}
                     >
@@ -267,25 +131,6 @@ const LeagueHistory = () => {
                       </TableCell>
                       <TableCell className="font-medium">
                         {record.name}
-                        {!record.isActive && (
-                          <span className="text-[10px] text-muted-foreground ml-1">(inactive)</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={cn(
-                          "font-semibold",
-                          record.championships > 0 && "text-yellow-500"
-                        )}>
-                          {record.championships}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={cn(
-                          "font-semibold",
-                          record.top3Finishes > 0 && "text-amber-600"
-                        )}>
-                          {record.top3Finishes}
-                        </span>
                       </TableCell>
                       <TableCell className="text-center font-medium">
                         {record.winPct}%
@@ -306,40 +151,40 @@ const LeagueHistory = () => {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="sticky left-0 bg-muted/50 z-10 min-w-[80px]"></TableHead>
-                    {allManagerEntries.map(entry => (
+                    {managers.map(m => (
                       <TableHead
-                        key={entry.id}
+                        key={m.id}
                         className="text-center text-xs font-semibold min-w-[60px] px-1"
                       >
-                        {entry.name}
+                        {m.name}
                       </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allManagerEntries.map(rowEntry => (
+                  {managers.map(rowManager => (
                     <TableRow
-                      key={rowEntry.id}
-                      className={cn(rowEntry.name === userProfile?.username && "bg-secondary/10")}
+                      key={rowManager.id}
+                      className={cn(rowManager.name === userProfile?.username && "bg-secondary/10")}
                     >
                       <TableCell className={cn(
                         "sticky left-0 z-10 font-semibold text-xs",
-                        rowEntry.name === userProfile?.username ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
+                        rowManager.name === userProfile?.username ? "bg-secondary/10 border-l-2 border-l-secondary" : "bg-card"
                       )}>
-                        {rowEntry.name}
+                        {rowManager.name}
                       </TableCell>
-                      {allManagerEntries.map(colEntry => {
-                        if (rowEntry.id === colEntry.id) {
+                      {managers.map(colManager => {
+                        if (rowManager.id === colManager.id) {
                           return (
-                            <TableCell key={colEntry.id} className="text-center text-muted-foreground">
+                            <TableCell key={colManager.id} className="text-center text-muted-foreground">
                               —
                             </TableCell>
                           );
                         }
-                        const record = getCombinedH2H(rowEntry.id, colEntry.id);
+                        const record = getH2H(rowManager.id, colManager.id);
                         return (
                           <TableCell
-                            key={colEntry.id}
+                            key={colManager.id}
                             className={cn(
                               "text-center text-xs font-medium whitespace-nowrap",
                               record.wins > record.losses && "text-green-600",
