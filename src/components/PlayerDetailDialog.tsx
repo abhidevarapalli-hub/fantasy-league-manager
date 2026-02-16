@@ -422,7 +422,7 @@ export function PlayerDetailDialog({
 
                                                 {/* Fantasy Points */}
                                                 <div className="w-[80px] py-2 border-r border-border/50 bg-muted/20 font-bold text-primary flex items-center justify-center text-sm">
-                                                    {hasStats ? fpts.toFixed(1) : '-'}
+                                                    {hasStats ? fpts.toFixed(1) : (isUpcoming ? '' : 'DNP')}
                                                 </div>
 
                                                 {/* Dynamic Data Columns */}
@@ -463,7 +463,7 @@ export function PlayerDetailDialog({
                                                                     key={col.key}
                                                                     className={cn(col.w, "py-2 border-r border-border/50 flex items-center justify-center text-muted-foreground")}
                                                                 >
-                                                                    {isUpcoming ? '' : (hasStats ? val : '-')}
+                                                                    {isUpcoming ? '' : (hasStats ? val : 'DNP')}
                                                                 </div>
                                                             );
                                                         })}
