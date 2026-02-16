@@ -11,6 +11,39 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // --- Authorization check ---
+  // Allow internal service-to-service calls (e.g., from match-lifecycle-manager) to bypass user JWT validation
+  const isInternalCall = req.headers.get('x-supabase-service') === 'internal';
+
+  if (!isInternalCall) {
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid Authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate the JWT by creating a user-scoped client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // NOTE: League manager role verification could be added here in the future,
+    // but JWT validation is the critical first step to prevent unauthenticated access.
+  }
+  // --- End authorization check ---
+
   const startTime = Date.now();
   const results: Array<{
     matchId: number;
@@ -23,6 +56,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+    // Service-role client for database operations (unchanged — needed for elevated access)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get matches that need polling
