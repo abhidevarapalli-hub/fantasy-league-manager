@@ -378,7 +378,7 @@ SELECT
   lpms.league_id,
   lpms.player_id,
   mp.name as player_name,
-  COALESCE(lpp.team_override, mp.primary_team) as ipl_team,
+  COALESCE(lpp.team_override, mp.teams[1]) as ipl_team,
   mp.primary_role as role,
   COUNT(DISTINCT lpms.match_id) as matches_played,
   COALESCE(SUM(mps.runs), 0) as total_runs,
@@ -390,7 +390,7 @@ FROM league_player_match_scores lpms
 JOIN match_player_stats mps ON mps.id = lpms.match_player_stats_id
 JOIN master_players mp ON mp.id = lpms.player_id
 LEFT JOIN league_player_pool lpp ON lpp.league_id = lpms.league_id AND lpp.player_id = lpms.player_id
-GROUP BY lpms.league_id, lpms.player_id, mp.name, lpp.team_override, mp.primary_team, mp.primary_role;
+GROUP BY lpms.league_id, lpms.player_id, mp.name, lpp.team_override, mp.teams[1], mp.primary_role;
 
 -- Grant view access
 GRANT SELECT ON fantasy_weekly_summary TO authenticated;
