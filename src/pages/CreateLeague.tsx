@@ -17,6 +17,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
 import { toast } from 'sonner';
+import { DEFAULT_SCORING_RULES, ScoringRules as ScoringRulesType, sanitizeScoringRules } from '@/lib/scoring-types';
+import type { Json } from '@/integrations/supabase/types';
+import { ScoringRulesForm } from '@/components/ScoringRulesForm';
+
+const STEP_LABELS = ['Configure Rules', 'Scoring Rules', 'Team Identity'] as const;
 
 const CreateLeague = () => {
     const navigate = useNavigate();
@@ -81,6 +86,9 @@ const CreateLeague = () => {
     const [selectedTournament, setSelectedTournament] = useState<Tournament>(
         SUPPORTED_TOURNAMENTS.find(t => t.type === 'league') || SUPPORTED_TOURNAMENTS[0]
     );
+
+    // Scoring Rules
+    const [scoringRules, setScoringRules] = useState<ScoringRulesType>(DEFAULT_SCORING_RULES);
 
     // Creator Manager Settings
     const [teamName, setTeamName] = useState('');
@@ -159,6 +167,20 @@ const CreateLeague = () => {
 
             if (!league) {
                 throw new Error('League creation returned no data');
+            }
+
+            // 1b. Insert scoring rules (non-fatal if it fails)
+            try {
+                const sanitizedRules = sanitizeScoringRules(scoringRules);
+                const { error: scoringError } = await supabase
+                    .from('scoring_rules')
+                    .insert({ league_id: league.id, rules: sanitizedRules as unknown as Json });
+
+                if (scoringError) {
+                    console.warn('[CreateLeague] ⚠️ Failed to save scoring rules:', scoringError);
+                }
+            } catch (e) {
+                console.warn('[CreateLeague] ⚠️ Scoring rules insert failed:', e);
             }
 
             // 2. Create the creator's manager record
@@ -379,21 +401,25 @@ const CreateLeague = () => {
                             <Trophy className="w-8 h-8 text-primary" />
                         </div>
                         <h1 className="text-4xl font-extrabold tracking-tight">Create New League</h1>
-                        <p className="text-muted-foreground text-lg italic">Step {step} of 2: {step === 1 ? 'Configure Rules' : 'Team Identity'}</p>
+                        <p className="text-muted-foreground text-lg italic">Step {step} of 3: {STEP_LABELS[step - 1]}</p>
                     </div>
 
                     <Card className="border-2 border-primary/10 shadow-xl overflow-hidden glass-morphism">
                         <CardHeader className="bg-primary/5 border-b border-primary/10">
-                            <CardTitle className="text-2xl">{step === 1 ? 'League Configuration' : 'League Manager Setup'}</CardTitle>
+                            <CardTitle className="text-2xl">
+                                {step === 1 ? 'League Configuration' : step === 2 ? 'Scoring Rules' : 'League Manager Setup'}
+                            </CardTitle>
                             <CardDescription>
                                 {step === 1
                                     ? 'Set the core structure and constraints for your competition.'
-                                    : `Logged in as @${userProfile?.username || 'user'}. Choose your team name for this league.`}
+                                    : step === 2
+                                        ? 'Configure how fantasy points are awarded. You can change these later.'
+                                        : `Logged in as @${userProfile?.username || 'user'}. Choose your team name for this league.`}
                             </CardDescription>
                         </CardHeader>
 
                         <CardContent className="pt-8 space-y-8">
-                            {step === 1 ? (
+                            {step === 1 && (
                                 <>
                                     <div className="space-y-3">
                                         <Label htmlFor="leagueName" className="text-base font-semibold">League Name</Label>
@@ -568,7 +594,13 @@ const CreateLeague = () => {
                                     <div className="pb-4"></div>
 
                                 </>
-                            ) : (
+                            )}
+
+                            {step === 2 && (
+                                <ScoringRulesForm rules={scoringRules} onChange={setScoringRules} />
+                            )}
+
+                            {step === 3 && (
                                 <div className="space-y-6">
                                     <div className="space-y-2">
                                         <Label htmlFor="teamName" className="text-base font-semibold">Your Team Name</Label>
@@ -586,10 +618,10 @@ const CreateLeague = () => {
 
 
                         <CardFooter className="bg-primary/5 border-t border-primary/10 p-6 flex gap-4">
-                            {step === 2 && (
+                            {step > 1 && (
                                 <Button
                                     variant="outline"
-                                    onClick={() => setStep(1)}
+                                    onClick={() => setStep(step - 1)}
                                     className="flex-1 h-12 text-base"
                                     disabled={loading}
                                 >
@@ -599,15 +631,14 @@ const CreateLeague = () => {
 
                             <Button
                                 className="flex-1 h-12 text-lg font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
-                                onClick={() => step === 1 ? setStep(2) : handleCreateLeague()}
-                                disabled={loading || (step === 1 && (!leagueName || !validationResult.isValid)) || (step === 2 && !teamName)}
-
+                                onClick={() => step < 3 ? setStep(step + 1) : handleCreateLeague()}
+                                disabled={loading || (step === 1 && (!leagueName || !validationResult.isValid)) || (step === 3 && !teamName)}
                             >
                                 {loading ? (
                                     'Creating League...'
-                                ) : step === 1 ? (
+                                ) : step < 3 ? (
                                     <>
-                                        Next Strategy
+                                        {step === 1 ? 'Next: Scoring Rules' : 'Next: Team Setup'}
                                         <ChevronRight className="w-5 h-5 ml-2" />
                                     </>
                                 ) : (
