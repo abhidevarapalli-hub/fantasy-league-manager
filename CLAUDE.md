@@ -82,7 +82,8 @@ npm run dev:full          # Starts Supabase + Vite together
 ```
 
 ### How Environment Switching Works
-- `npm run dev` loads `.env.development` which points to `http://127.0.0.1:54321` (local)
+- `npm run dev` loads `.env.development` + `.env.development.local` (local Supabase)
+- `.env.development.local` (gitignored) holds secrets: `VITE_RAPIDAPI_KEY`, `VITE_RAPIDAPI_HOST`
 - `npm run build` / Vercel uses production env vars from `.env` or Vercel dashboard
 - No source code changes needed — Vite's mode-based env loading handles it
 
