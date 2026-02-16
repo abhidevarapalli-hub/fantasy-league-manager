@@ -66,6 +66,8 @@ Key characteristics:
 
 ### Prerequisites
 - Docker (via Colima or Docker Desktop)
+  - If using Colima with VZ driver, analytics is disabled in config.toml to avoid docker socket mount issues
+  - For Colima users with multiple profiles (e.g. work + personal), ensure the correct Docker context is active: `docker context use <profile>`
 - Supabase CLI (`brew install supabase/tap/supabase`)
 
 ### Quick Start
@@ -91,6 +93,16 @@ npm run dev:full          # Starts Supabase + Vite together
 | player1@test.com | password123 | Regular manager |
 | player2@test.com | password123 | Regular manager |
 | player3@test.com | password123 | Regular manager |
+
+### Google OAuth (local)
+- Credentials go in `supabase/.env` (gitignored): `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+- Config uses `env()` substitution in `supabase/config.toml`
+- Google Cloud Console redirect URI: `http://127.0.0.1:54321/auth/v1/callback`
+
+### Port Handling
+- Vite may bind to 8080, 8081, 8082, or 8083 depending on availability
+- All are configured as allowed redirect URLs in `supabase/config.toml`
+- `site_url` defaults to `http://localhost:8083`
 
 ### Useful Commands
 - `npm run supabase:reset` — Drop and recreate local DB (re-applies migrations + seed)
