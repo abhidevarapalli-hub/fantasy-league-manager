@@ -102,7 +102,7 @@ npm run dev:full          # Starts Supabase + Vite together
 ### Port Handling
 - Vite may bind to 8080, 8081, 8082, or 8083 depending on availability
 - All are configured as allowed redirect URLs in `supabase/config.toml`
-- `site_url` defaults to `http://localhost:8083`
+- `site_url` defaults to `http://localhost:8080`
 
 ### Useful Commands
 - `npm run supabase:reset` — Drop and recreate local DB (re-applies migrations + seed)
