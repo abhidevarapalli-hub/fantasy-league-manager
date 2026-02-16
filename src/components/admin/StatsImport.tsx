@@ -400,11 +400,12 @@ export const StatsImport = () => {
           .maybeSingle();
 
         if (existingLink) {
-          // Already linked — update result if changed
+          // Already linked — update result and state if changed
           await supabase
             .from('cricket_matches')
             .update({
               result: match.status || null,
+              state: matchState,
             })
             .eq('id', existingMatch.id);
           // Update match_state in live_match_polling
@@ -433,7 +434,12 @@ export const StatsImport = () => {
       });
 
       if (!error && data && data.length > 0) {
-        // Update match_state in live_match_polling
+        // Update state in cricket_matches and match_state in live_match_polling
+        await supabase
+          .from('cricket_matches')
+          .update({ state: matchState })
+          .eq('id', data[0].out_match_id);
+
         await supabase.rpc('upsert_match_polling_state', {
           p_cricbuzz_match_id: match.matchId,
           p_match_id: data[0].out_match_id,
@@ -619,7 +625,7 @@ export const StatsImport = () => {
       if (scorecard.status) {
         await supabase
           .from('cricket_matches')
-          .update({ result: scorecard.status })
+          .update({ result: scorecard.status, state: isLive ? 'In Progress' : 'Complete' })
           .eq('id', match.id);
 
         // Update match_state in live_match_polling
@@ -694,7 +700,7 @@ export const StatsImport = () => {
         if (scorecard.status) {
           await supabase
             .from('cricket_matches')
-            .update({ result: scorecard.status })
+            .update({ result: scorecard.status, state: 'Complete' })
             .eq('id', match.id);
 
           await supabase.rpc('upsert_match_polling_state', {
