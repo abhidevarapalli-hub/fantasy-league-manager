@@ -1,0 +1,2 @@
+# Require JWT verification — only authenticated league managers can manage sessions
+verify_jwt = true
