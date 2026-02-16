@@ -4,96 +4,11 @@
 -- =============================================================
 
 -- =============================================
--- 1. Test auth users
+-- 1. Test league
 -- =============================================
--- GoTrue (Supabase Auth) scans all varchar columns and cannot handle NULLs,
--- so we must explicitly set every nullable string column to '' (empty string).
-INSERT INTO auth.users (
-  id, instance_id, email, encrypted_password, email_confirmed_at,
-  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
-  confirmation_token, recovery_token, email_change, email_change_token_new,
-  email_change_token_current, phone_change, phone_change_token,
-  reauthentication_token, aud, role, is_sso_user, is_anonymous
-) VALUES
-  (
-    '00000000-0000-0000-0000-000000000001',
-    '00000000-0000-0000-0000-000000000000',
-    'admin@test.com',
-    crypt('password123', gen_salt('bf')),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"name":"Test Admin"}',
-    NOW(), NOW(),
-    '', '', '', '', '', '', '', '',
-    'authenticated', 'authenticated', false, false
-  ),
-  (
-    '00000000-0000-0000-0000-000000000002',
-    '00000000-0000-0000-0000-000000000000',
-    'player1@test.com',
-    crypt('password123', gen_salt('bf')),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"name":"Player One"}',
-    NOW(), NOW(),
-    '', '', '', '', '', '', '', '',
-    'authenticated', 'authenticated', false, false
-  ),
-  (
-    '00000000-0000-0000-0000-000000000003',
-    '00000000-0000-0000-0000-000000000000',
-    'player2@test.com',
-    crypt('password123', gen_salt('bf')),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"name":"Player Two"}',
-    NOW(), NOW(),
-    '', '', '', '', '', '', '', '',
-    'authenticated', 'authenticated', false, false
-  ),
-  (
-    '00000000-0000-0000-0000-000000000004',
-    '00000000-0000-0000-0000-000000000000',
-    'player3@test.com',
-    crypt('password123', gen_salt('bf')),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"name":"Player Three"}',
-    NOW(), NOW(),
-    '', '', '', '', '', '', '', '',
-    'authenticated', 'authenticated', false, false
-  );
-
--- Auth identities (required for email/password login)
-INSERT INTO auth.identities (
-  id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
-) VALUES
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001',
-   '{"sub":"00000000-0000-0000-0000-000000000001","email":"admin@test.com"}',
-   'email', '00000000-0000-0000-0000-000000000001', NOW(), NOW(), NOW()),
-  ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000002',
-   '{"sub":"00000000-0000-0000-0000-000000000002","email":"player1@test.com"}',
-   'email', '00000000-0000-0000-0000-000000000002', NOW(), NOW(), NOW()),
-  ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003',
-   '{"sub":"00000000-0000-0000-0000-000000000003","email":"player2@test.com"}',
-   'email', '00000000-0000-0000-0000-000000000003', NOW(), NOW(), NOW()),
-  ('00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000004',
-   '{"sub":"00000000-0000-0000-0000-000000000004","email":"player3@test.com"}',
-   'email', '00000000-0000-0000-0000-000000000004', NOW(), NOW(), NOW());
-
--- =============================================
--- 2. User profiles
--- =============================================
-INSERT INTO profiles (id, username, full_name) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'admin', 'Test Admin'),
-  ('00000000-0000-0000-0000-000000000002', 'player1', 'Player One'),
-  ('00000000-0000-0000-0000-000000000003', 'player2', 'Player Two'),
-  ('00000000-0000-0000-0000-000000000004', 'player3', 'Player Three')
-ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, full_name = EXCLUDED.full_name;
-
--- =============================================
--- 3. Test league
--- =============================================
+-- NOTE: Auth users, profiles, and managers are created dynamically
+-- when users sign in via Google OAuth. Only league structure,
+-- players, scoring rules, and matches are seeded.
 INSERT INTO leagues (
   id, name, league_manager_id, manager_count,
   active_size, bench_size,
@@ -102,27 +17,14 @@ INSERT INTO leagues (
 ) VALUES (
   '10000000-0000-0000-0000-000000000001',
   'Test Cricket League',
-  '00000000-0000-0000-0000-000000000001',
+  NULL,
   8, 11, 3,
   3, 6, 3, 1, 1, 4,
   11253, 'T20 World Cup 2026'
 );
 
 -- =============================================
--- 4. Managers (teams in the league)
--- =============================================
-INSERT INTO managers (id, name, team_name, user_id, league_id, is_league_manager) VALUES
-  ('20000000-0000-0000-0000-000000000001', 'Test Admin', 'Thunder XI',
-   '00000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', true),
-  ('20000000-0000-0000-0000-000000000002', 'Player One', 'Fire Kings',
-   '00000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', false),
-  ('20000000-0000-0000-0000-000000000003', 'Player Two', 'Ice Warriors',
-   '00000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', false),
-  ('20000000-0000-0000-0000-000000000004', 'Player Three', 'Storm Riders',
-   '00000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', false);
-
--- =============================================
--- 5. Scoring rules (uses the default rules structure)
+-- 2. Scoring rules (uses the default rules structure)
 -- =============================================
 INSERT INTO scoring_rules (league_id, rules) VALUES (
   '10000000-0000-0000-0000-000000000001',
@@ -182,7 +84,7 @@ INSERT INTO scoring_rules (league_id, rules) VALUES (
 );
 
 -- =============================================
--- 6. Master players (cricket players)
+-- 3. Master players (cricket players)
 -- =============================================
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000001', 'Virat Kohli', 'Batsman', '1413', ARRAY['India'], true),
@@ -203,7 +105,7 @@ INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_inter
   ('30000000-0000-0000-0000-000000000016', 'Trent Boult', 'Bowler', '4548', ARRAY['New Zealand'], true);
 
 -- =============================================
--- 7. League player pool (make players available in the test league)
+-- 4. League player pool (make players available in the test league)
 -- =============================================
 INSERT INTO league_player_pool (league_id, player_id, is_available) VALUES
   ('10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', true),
@@ -224,7 +126,7 @@ INSERT INTO league_player_pool (league_id, player_id, is_available) VALUES
   ('10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000016', true);
 
 -- =============================================
--- 8. Link T20 WC matches to the test league
+-- 5. Link T20 WC matches to the test league
 --    (cricket_matches are seeded by migration 20260207000000_seed_t20_wc_schedule_v2.sql)
 -- =============================================
 INSERT INTO league_matches (league_id, match_id, week)

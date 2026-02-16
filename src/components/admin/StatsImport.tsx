@@ -408,13 +408,11 @@ export const StatsImport = () => {
             })
             .eq('id', existingMatch.id);
           // Update match_state in live_match_polling
-          await supabase
-            .from('live_match_polling')
-            .upsert({
-              cricbuzz_match_id: match.matchId,
-              match_id: existingMatch.id,
-              match_state: matchState,
-            }, { onConflict: 'cricbuzz_match_id' });
+          await supabase.rpc('upsert_match_polling_state', {
+            p_cricbuzz_match_id: match.matchId,
+            p_match_id: existingMatch.id,
+            p_match_state: matchState,
+          });
           updatedCount++;
           continue;
         }
@@ -436,13 +434,11 @@ export const StatsImport = () => {
 
       if (!error && data && data.length > 0) {
         // Update match_state in live_match_polling
-        await supabase
-          .from('live_match_polling')
-          .upsert({
-            cricbuzz_match_id: match.matchId,
-            match_id: data[0].out_match_id,
-            match_state: matchState,
-          }, { onConflict: 'cricbuzz_match_id' });
+        await supabase.rpc('upsert_match_polling_state', {
+          p_cricbuzz_match_id: match.matchId,
+          p_match_id: data[0].out_match_id,
+          p_match_state: matchState,
+        });
 
         if (data[0].is_new_match) {
           addedCount++;
@@ -627,13 +623,11 @@ export const StatsImport = () => {
           .eq('id', match.id);
 
         // Update match_state in live_match_polling
-        await supabase
-          .from('live_match_polling')
-          .upsert({
-            cricbuzz_match_id: match.cricbuzzMatchId,
-            match_id: match.id,
-            match_state: isLive ? 'Live' : 'Complete',
-          }, { onConflict: 'cricbuzz_match_id' });
+        await supabase.rpc('upsert_match_polling_state', {
+          p_cricbuzz_match_id: match.cricbuzzMatchId,
+          p_match_id: match.id,
+          p_match_state: isLive ? 'Live' : 'Complete',
+        });
 
         // Update local match state with live status
         setMatches(prev =>
@@ -703,13 +697,11 @@ export const StatsImport = () => {
             .update({ result: scorecard.status })
             .eq('id', match.id);
 
-          await supabase
-            .from('live_match_polling')
-            .upsert({
-              cricbuzz_match_id: match.cricbuzzMatchId,
-              match_id: match.id,
-              match_state: 'Complete',
-            }, { onConflict: 'cricbuzz_match_id' });
+          await supabase.rpc('upsert_match_polling_state', {
+            p_cricbuzz_match_id: match.cricbuzzMatchId,
+            p_match_id: match.id,
+            p_match_state: 'Complete',
+          });
         }
 
         const weekNum = parseInt(selectedWeek);

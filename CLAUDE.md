@@ -86,18 +86,12 @@ npm run dev:full          # Starts Supabase + Vite together
 - `npm run build` / Vercel uses production env vars from `.env` or Vercel dashboard
 - No source code changes needed — Vite's mode-based env loading handles it
 
-### Test Accounts (local only)
-| Email | Password | Role |
-|-------|----------|------|
-| admin@test.com | password123 | League manager |
-| player1@test.com | password123 | Regular manager |
-| player2@test.com | password123 | Regular manager |
-| player3@test.com | password123 | Regular manager |
-
-### Google OAuth (local)
+### Authentication (Google OAuth only)
+- Login is Google OAuth only — no email/password
 - Credentials go in `supabase/.env` (gitignored): `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
 - Config uses `env()` substitution in `supabase/config.toml`
 - Google Cloud Console redirect URI: `http://127.0.0.1:54321/auth/v1/callback`
+- Users, profiles, and managers are created dynamically on first sign-in
 
 ### Port Handling
 - Vite may bind to 8080, 8081, 8082, or 8083 depending on availability

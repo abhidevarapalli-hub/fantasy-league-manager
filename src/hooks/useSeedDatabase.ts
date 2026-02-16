@@ -370,6 +370,8 @@ export const useSeedDatabase = () => {
 
   const seedFromTournament = useCallback(async (leagueId: string, tournamentId: number, forceRefresh = false): Promise<boolean> => {
     setSeeding(true);
+    const tournament = getTournamentById(tournamentId);
+    const isInternational = tournament?.type === 'international';
     try {
       if (!forceRefresh) {
         const { count } = await supabase
@@ -382,9 +384,6 @@ export const useSeedDatabase = () => {
           return true;
         }
       }
-
-      const tournament = getTournamentById(tournamentId);
-      const isInternational = tournament?.type === 'international';
 
       const targetTeams = tournament?.teams || [];
       const testTeam = isInternational ? 'NAM' : 'CSK';
@@ -434,7 +433,11 @@ export const useSeedDatabase = () => {
       }
 
       if (!isApiConfigured()) {
-        console.warn("[Seed] API not configured, using hardcoded data");
+        if (isInternational) {
+          console.error("[Seed] API not configured — cannot seed international tournament with IPL data. Set VITE_RAPIDAPI_KEY in .env.development.");
+          return false;
+        }
+        console.warn("[Seed] API not configured, using hardcoded IPL data");
         return await seedDatabase(leagueId);
       }
 
@@ -449,10 +452,18 @@ export const useSeedDatabase = () => {
         );
       } catch (apiError: unknown) {
         console.error("[Seed] API fetch failed:", apiError);
+        if (isInternational) {
+          console.error("[Seed] Cannot fall back to IPL data for international tournament.");
+          return false;
+        }
         return await seedDatabase(leagueId);
       }
 
       if (!teamsWithPlayers || teamsWithPlayers.length === 0) {
+        if (isInternational) {
+          console.error("[Seed] API returned no teams for international tournament — refusing to fall back to IPL data.");
+          return false;
+        }
         return await seedDatabase(leagueId);
       }
 
@@ -563,6 +574,10 @@ export const useSeedDatabase = () => {
 
     } catch (error: unknown) {
       console.error(`[useSeedDatabase] ❌ Error seeding from tournament:`, error);
+      if (isInternational) {
+        console.error("[Seed] Cannot fall back to IPL data for international tournament.");
+        return false;
+      }
       return await seedDatabase(leagueId);
     } finally {
       setSeeding(false);

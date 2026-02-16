@@ -612,14 +612,10 @@ export async function saveMatchStatsLive(
         .single();
 
       if (matchData) {
-        await supabase
-          .from('live_match_polling')
-          .upsert({
-            cricbuzz_match_id: matchData.cricbuzz_match_id,
-            match_id: matchId,
-            match_state: 'Live',
-            polling_enabled: true,
-          }, { onConflict: 'cricbuzz_match_id' });
+        await supabase.rpc('enable_match_polling', {
+          p_cricbuzz_match_id: matchData.cricbuzz_match_id,
+          p_initial_state: 'Live',
+        });
       }
     }
 

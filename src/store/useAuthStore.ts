@@ -164,16 +164,11 @@ export const useAuthStore = create<AuthState>()(
                     } else if (data) {
                         set({ userProfile: data as unknown as UserProfile });
                     } else {
-                        // Create profile if it doesn't exist
-                        const { data: newProfile } = await supabase
-                            .from('profiles')
-                            .insert({ id: currentUser.id })
-                            .select()
-                            .maybeSingle();
-
-                        if (newProfile) {
-                            set({ userProfile: newProfile as unknown as UserProfile });
-                        }
+                        // No profile found. This likely means the DB was reset but the
+                        // browser still has a stale session. Sign out to force re-auth.
+                        console.warn('No profile found for user — signing out stale session.');
+                        await supabase.auth.signOut();
+                        set({ user: null, session: null, userProfile: null, managerProfile: null });
                     }
                 } catch (e) {
                     console.error('Failed to refresh user profile:', e);

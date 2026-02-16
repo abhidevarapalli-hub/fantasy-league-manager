@@ -61,9 +61,9 @@ npm run dev:full    # starts Supabase + Vite together
 
 The app will be available at `http://localhost:8080` (or the next available port — Vite will auto-increment if 8080 is in use). It automatically connects to the local Supabase instance — no `.env` file needed for local development.
 
-### 4. Set up Google OAuth (optional)
+### 4. Set up Google OAuth
 
-To enable "Continue with Google" login locally, create `supabase/.env` (gitignored) with your Google Cloud OAuth credentials:
+Authentication is Google OAuth only. Create `supabase/.env` (gitignored) with your Google Cloud OAuth credentials:
 
 ```
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
@@ -72,16 +72,9 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 
 The redirect URI in Google Cloud Console must be set to `http://127.0.0.1:54321/auth/v1/callback`.
 
-### 5. Log in with a test account
+Users, profiles, and managers are created dynamically on first sign-in.
 
-| Email | Password | Role |
-|-------|----------|------|
-| admin@test.com | password123 | League manager |
-| player1@test.com | password123 | Regular manager |
-| player2@test.com | password123 | Regular manager |
-| player3@test.com | password123 | Regular manager |
-
-### 6. Access Supabase Studio
+### 5. Access Supabase Studio
 
 Open http://127.0.0.1:54323 to browse the local database, inspect tables, and run queries.
 
