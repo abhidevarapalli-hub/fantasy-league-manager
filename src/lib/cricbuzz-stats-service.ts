@@ -572,53 +572,7 @@ export async function saveMatchStatsLive(
       }
     }
 
-    // Fetch active scoring version for this league
-    let { data: scoringVersionData } = await supabase
-      .from('scoring_rule_versions')
-      .select('id')
-      .eq('league_id', leagueId)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    // Auto-create scoring version from league's scoring_rules if none exists
-    if (!scoringVersionData?.id) {
-      const { data: leagueData } = await supabase
-        .from('leagues')
-        .select('scoring_rules')
-        .eq('id', leagueId)
-        .single();
-
-      if (leagueData?.scoring_rules) {
-        const rulesHash = Array.from(
-          new Uint8Array(
-            await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(leagueData.scoring_rules)))
-          )
-        ).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
-
-        const { data: newVersion } = await supabase
-          .from('scoring_rule_versions')
-          .insert({
-            league_id: leagueId,
-            version: 1,
-            is_active: true,
-            rules: leagueData.scoring_rules,
-            rules_hash: rulesHash,
-            description: 'Auto-created from league scoring_rules',
-          })
-          .select('id')
-          .single();
-
-        scoringVersionData = newVersion;
-      }
-    }
-
-    const scoringVersionId = scoringVersionData?.id;
-    if (!scoringVersionId) {
-      console.error('No active scoring version found for league', leagueId);
-      return { success: false, error: 'No active scoring version found for this league' };
-    }
-
-    // Then upsert league-specific scores
+    // Upsert league-specific scores (no scoring_version_id needed)
     const leagueRecords = records
       .filter(r => mpsMap.has(r.cricbuzz_player_id))
       .map(r => ({
@@ -626,7 +580,6 @@ export async function saveMatchStatsLive(
         match_id: r.match_id,
         player_id: r.player_id,
         match_player_stats_id: mpsMap.get(r.cricbuzz_player_id)!,
-        scoring_version_id: scoringVersionId,
         manager_id: r.manager_id,
         was_in_active_roster: r.was_in_active_roster,
         week: r.week,
