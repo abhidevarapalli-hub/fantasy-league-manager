@@ -8,6 +8,38 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Allowed Cricbuzz API endpoint prefixes — prevents open relay abuse
+const ALLOWED_ENDPOINT_PREFIXES = [
+  '/matches/v1/',
+  '/mcenter/v1/',
+  '/series/v1/',
+  '/stats/v1/',
+  '/players/v1/',
+];
+
+/**
+ * Validate that the requested endpoint is safe and allowed.
+ * Returns null if valid, or an error string if invalid.
+ */
+function validateEndpoint(endpoint: string): string | null {
+  if (!endpoint.startsWith('/')) {
+    return 'Endpoint must start with /';
+  }
+  if (endpoint.includes('..')) {
+    return 'Path traversal not allowed';
+  }
+  if (endpoint.includes('://')) {
+    return 'Absolute URLs not allowed';
+  }
+  const isAllowed = ALLOWED_ENDPOINT_PREFIXES.some((prefix) =>
+    endpoint.startsWith(prefix)
+  );
+  if (!isAllowed) {
+    return `Endpoint not in allowlist. Allowed prefixes: ${ALLOWED_ENDPOINT_PREFIXES.join(', ')}`;
+  }
+  return null;
+}
+
 // Simple in-memory cache with TTL
 interface CacheEntry {
   data: unknown;
@@ -54,6 +86,15 @@ serve(async (req) => {
     if (!endpoint) {
       return new Response(
         JSON.stringify({ error: 'Missing endpoint parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate endpoint against allowlist
+    const endpointError = validateEndpoint(endpoint);
+    if (endpointError) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid endpoint', details: endpointError }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
