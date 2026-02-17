@@ -124,8 +124,8 @@ export const GlobalStatsImport = () => {
         result: m.result || '',
         matchDate: m.match_date || '',
         venue: m.venue || '',
-        matchState: ((m as Record<string, unknown>).match_state as string ?? m.state ?? 'Upcoming') as GlobalMatch['matchState'],
-        pollingEnabled: (m as Record<string, unknown>).polling_enabled as boolean | undefined,
+        matchState: (m.state as GlobalMatch['matchState']) ?? 'Upcoming',
+        pollingEnabled: undefined, // populated from pollingStatuses
         linkedLeagueCount: leagueCountMap.get(m.id) || 0,
         hasRawStats: matchIdsWithStats.has(m.id),
       }));
@@ -591,7 +591,7 @@ export const GlobalStatsImport = () => {
             if (scorecard.status) {
               await supabase
                 .from('cricket_matches')
-                .update({ result: scorecard.status, match_state: 'Complete' })
+                .update({ result: scorecard.status, state: 'Complete' })
                 .eq('id', match.id);
 
               await supabase.rpc('upsert_match_polling_state', {

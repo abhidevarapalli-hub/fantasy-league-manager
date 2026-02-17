@@ -196,6 +196,7 @@ export type Database = {
       draft_order: {
         Row: {
           auto_draft_enabled: boolean | null
+          created_at: string
           id: string
           league_id: string | null
           manager_id: string | null
@@ -203,6 +204,7 @@ export type Database = {
         }
         Insert: {
           auto_draft_enabled?: boolean | null
+          created_at?: string
           id?: string
           league_id?: string | null
           manager_id?: string | null
@@ -210,6 +212,7 @@ export type Database = {
         }
         Update: {
           auto_draft_enabled?: boolean | null
+          created_at?: string
           id?: string
           league_id?: string | null
           manager_id?: string | null
@@ -234,34 +237,37 @@ export type Database = {
       }
       draft_picks: {
         Row: {
-          created_at: string | null
+          created_at: string
           id: string
           is_auto_draft: boolean | null
           league_id: string | null
           manager_id: string | null
-          pick_number: number
+          pick_position: number
           player_id: string | null
           round: number
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           id?: string
           is_auto_draft?: boolean | null
           league_id?: string | null
           manager_id?: string | null
-          pick_number: number
+          pick_position: number
           player_id?: string | null
           round: number
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           id?: string
           is_auto_draft?: boolean | null
           league_id?: string | null
           manager_id?: string | null
-          pick_number?: number
+          pick_position?: number
           player_id?: string | null
           round?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -296,49 +302,40 @@ export type Database = {
       }
       draft_state: {
         Row: {
-          clock_duration_seconds: number | null
-          created_at: string | null
-          current_position: number | null
-          current_round: number | null
-          last_pick_at: string | null
-          league_id: string
+          created_at: string
+          current_pick_start_at: string | null
+          finalized_at: string | null
+          id: string
+          is_active: boolean | null
+          is_finalized: boolean
+          league_id: string | null
           paused_at: string | null
-          status: string | null
-          total_paused_duration_ms: number | null
-          updated_at: string | null
-          version: number | null
         }
         Insert: {
-          clock_duration_seconds?: number | null
-          created_at?: string | null
-          current_position?: number | null
-          current_round?: number | null
-          last_pick_at?: string | null
-          league_id: string
+          created_at?: string
+          current_pick_start_at?: string | null
+          finalized_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_finalized?: boolean
+          league_id?: string | null
           paused_at?: string | null
-          status?: string | null
-          total_paused_duration_ms?: number | null
-          updated_at?: string | null
-          version?: number | null
         }
         Update: {
-          clock_duration_seconds?: number | null
-          created_at?: string | null
-          current_position?: number | null
-          current_round?: number | null
-          last_pick_at?: string | null
-          league_id?: string
+          created_at?: string
+          current_pick_start_at?: string | null
+          finalized_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_finalized?: boolean
+          league_id?: string | null
           paused_at?: string | null
-          status?: string | null
-          total_paused_duration_ms?: number | null
-          updated_at?: string | null
-          version?: number | null
         }
         Relationships: [
           {
             foreignKeyName: "draft_state_league_id_fkey"
             columns: ["league_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "leagues"
             referencedColumns: ["id"]
           },
@@ -441,6 +438,13 @@ export type Database = {
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_matches_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "all_cricket_matches"
             referencedColumns: ["id"]
           },
           {
@@ -604,6 +608,13 @@ export type Database = {
             foreignKeyName: "league_player_match_scores_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
+            referencedRelation: "all_cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
             referencedRelation: "cricket_matches"
             referencedColumns: ["id"]
           },
@@ -686,96 +697,23 @@ export type Database = {
           },
         ]
       }
-      league_schedules: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_finalized: boolean
-          league_id: string
-          manager1_id: string
-          manager1_score: number | null
-          manager2_id: string | null
-          manager2_score: number | null
-          week: number
-          winner_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_finalized?: boolean
-          league_id: string
-          manager1_id: string
-          manager1_score?: number | null
-          manager2_id?: string | null
-          manager2_score?: number | null
-          week: number
-          winner_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_finalized?: boolean
-          league_id?: string
-          manager1_id?: string
-          manager1_score?: number | null
-          manager2_id?: string | null
-          manager2_score?: number | null
-          week?: number
-          winner_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_schedules_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_manager1_id_fkey"
-            columns: ["manager1_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_manager2_id_fkey"
-            columns: ["manager2_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_winner_id_fkey"
-            columns: ["winner_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       leagues: {
         Row: {
           active_size: number
           bench_size: number
           created_at: string
+          current_week: number
           id: string
           league_manager_id: string | null
           league_manager_username: string | null
           manager_count: number
-          max_all_rounders: number
-          max_bat_wk: number
           max_batsmen: number
-          max_bowlers: number
-          max_from_team: number | null
           max_international: number
           min_all_rounders: number
-          min_bat_wk: number
           min_batsmen: number
           min_bowlers: number
           min_wks: number
           name: string
-          require_wk: boolean
           tournament_id: number | null
           tournament_name: string | null
           updated_at: string
@@ -784,23 +722,18 @@ export type Database = {
           active_size?: number
           bench_size?: number
           created_at?: string
+          current_week?: number
           id?: string
           league_manager_id?: string | null
           league_manager_username?: string | null
           manager_count?: number
-          max_all_rounders?: number
-          max_bat_wk?: number
           max_batsmen?: number
-          max_bowlers?: number
-          max_from_team?: number | null
           max_international?: number
           min_all_rounders?: number
-          min_bat_wk?: number
           min_batsmen?: number
           min_bowlers?: number
           min_wks?: number
           name: string
-          require_wk?: boolean
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
@@ -809,23 +742,18 @@ export type Database = {
           active_size?: number
           bench_size?: number
           created_at?: string
+          current_week?: number
           id?: string
           league_manager_id?: string | null
           league_manager_username?: string | null
           manager_count?: number
-          max_all_rounders?: number
-          max_bat_wk?: number
           max_batsmen?: number
-          max_bowlers?: number
-          max_from_team?: number | null
           max_international?: number
           min_all_rounders?: number
-          min_bat_wk?: number
           min_batsmen?: number
           min_bowlers?: number
           min_wks?: number
           name?: string
-          require_wk?: boolean
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
@@ -906,6 +834,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "live_match_polling_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "all_cricket_matches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "live_match_polling_match_id_fkey"
             columns: ["match_id"]
@@ -1214,6 +1149,13 @@ export type Database = {
             foreignKeyName: "match_player_stats_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
+            referencedRelation: "all_cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_player_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
             referencedRelation: "cricket_matches"
             referencedColumns: ["id"]
           },
@@ -1404,6 +1346,13 @@ export type Database = {
             foreignKeyName: "player_match_stats_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
+            referencedRelation: "all_cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_match_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
             referencedRelation: "cricket_matches"
             referencedColumns: ["id"]
           },
@@ -1435,6 +1384,7 @@ export type Database = {
           avatar_url: string | null
           full_name: string | null
           id: string
+          is_platform_admin: boolean
           updated_at: string | null
           username: string | null
         }
@@ -1442,6 +1392,7 @@ export type Database = {
           avatar_url?: string | null
           full_name?: string | null
           id: string
+          is_platform_admin?: boolean
           updated_at?: string | null
           username?: string | null
         }
@@ -1449,6 +1400,7 @@ export type Database = {
           avatar_url?: string | null
           full_name?: string | null
           id?: string
+          is_platform_admin?: boolean
           updated_at?: string | null
           username?: string | null
         }
@@ -1711,6 +1663,30 @@ export type Database = {
       }
     }
     Views: {
+      all_cricket_matches: {
+        Row: {
+          auto_enabled: boolean | null
+          created_at: string | null
+          cricbuzz_match_id: number | null
+          error_count: number | null
+          has_raw_stats: boolean | null
+          id: string | null
+          last_polled_at: string | null
+          linked_league_count: number | null
+          match_date: string | null
+          match_description: string | null
+          match_state: string | null
+          poll_count: number | null
+          polling_enabled: boolean | null
+          result: string | null
+          series_id: number | null
+          state: string | null
+          team1_name: string | null
+          team2_name: string | null
+          venue: string | null
+        }
+        Relationships: []
+      }
       fantasy_weekly_summary: {
         Row: {
           active_points: number | null
@@ -1771,10 +1747,6 @@ export type Database = {
           venue: string | null
           week: number | null
           winner_team_id: number | null
-          auto_enabled: boolean | null
-          last_polled_at: string | null
-          poll_count: number | null
-          error_count: number | null
         }
         Relationships: [
           {
@@ -1907,6 +1879,13 @@ export type Database = {
             foreignKeyName: "league_player_match_scores_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
+            referencedRelation: "all_cricket_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_player_match_scores_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
             referencedRelation: "cricket_matches"
             referencedColumns: ["id"]
           },
@@ -1918,14 +1897,14 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "match_player_stats_player_id_fkey"
+            foreignKeyName: "league_player_match_scores_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "league_players"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "match_player_stats_player_id_fkey"
+            foreignKeyName: "league_player_match_scores_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "master_players"
@@ -1940,7 +1919,6 @@ export type Database = {
         Returns: boolean
       }
       batch_update_league_scores: { Args: { p_updates: Json }; Returns: number }
-      check_auto_draft: { Args: { p_league_id: string }; Returns: Json }
       disable_match_polling: {
         Args: { p_cricbuzz_match_id: number }
         Returns: undefined
@@ -1948,15 +1926,6 @@ export type Database = {
       enable_match_polling: {
         Args: { p_cricbuzz_match_id: number; p_initial_state?: string }
         Returns: string
-      }
-      execute_draft_pick: {
-        Args: {
-          p_is_auto_draft: boolean
-          p_league_id: string
-          p_manager_id: string
-          p_player_id: string
-        }
-        Returns: Json
       }
       finalize_match_stats: {
         Args: {
@@ -2046,6 +2015,18 @@ export type Database = {
         Args: { p_league_id: string; p_player_id: string; p_week: number }
         Returns: number
       }
+      get_upcoming_matches_to_activate: {
+        Args: { p_lookahead_minutes?: number }
+        Returns: {
+          cricbuzz_match_id: number
+          current_state: string
+          match_date: string
+          match_description: string
+          match_id: string
+        }[]
+      }
+      is_league_manager_of: { Args: { p_league_id: string }; Returns: boolean }
+      is_platform_admin: { Args: never; Returns: boolean }
       record_poll_error: {
         Args: { p_cricbuzz_match_id: number; p_error_message: string }
         Returns: undefined
@@ -2110,116 +2091,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   graphql_public: {
