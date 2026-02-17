@@ -46,7 +46,7 @@ INSERT INTO leagues (
 -- 2. Scoring rules
 -- =============================================
 
--- T20 WC scoring rules
+-- T20 WC scoring rules (ON CONFLICT handles the trigger-created empty row)
 INSERT INTO scoring_rules (league_id, rules) VALUES (
   '10000000-0000-0000-0000-000000000001',
   '{
@@ -102,7 +102,7 @@ INSERT INTO scoring_rules (league_id, rules) VALUES (
       "multiCatchBonus": {"count": 2, "points": 10}
     }
   }'::jsonb
-);
+) ON CONFLICT (league_id) DO UPDATE SET rules = EXCLUDED.rules;
 
 -- IPL scoring rules (same structure, slightly different values for franchise cricket)
 INSERT INTO scoring_rules (league_id, rules) VALUES (
@@ -160,14 +160,14 @@ INSERT INTO scoring_rules (league_id, rules) VALUES (
       "multiCatchBonus": {"count": 2, "points": 10}
     }
   }'::jsonb
-);
+) ON CONFLICT (league_id) DO UPDATE SET rules = EXCLUDED.rules;
 
 -- =============================================
 -- 3. Master players
 -- =============================================
 -- T20 WC: 8 national squads × 15 players = 120 players
--- IPL: 10 franchises × 15 players = 150 players
--- Some players appear in both (shared master_players rows)
+-- IPL: 10 franchises × 15 players = 150 (shared international players reuse the same row)
+-- Players who appear in both leagues share a single master_players row
 
 -- -----------------------------------------------
 -- INDIA (T20 WC) — 15 players
@@ -227,7 +227,7 @@ INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_inter
   ('30000000-0000-0000-0000-000000000042', 'Abrar Ahmed', 'Bowler', '14227', ARRAY['Pakistan'], true),
   ('30000000-0000-0000-0000-000000000043', 'Mohammad Amir', 'Bowler', '2891', ARRAY['Pakistan'], true),
   ('30000000-0000-0000-0000-000000000044', 'Azam Khan', 'Wicket Keeper', '13639', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000045', 'Usman Khan', 'Batsman', NULL, ARRAY['Pakistan'], true);
+  ('30000000-0000-0000-0000-000000000045', 'Usman Khan', 'Batsman', '19013', ARRAY['Pakistan'], true);
 
 -- -----------------------------------------------
 -- ENGLAND (T20 WC) — 15 players
@@ -286,7 +286,7 @@ INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_inter
   ('30000000-0000-0000-0000-000000000086', 'Karim Janat', 'All Rounder', '11541', ARRAY['Afghanistan'], true),
   ('30000000-0000-0000-0000-000000000087', 'Noor Ahmad', 'Bowler', '14261', ARRAY['Afghanistan'], true),
   ('30000000-0000-0000-0000-000000000088', 'Hazratullah Zazai', 'Batsman', '11543', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000089', 'Sediqullah Atal', 'Batsman', NULL, ARRAY['Afghanistan'], true),
+  ('30000000-0000-0000-0000-000000000089', 'Sediqullah Atal', 'Batsman', '14204', ARRAY['Afghanistan'], true),
   ('30000000-0000-0000-0000-000000000090', 'Ikram Alikhil', 'Wicket Keeper', '13155', ARRAY['Afghanistan'], true);
 
 -- -----------------------------------------------
@@ -336,52 +336,51 @@ INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_inter
 -- -----------------------------------------------
 
 -- CSK — Chennai Super Kings (15 players)
--- Shared: Jadeja (005), Moeen Ali (052), Conway (063), Gurbaz (078)
+-- Shared: Jadeja (005), Moeen Ali (052), Conway (063), Gurbaz (078), Rachin Ravindra (069), Noor Ahmad (087)
+-- Deepak Chahar (126) moved to MI; Mukesh Choudhary (240) added as replacement
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000121', 'Ruturaj Gaikwad', 'Batsman', '12092', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000122', 'MS Dhoni', 'Wicket Keeper', '1627', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000123', 'Matheesha Pathirana', 'Bowler', '14253', ARRAY['Sri Lanka'], true),
-  ('30000000-0000-0000-0000-000000000124', 'Rachin Ravindra CSK', 'All Rounder', NULL, ARRAY['New Zealand'], true),
   ('30000000-0000-0000-0000-000000000125', 'Shardul Thakur', 'All Rounder', '8099', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000126', 'Deepak Chahar', 'Bowler', '8510', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000127', 'Shivam Dube', 'All Rounder', '11809', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000128', 'Ravichandran Ashwin', 'Bowler', '2270', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000129', 'Ajinkya Rahane', 'Batsman', '2837', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000130', 'Tushar Deshpande', 'Bowler', '12093', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000131', 'Noor Ahmad CSK', 'Bowler', NULL, ARRAY['Afghanistan'], true);
+  ('30000000-0000-0000-0000-000000000240', 'Mukesh Choudhary', 'Bowler', '13184', ARRAY['India'], true);
 
 -- MI — Mumbai Indians (15 players)
--- Shared: Rohit (002), Bumrah (003), Hardik (007), Tim David (029), Pooran (106)
+-- Shared: Rohit (002), Bumrah (003), Hardik (007), Tim David (029), Suryakumar (004),
+--         Trent Boult (062), Will Jacks (060), Deepak Chahar (126)
+-- Pooran moved to LSG; Sherfane Rutherford (241) added as replacement
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000132', 'Ishan Kishan', 'Wicket Keeper', '9560', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000133', 'Tilak Varma', 'Batsman', '14256', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000134', 'Trent Boult MI', 'Bowler', NULL, ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000135', 'Suryakumar Yadav MI', 'Batsman', NULL, ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000136', 'Dewald Brevis', 'Batsman', '14245', ARRAY['South Africa'], true),
   ('30000000-0000-0000-0000-000000000137', 'Piyush Chawla', 'Bowler', '2268', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000138', 'Nehal Wadhera', 'Batsman', '14260', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000139', 'Naman Dhir', 'All Rounder', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000140', 'Deepak Chahar MI', 'Bowler', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000141', 'Will Jacks MI', 'All Rounder', NULL, ARRAY['England'], true);
+  ('30000000-0000-0000-0000-000000000139', 'Naman Dhir', 'All Rounder', '36139', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000241', 'Sherfane Rutherford', 'All Rounder', '13748', ARRAY['West Indies'], true);
 
 -- RCB — Royal Challengers Bengaluru (15 players)
--- Shared: Kohli (001), Phil Salt (054), Hazlewood (022)
+-- Shared: Kohli (001), Hazlewood (022), Glenn Maxwell (021), Mohammed Siraj (009),
+--         Lockie Ferguson (068), Liam Livingstone (055)
+-- Phil Salt moved to KKR; Mahipal Lomror (242) added as replacement
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000142', 'Faf du Plessis', 'Batsman', '2498', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000143', 'Glenn Maxwell RCB', 'All Rounder', NULL, ARRAY['Australia'], true),
   ('30000000-0000-0000-0000-000000000144', 'Dinesh Karthik', 'Wicket Keeper', '1559', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000145', 'Mohammed Siraj RCB', 'Bowler', NULL, ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000146', 'Rajat Patidar', 'Batsman', '13098', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000147', 'Swapnil Singh', 'All Rounder', NULL, ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000147', 'Swapnil Singh', 'All Rounder', '10238', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000148', 'Yash Dayal', 'Bowler', '14258', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000149', 'Vyshak Vijaykumar', 'Bowler', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000150', 'Manoj Bhandage', 'All Rounder', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000151', 'Suyash Sharma', 'Bowler', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000152', 'Lockie Ferguson RCB', 'Bowler', NULL, ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000153', 'Liam Livingstone RCB', 'All Rounder', NULL, ARRAY['England'], true);
+  ('30000000-0000-0000-0000-000000000149', 'Vyshak Vijaykumar', 'Bowler', '10486', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000150', 'Manoj Bhandage', 'All Rounder', '13962', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000151', 'Suyash Sharma', 'Bowler', '36487', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000242', 'Mahipal Lomror', 'All Rounder', '10954', ARRAY['India'], true);
 
 -- KKR — Kolkata Knight Riders (15 players)
--- Shared: Russell (107), Starc (018), Salt (054 already in RCB — use separate for KKR)
+-- Shared: Russell (107), Phil Salt (054)
+-- Starc moved to DC, SKY moved to MI; Manish Pandey (243) and Allah Ghazanfar (251) added
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000154', 'Shreyas Iyer', 'Batsman', '6439', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000155', 'Rinku Singh', 'Batsman', '11811', ARRAY['India'], true),
@@ -393,93 +392,89 @@ INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_inter
   ('30000000-0000-0000-0000-000000000161', 'Ramandeep Singh', 'All Rounder', '13474', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000162', 'Anukul Roy', 'All Rounder', '11542', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000163', 'Vaibhav Arora', 'Bowler', '13454', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000164', 'Phil Salt KKR', 'Batsman', NULL, ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000165', 'Angkrish Raghuvanshi', 'Batsman', NULL, ARRAY['India'], true);
+  ('30000000-0000-0000-0000-000000000165', 'Angkrish Raghuvanshi', 'Batsman', '22566', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000243', 'Manish Pandey', 'Batsman', '1836', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000251', 'Allah Ghazanfar', 'Bowler', '36501', ARRAY['Afghanistan'], true);
 
 -- DC — Delhi Capitals (15 players)
--- Shared: Pant (006), Axar (012), Kuldeep (008)
+-- Shared: Pant (006), Axar (012), Kuldeep (008), Mitchell Starc (018),
+--         Tristan Stubbs (099), Harry Brook (053)
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000166', 'Jake Fraser-McGurk', 'Batsman', '14249', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000167', 'Tristan Stubbs DC', 'Batsman', NULL, ARRAY['South Africa'], true),
   ('30000000-0000-0000-0000-000000000168', 'Abishek Porel', 'Wicket Keeper', '14257', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000169', 'Mitchell Starc DC', 'Bowler', NULL, ARRAY['Australia'], true),
   ('30000000-0000-0000-0000-000000000170', 'Ishant Sharma', 'Bowler', '2261', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000171', 'Khaleel Ahmed', 'Bowler', '11552', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000172', 'Mukesh Kumar', 'Bowler', '13417', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000173', 'Pravin Dubey', 'Bowler', '12084', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000174', 'Kumar Kushagra', 'Wicket Keeper', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000175', 'Ricky Bhui', 'Batsman', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000176', 'Sumit Kumar', 'Batsman', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000177', 'Harry Brook DC', 'Batsman', NULL, ARRAY['England'], true);
+  ('30000000-0000-0000-0000-000000000174', 'Kumar Kushagra', 'Wicket Keeper', '15779', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000175', 'Ricky Bhui', 'Batsman', '9425', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000176', 'Sumit Kumar', 'Batsman', '10305', ARRAY['India'], true);
 
 -- GT — Gujarat Titans (15 players)
--- Shared: Gill (010), Rashid Khan (076)
+-- Shared: Gill (010), Rashid Khan (076), Azmatullah Omarzai (081), Kane Williamson (061)
+-- Noor Ahmad moved to CSK; Mohit Sharma (244) added as replacement
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000178', 'Sai Sudharsan', 'Batsman', '14259', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000179', 'Wriddhiman Saha', 'Wicket Keeper', '2836', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000180', 'Mohammed Shami', 'Bowler', '6738', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000181', 'Noor Ahmad GT', 'Bowler', NULL, ARRAY['Afghanistan'], true),
   ('30000000-0000-0000-0000-000000000182', 'Sai Kishore', 'Bowler', '12095', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000183', 'Vijay Shankar', 'All Rounder', '9571', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000184', 'Abhinav Manohar', 'Batsman', NULL, ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000184', 'Abhinav Manohar', 'Batsman', '10499', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000185', 'Darshan Nalkande', 'All Rounder', '13458', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000186', 'Spencer Johnson', 'Bowler', NULL, ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000187', 'Azmatullah Omarzai GT', 'All Rounder', NULL, ARRAY['Afghanistan'], true),
+  ('30000000-0000-0000-0000-000000000186', 'Spencer Johnson', 'Bowler', '13143', ARRAY['Australia'], true),
   ('30000000-0000-0000-0000-000000000188', 'Matthew Wade', 'Wicket Keeper', '4537', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000189', 'Kane Williamson GT', 'Batsman', NULL, ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000190', 'Rahul Tewatia', 'All Rounder', '9564', ARRAY['India'], true);
+  ('30000000-0000-0000-0000-000000000190', 'Rahul Tewatia', 'All Rounder', '9564', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000244', 'Mohit Sharma', 'Bowler', '8181', ARRAY['India'], true);
 
 -- LSG — Lucknow Super Giants (15 players)
--- Shared: KL Rahul (not in WC list, new), Stoinis (025), Bishnoi (new)
+-- Shared: Marcus Stoinis (025), Naveen-ul-Haq (080), Matt Henry (072),
+--         Nicholas Pooran (106), Quinton de Kock (091)
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000191', 'KL Rahul', 'Wicket Keeper', '7737', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000192', 'Quinton de Kock LSG', 'Wicket Keeper', NULL, ARRAY['South Africa'], true),
   ('30000000-0000-0000-0000-000000000193', 'Ravi Bishnoi', 'Bowler', '13472', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000194', 'Krunal Pandya', 'All Rounder', '7399', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000195', 'Avesh Khan', 'Bowler', '10811', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000196', 'Devdutt Padikkal', 'Batsman', '12698', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000197', 'Ayush Badoni', 'Batsman', '14254', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000198', 'Deepak Hooda', 'All Rounder', '7395', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000199', 'Naveen-ul-Haq LSG', 'Bowler', NULL, ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000200', 'Matt Henry LSG', 'Bowler', NULL, ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000201', 'Nicholas Pooran LSG', 'Wicket Keeper', NULL, ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000202', 'Marcus Stoinis LSG', 'All Rounder', NULL, ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000203', 'Mohsin Khan', 'Bowler', '13483', ARRAY['India'], true);
+  ('30000000-0000-0000-0000-000000000203', 'Mohsin Khan', 'Bowler', '13483', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000245', 'Manan Vohra', 'Batsman', '8358', ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000246', 'Prerak Mankad', 'All Rounder', '11054', ARRAY['India'], true);
 
 -- PBKS — Punjab Kings (15 players)
--- Shared: Arshdeep (013), Bairstow (059)
+-- Shared: Arshdeep (013), Bairstow (059), Sam Curran (056), Kagiso Rabada (092),
+--         Nathan Ellis (028), Jaiswal (011)
+-- Liam Livingstone moved to RCB; Josh Inglis (247) added as replacement
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000204', 'Shikhar Dhawan', 'Batsman', '2264', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000205', 'Sam Curran PBKS', 'All Rounder', NULL, ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000206', 'Liam Livingstone PBKS', 'All Rounder', NULL, ARRAY['England'], true),
   ('30000000-0000-0000-0000-000000000207', 'Jitesh Sharma', 'Wicket Keeper', '13475', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000208', 'Kagiso Rabada PBKS', 'Bowler', NULL, ARRAY['South Africa'], true),
   ('30000000-0000-0000-0000-000000000209', 'Rahul Chahar', 'Bowler', '11806', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000210', 'Prabhsimran Singh', 'Batsman', '12085', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000211', 'Harpreet Brar', 'All Rounder', '11807', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000212', 'Nathan Ellis PBKS', 'Bowler', NULL, ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000213', 'Atharva Taide', 'Batsman', NULL, ARRAY['India'], true),
+  ('30000000-0000-0000-0000-000000000213', 'Atharva Taide', 'Batsman', '13914', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000214', 'Vishwanath Pratap Singh', 'Bowler', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000215', 'Rilee Rossouw', 'Batsman', '7282', ARRAY['South Africa'], true);
+  ('30000000-0000-0000-0000-000000000215', 'Rilee Rossouw', 'Batsman', '7282', ARRAY['South Africa'], true),
+  ('30000000-0000-0000-0000-000000000247', 'Josh Inglis', 'Wicket Keeper', '10637', ARRAY['Australia'], true);
 
 -- RR — Rajasthan Royals (15 players)
--- Shared: Buttler (046), Chahal (015), Samson (014)
+-- Shared: Buttler (046), Chahal (015), Samson (014), Shimron Hetmyer (108)
+-- Trent Boult moved to MI, Ashwin stays in CSK, Avesh Khan stays in LSG
+-- Replacements: Wanindu Hasaranga (248), Maheesh Theekshana (249), Prasidh Krishna (250)
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000216', 'Shimron Hetmyer RR', 'Batsman', NULL, ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000217', 'Trent Boult RR', 'Bowler', NULL, ARRAY['New Zealand'], true),
   ('30000000-0000-0000-0000-000000000218', 'Riyan Parag', 'All Rounder', '13471', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000219', 'Dhruv Jurel', 'Wicket Keeper', '14255', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000220', 'Ravichandran Ashwin RR', 'Bowler', NULL, ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000221', 'Sandeep Sharma', 'Bowler', '6390', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000222', 'Navdeep Saini', 'Bowler', '10812', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000223', 'Nandre Burger', 'Bowler', NULL, ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000224', 'Donovan Ferreira', 'All Rounder', NULL, ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000225', 'Tom Kohler-Cadmore', 'Batsman', NULL, ARRAY['England'], true),
+  ('30000000-0000-0000-0000-000000000223', 'Nandre Burger', 'Bowler', '13630', ARRAY['South Africa'], true),
+  ('30000000-0000-0000-0000-000000000224', 'Donovan Ferreira', 'All Rounder', '14798', ARRAY['South Africa'], true),
+  ('30000000-0000-0000-0000-000000000225', 'Tom Kohler-Cadmore', 'Batsman', '10033', ARRAY['England'], true),
   ('30000000-0000-0000-0000-000000000226', 'Kunal Rathore', 'Batsman', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000227', 'Avesh Khan RR', 'Bowler', NULL, ARRAY['India'], true);
+  ('30000000-0000-0000-0000-000000000248', 'Wanindu Hasaranga', 'All Rounder', '10926', ARRAY['Sri Lanka'], true),
+  ('30000000-0000-0000-0000-000000000249', 'Maheesh Theekshana', 'Bowler', '18504', ARRAY['Sri Lanka'], true),
+  ('30000000-0000-0000-0000-000000000250', 'Prasidh Krishna', 'Bowler', '10551', ARRAY['India'], true);
 
 -- SRH — Sunrisers Hyderabad (15 players)
--- Shared: Head (017), Klaasen (097), Cummins (016)
+-- Shared: Head (017), Klaasen (097), Cummins (016), Glenn Phillips (065), Marco Jansen (096)
 INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
   ('30000000-0000-0000-0000-000000000228', 'Abhishek Sharma', 'All Rounder', '13466', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000229', 'Bhuvneshwar Kumar', 'Bowler', '2839', ARRAY['India'], true),
@@ -487,10 +482,8 @@ INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_inter
   ('30000000-0000-0000-0000-000000000231', 'Washington Sundar', 'All Rounder', '10809', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000232', 'Abdul Samad', 'Batsman', '13467', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000233', 'Rahul Tripathi', 'Batsman', '10813', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000234', 'Glenn Phillips SRH', 'Batsman', NULL, ARRAY['New Zealand'], true),
   ('30000000-0000-0000-0000-000000000235', 'Mayank Agarwal', 'Batsman', '6408', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000236', 'Jaydev Unadkat', 'Bowler', '6438', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000237', 'Marco Jansen SRH', 'All Rounder', NULL, ARRAY['South Africa'], true),
   ('30000000-0000-0000-0000-000000000238', 'Anmolpreet Singh', 'Batsman', '12082', ARRAY['India'], true),
   ('30000000-0000-0000-0000-000000000239', 'Nitish Reddy', 'All Rounder', '14264', ARRAY['India'], true);
 
@@ -633,59 +626,60 @@ INSERT INTO league_player_pool (league_id, player_id, is_available, team_overrid
 -- 5. League player pool — IPL league
 -- =============================================
 -- Each franchise gets 15 players (mix of shared international + IPL-only)
+-- Each player appears in exactly one IPL team (no duplicates)
 
 INSERT INTO league_player_pool (league_id, player_id, is_available, team_override) VALUES
-  -- CSK (15): shared nationals + CSK-specific
+  -- CSK (15): Jadeja, Moeen, Conway, Gurbaz, Rachin Ravindra, Noor Ahmad + CSK-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000005', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000052', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000063', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000078', true, 'Chennai Super Kings'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000069', true, 'Chennai Super Kings'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000087', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000121', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000122', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000123', true, 'Chennai Super Kings'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000124', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000125', true, 'Chennai Super Kings'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000126', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000127', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000128', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000129', true, 'Chennai Super Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000130', true, 'Chennai Super Kings'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000131', true, 'Chennai Super Kings'),
-  -- MI (15)
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000240', true, 'Chennai Super Kings'),
+  -- MI (15): Rohit, Bumrah, Hardik, Tim David, SKY, Boult, Jacks, Chahar + MI-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000003', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000007', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000029', true, 'Mumbai Indians'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000106', true, 'Mumbai Indians'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000004', true, 'Mumbai Indians'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000062', true, 'Mumbai Indians'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000060', true, 'Mumbai Indians'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000126', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000132', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000133', true, 'Mumbai Indians'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000134', true, 'Mumbai Indians'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000135', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000136', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000137', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000138', true, 'Mumbai Indians'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000139', true, 'Mumbai Indians'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000140', true, 'Mumbai Indians'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000141', true, 'Mumbai Indians'),
-  -- RCB (15)
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000241', true, 'Mumbai Indians'),
+  -- RCB (15): Kohli, Hazlewood, Maxwell, Siraj, Ferguson, Livingstone + RCB-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', true, 'Royal Challengers Bengaluru'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000054', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000022', true, 'Royal Challengers Bengaluru'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000021', true, 'Royal Challengers Bengaluru'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000009', true, 'Royal Challengers Bengaluru'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000068', true, 'Royal Challengers Bengaluru'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000055', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000142', true, 'Royal Challengers Bengaluru'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000143', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000144', true, 'Royal Challengers Bengaluru'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000145', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000146', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000147', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000148', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000149', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000150', true, 'Royal Challengers Bengaluru'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000151', true, 'Royal Challengers Bengaluru'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000152', true, 'Royal Challengers Bengaluru'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000153', true, 'Royal Challengers Bengaluru'),
-  -- KKR (15)
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000242', true, 'Royal Challengers Bengaluru'),
+  -- KKR (15): Russell, Phil Salt + KKR-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000107', true, 'Kolkata Knight Riders'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000018', true, 'Kolkata Knight Riders'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000054', true, 'Kolkata Knight Riders'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000154', true, 'Kolkata Knight Riders'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000155', true, 'Kolkata Knight Riders'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000156', true, 'Kolkata Knight Riders'),
@@ -696,17 +690,18 @@ INSERT INTO league_player_pool (league_id, player_id, is_available, team_overrid
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000161', true, 'Kolkata Knight Riders'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000162', true, 'Kolkata Knight Riders'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000163', true, 'Kolkata Knight Riders'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000164', true, 'Kolkata Knight Riders'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000165', true, 'Kolkata Knight Riders'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000004', true, 'Kolkata Knight Riders'),
-  -- DC (15)
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000243', true, 'Kolkata Knight Riders'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000251', true, 'Kolkata Knight Riders'),
+  -- DC (15): Pant, Axar, Kuldeep, Starc, Stubbs, Brook + DC-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000006', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000012', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000008', true, 'Delhi Capitals'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000018', true, 'Delhi Capitals'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000099', true, 'Delhi Capitals'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000053', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000166', true, 'Delhi Capitals'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000167', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000168', true, 'Delhi Capitals'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000169', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000170', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000171', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000172', true, 'Delhi Capitals'),
@@ -714,85 +709,84 @@ INSERT INTO league_player_pool (league_id, player_id, is_available, team_overrid
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000174', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000175', true, 'Delhi Capitals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000176', true, 'Delhi Capitals'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000177', true, 'Delhi Capitals'),
-  -- GT (15)
+  -- GT (15): Gill, Rashid Khan, Omarzai, Williamson + GT-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000010', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000076', true, 'Gujarat Titans'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000081', true, 'Gujarat Titans'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000061', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000178', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000179', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000180', true, 'Gujarat Titans'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000181', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000182', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000183', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000184', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000185', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000186', true, 'Gujarat Titans'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000187', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000188', true, 'Gujarat Titans'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000189', true, 'Gujarat Titans'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000190', true, 'Gujarat Titans'),
-  -- LSG (15)
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000244', true, 'Gujarat Titans'),
+  -- LSG (15): Stoinis, Naveen, Matt Henry, Pooran, de Kock + LSG-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000025', true, 'Lucknow Super Giants'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000080', true, 'Lucknow Super Giants'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000072', true, 'Lucknow Super Giants'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000106', true, 'Lucknow Super Giants'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000091', true, 'Lucknow Super Giants'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000191', true, 'Lucknow Super Giants'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000192', true, 'Lucknow Super Giants'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000193', true, 'Lucknow Super Giants'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000194', true, 'Lucknow Super Giants'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000195', true, 'Lucknow Super Giants'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000196', true, 'Lucknow Super Giants'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000197', true, 'Lucknow Super Giants'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000198', true, 'Lucknow Super Giants'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000199', true, 'Lucknow Super Giants'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000200', true, 'Lucknow Super Giants'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000201', true, 'Lucknow Super Giants'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000202', true, 'Lucknow Super Giants'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000203', true, 'Lucknow Super Giants'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000080', true, 'Lucknow Super Giants'),
-  -- PBKS (15)
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000245', true, 'Lucknow Super Giants'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000246', true, 'Lucknow Super Giants'),
+  -- PBKS (15): Arshdeep, Bairstow, Sam Curran, Rabada, Nathan Ellis, Jaiswal + PBKS-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000013', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000059', true, 'Punjab Kings'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000056', true, 'Punjab Kings'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000092', true, 'Punjab Kings'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000028', true, 'Punjab Kings'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000011', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000204', true, 'Punjab Kings'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000205', true, 'Punjab Kings'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000206', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000207', true, 'Punjab Kings'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000208', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000209', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000210', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000211', true, 'Punjab Kings'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000212', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000213', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000214', true, 'Punjab Kings'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000215', true, 'Punjab Kings'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000011', true, 'Punjab Kings'),
-  -- RR (15)
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000247', true, 'Punjab Kings'),
+  -- RR (15): Buttler, Chahal, Samson, Hetmyer + RR-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000046', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000015', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000014', true, 'Rajasthan Royals'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000216', true, 'Rajasthan Royals'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000217', true, 'Rajasthan Royals'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000108', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000218', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000219', true, 'Rajasthan Royals'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000220', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000221', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000222', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000223', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000224', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000225', true, 'Rajasthan Royals'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000226', true, 'Rajasthan Royals'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000227', true, 'Rajasthan Royals'),
-  -- SRH (15)
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000248', true, 'Rajasthan Royals'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000249', true, 'Rajasthan Royals'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000250', true, 'Rajasthan Royals'),
+  -- SRH (15): Head, Klaasen, Cummins, Glenn Phillips, Marco Jansen + SRH-specific
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000017', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000097', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000016', true, 'Sunrisers Hyderabad'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000065', true, 'Sunrisers Hyderabad'),
+  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000096', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000228', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000229', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000230', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000231', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000232', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000233', true, 'Sunrisers Hyderabad'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000234', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000235', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000236', true, 'Sunrisers Hyderabad'),
-  ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000237', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000238', true, 'Sunrisers Hyderabad'),
   ('10000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000239', true, 'Sunrisers Hyderabad');
 
@@ -904,7 +898,7 @@ INSERT INTO draft_order (league_id, position, manager_id) VALUES
 INSERT INTO draft_picks (league_id, round, pick_position, manager_id, player_id) VALUES
   -- Round 1 (odd): Mgr5, Mgr6, Mgr7, Mgr8
   ('10000000-0000-0000-0000-000000000002', 1, 1, '20000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000001'),  -- Kohli
-  ('10000000-0000-0000-0000-000000000002', 1, 2, '20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000135'),  -- SKY
+  ('10000000-0000-0000-0000-000000000002', 1, 2, '20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000004'),  -- SKY
   ('10000000-0000-0000-0000-000000000002', 1, 3, '20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000011'),  -- Jaiswal
   ('10000000-0000-0000-0000-000000000002', 1, 4, '20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000204'),  -- Dhawan
   -- Round 2 (even): Mgr8, Mgr7, Mgr6, Mgr5
@@ -929,7 +923,7 @@ INSERT INTO draft_picks (league_id, round, pick_position, manager_id, player_id)
   ('10000000-0000-0000-0000-000000000002', 5, 4, '20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000127'),  -- Dube
   -- Round 6 (even)
   ('10000000-0000-0000-0000-000000000002', 6, 1, '20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000209'),  -- R.Chahar
-  ('10000000-0000-0000-0000-000000000002', 6, 2, '20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000145'),  -- Siraj
+  ('10000000-0000-0000-0000-000000000002', 6, 2, '20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000009'),  -- Siraj
   ('10000000-0000-0000-0000-000000000002', 6, 3, '20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000013'),  -- Arshdeep
   ('10000000-0000-0000-0000-000000000002', 6, 4, '20000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000154'),  -- S.Iyer
   -- Round 7 (odd)
@@ -956,7 +950,7 @@ INSERT INTO draft_picks (league_id, round, pick_position, manager_id, player_id)
   ('10000000-0000-0000-0000-000000000002', 11, 1, '20000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000228'),  -- Abhishek S.
   ('10000000-0000-0000-0000-000000000002', 11, 2, '20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000142'),  -- Faf
   ('10000000-0000-0000-0000-000000000002', 11, 3, '20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000018'),  -- Starc
-  ('10000000-0000-0000-0000-000000000002', 11, 4, '20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000208'),  -- Rabada
+  ('10000000-0000-0000-0000-000000000002', 11, 4, '20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000092'),  -- Rabada
   -- Round 12 (even)
   ('10000000-0000-0000-0000-000000000002', 12, 1, '20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000166'),  -- Fraser-McGurk
   ('10000000-0000-0000-0000-000000000002', 12, 2, '20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000146'),  -- Patidar
@@ -997,7 +991,7 @@ INSERT INTO manager_roster (manager_id, player_id, league_id, slot_type, positio
   ('20000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000128', '10000000-0000-0000-0000-000000000002', 'bench', 3),    -- Ashwin (Bowl)
 
   -- Manager 6 (Turbo Titans) — Active 11
-  ('20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000135', '10000000-0000-0000-0000-000000000002', 'active', 1),   -- SKY (Bat)
+  ('20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000002', 'active', 1),   -- SKY (Bat)
   ('20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000002', 'active', 2),   -- Gill (Bat)
   ('20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000142', '10000000-0000-0000-0000-000000000002', 'active', 3),   -- Faf (Bat)
   ('20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000002', 'active', 4),   -- Hardik (AR)
@@ -1020,7 +1014,7 @@ INSERT INTO manager_roster (manager_id, player_id, league_id, slot_type, positio
   ('20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000002', 'active', 4),   -- Axar (AR)
   ('20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000107', '10000000-0000-0000-0000-000000000002', 'active', 5),   -- Russell (AR)
   ('20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000014', '10000000-0000-0000-0000-000000000002', 'active', 6),   -- Samson (WK)
-  ('20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000145', '10000000-0000-0000-0000-000000000002', 'active', 7),   -- Siraj (Bowl)
+  ('20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000002', 'active', 7),   -- Siraj (Bowl)
   ('20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000015', '10000000-0000-0000-0000-000000000002', 'active', 8),   -- Chahal (Bowl)
   ('20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000195', '10000000-0000-0000-0000-000000000002', 'active', 9),   -- Avesh (Bowl)
   ('20000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000022', '10000000-0000-0000-0000-000000000002', 'active', 10),  -- Hazlewood (Bowl)
@@ -1041,7 +1035,7 @@ INSERT INTO manager_roster (manager_id, player_id, league_id, slot_type, positio
   ('20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000209', '10000000-0000-0000-0000-000000000002', 'active', 8),   -- R.Chahar (Bowl)
   ('20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000230', '10000000-0000-0000-0000-000000000002', 'active', 9),   -- Umran (Bowl)
   ('20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000171', '10000000-0000-0000-0000-000000000002', 'active', 10),  -- Khaleel (Bowl)
-  ('20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000208', '10000000-0000-0000-0000-000000000002', 'active', 11),  -- Rabada (Bowl)
+  ('20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000092', '10000000-0000-0000-0000-000000000002', 'active', 11),  -- Rabada (Bowl)
   -- Manager 8 — Bench 3
   ('20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000166', '10000000-0000-0000-0000-000000000002', 'bench', 1),    -- Fraser-McGurk (Bat)
   ('20000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000197', '10000000-0000-0000-0000-000000000002', 'bench', 2),    -- Badoni (Bat)
@@ -1063,7 +1057,7 @@ WHERE league_id = '10000000-0000-0000-0000-000000000002'
     '30000000-0000-0000-0000-000000000228', '30000000-0000-0000-0000-000000000193',
     '30000000-0000-0000-0000-000000000017', '30000000-0000-0000-0000-000000000128',
     -- Manager 6
-    '30000000-0000-0000-0000-000000000135', '30000000-0000-0000-0000-000000000010',
+    '30000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000010',
     '30000000-0000-0000-0000-000000000007', '30000000-0000-0000-0000-000000000132',
     '30000000-0000-0000-0000-000000000008', '30000000-0000-0000-0000-000000000013',
     '30000000-0000-0000-0000-000000000229', '30000000-0000-0000-0000-000000000218',
@@ -1073,7 +1067,7 @@ WHERE league_id = '10000000-0000-0000-0000-000000000002'
     -- Manager 7
     '30000000-0000-0000-0000-000000000011', '30000000-0000-0000-0000-000000000155',
     '30000000-0000-0000-0000-000000000178', '30000000-0000-0000-0000-000000000012',
-    '30000000-0000-0000-0000-000000000014', '30000000-0000-0000-0000-000000000145',
+    '30000000-0000-0000-0000-000000000014', '30000000-0000-0000-0000-000000000009',
     '30000000-0000-0000-0000-000000000015', '30000000-0000-0000-0000-000000000195',
     '30000000-0000-0000-0000-000000000022', '30000000-0000-0000-0000-000000000107',
     '30000000-0000-0000-0000-000000000018', '30000000-0000-0000-0000-000000000146',
@@ -1084,7 +1078,7 @@ WHERE league_id = '10000000-0000-0000-0000-000000000002'
     '30000000-0000-0000-0000-000000000127', '30000000-0000-0000-0000-000000000209',
     '30000000-0000-0000-0000-000000000230', '30000000-0000-0000-0000-000000000171',
     '30000000-0000-0000-0000-000000000025', '30000000-0000-0000-0000-000000000054',
-    '30000000-0000-0000-0000-000000000208', '30000000-0000-0000-0000-000000000166',
+    '30000000-0000-0000-0000-000000000092', '30000000-0000-0000-0000-000000000166',
     '30000000-0000-0000-0000-000000000197', '30000000-0000-0000-0000-000000000170'
   );
 
@@ -1165,7 +1159,7 @@ INSERT INTO match_player_stats (id, match_id, player_id, cricbuzz_player_id, run
 
 -- MI players (team2)
 INSERT INTO match_player_stats (id, match_id, player_id, cricbuzz_player_id, runs, balls_faced, fours, sixes, strike_rate, is_out, batting_position, overs, maidens, runs_conceded, wickets, economy, dots, wides, no_balls, lbw_bowled_count, catches, stumpings, run_outs, is_in_playing_11, team_won, finalized_at) VALUES
-  ('40000000-0000-0000-0000-000000010201', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000135', 'sky_mi', 45, 30, 4, 2, 150.00, true, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, true, false, '2026-03-14T18:00:00.000Z'),
+  ('40000000-0000-0000-0000-000000010201', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000004', 'sky_mi', 45, 30, 4, 2, 150.00, true, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, true, false, '2026-03-14T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000010202', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000007', '7400', 35, 22, 2, 3, 159.09, true, 5, 3.0, 0, 28, 1, 9.33, 5, 0, 0, 0, 1, 0, 0, true, false, '2026-03-14T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000010203', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000003', '6906', 2, 4, 0, 0, 50.00, false, 10, 4.0, 0, 30, 3, 7.50, 10, 0, 0, 2, 0, 0, 0, true, false, '2026-03-14T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000010204', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000132', '9560', 22, 18, 2, 1, 122.22, true, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, true, false, '2026-03-14T18:00:00.000Z'),
@@ -1178,7 +1172,7 @@ INSERT INTO match_player_stats (id, match_id, player_id, cricbuzz_player_id, run
   ('40000000-0000-0000-0000-000000020102', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000142', '2498', 48, 32, 5, 2, 150.00, true, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, true, true, '2026-03-15T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000020103', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000054', '12205', 32, 20, 4, 1, 160.00, true, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, true, true, '2026-03-15T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000020104', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000022', '4316', 0, 0, 0, 0, 0, false, 0, 4.0, 0, 35, 2, 8.75, 9, 1, 0, 1, 1, 0, 0, true, true, '2026-03-15T18:00:00.000Z'),
-  ('40000000-0000-0000-0000-000000020105', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000145', 'siraj_rcb', 0, 0, 0, 0, 0, false, 0, 4.0, 0, 42, 1, 10.50, 7, 2, 0, 0, 0, 0, 0, true, true, '2026-03-15T18:00:00.000Z'),
+  ('40000000-0000-0000-0000-000000020105', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000009', 'siraj_rcb', 0, 0, 0, 0, 0, false, 0, 4.0, 0, 42, 1, 10.50, 7, 2, 0, 0, 0, 0, 0, true, true, '2026-03-15T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000020106', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000146', '13098', 15, 12, 2, 0, 125.00, true, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, true, true, '2026-03-15T18:00:00.000Z');
 
 -- KKR players
@@ -1224,7 +1218,7 @@ INSERT INTO match_player_stats (id, match_id, player_id, cricbuzz_player_id, run
   ('40000000-0000-0000-0000-000000040202', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000013', '13476', 0, 0, 0, 0, 0, false, 0, 4.0, 0, 28, 3, 7.00, 12, 0, 0, 2, 0, 0, 0, true, true, '2026-03-16T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000040203', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000209', '11806', 0, 0, 0, 0, 0, false, 0, 4.0, 0, 32, 2, 8.00, 9, 1, 0, 0, 1, 0, 0, true, true, '2026-03-16T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000040204', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000011', '13498', 42, 28, 5, 1, 150.00, false, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, true, true, '2026-03-16T18:00:00.000Z'),
-  ('40000000-0000-0000-0000-000000040205', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000208', 'rabada_pbks', 0, 0, 0, 0, 0, false, 0, 3.0, 0, 22, 2, 7.33, 8, 0, 0, 1, 0, 0, 0, true, true, '2026-03-16T18:00:00.000Z');
+  ('40000000-0000-0000-0000-000000040205', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000092', 'rabada_pbks', 0, 0, 0, 0, 0, false, 0, 3.0, 0, 22, 2, 7.33, 8, 0, 0, 1, 0, 0, 0, true, true, '2026-03-16T18:00:00.000Z');
 
 -- ----- Match 200005: RR 192/5 beat SRH 188/7 -----
 -- RR players
@@ -1264,7 +1258,7 @@ INSERT INTO league_player_match_scores (league_id, match_id, player_id, match_pl
   -- Ashwin (Mgr5 bench): 5r+0f = 5 bat, 1w×30+12d+1m×40=82 bowl, 10 common(5+5win) = 97
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000128', '40000000-0000-0000-0000-000000010104', '20000000-0000-0000-0000-000000000005', 97.0, 5.0, 82.0, 0, 10.0, false, 1, '2026-03-18T00:00:00.000Z'),
   -- SKY (Mgr6 active): 45r+4f+2×2s+25m(10)+40m(15)+SR150(30) = 45+4+4+10+15+30=108 bat, 5 common(5+0loss) = 113
-  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000135', '40000000-0000-0000-0000-000000010201', '20000000-0000-0000-0000-000000000006', 113.0, 108.0, 0, 0, 5.0, true, 1, '2026-03-18T00:00:00.000Z'),
+  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000004', '40000000-0000-0000-0000-000000010201', '20000000-0000-0000-0000-000000000006', 113.0, 108.0, 0, 0, 5.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Hardik (Mgr6 active): 35r+2f+3×2s+25m(10)+SR159(30) = 35+2+6+10+30=83 bat, 1w×30+5d=35 bowl, 10 field(catch), 5 common = 133
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000007', '40000000-0000-0000-0000-000000010202', '20000000-0000-0000-0000-000000000006', 133.0, 83.0, 35.0, 10.0, 5.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Bumrah (Mgr5 active): 2r = 2 bat, 3w×30+10d+2lbw×5+2w_milestone(10)+3w_milestone(20)=130 bowl, 5 common = 137
@@ -1284,7 +1278,7 @@ INSERT INTO league_player_match_scores (league_id, match_id, player_id, match_pl
   -- Hazlewood (Mgr7 active): 2w×30+9d+1lbw×5+2w_milestone(10)=84 bowl, 10 field(catch), 10 common = 104
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000022', '40000000-0000-0000-0000-000000020104', '20000000-0000-0000-0000-000000000007', 104.0, 0, 84.0, 10.0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Siraj (Mgr7 active): 1w×30+7d-15(econ10.5)=22 bowl, 10 common = 32
-  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000145', '40000000-0000-0000-0000-000000020105', '20000000-0000-0000-0000-000000000007', 32.0, 0, 22.0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
+  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000009', '40000000-0000-0000-0000-000000020105', '20000000-0000-0000-0000-000000000007', 32.0, 0, 22.0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Patidar (Mgr7 bench): 15r+2f = 15+2=17 bat, 10 common = 27
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000146', '40000000-0000-0000-0000-000000020106', '20000000-0000-0000-0000-000000000007', 27.0, 17.0, 0, 0, 10.0, false, 1, '2026-03-18T00:00:00.000Z'),
   -- S.Iyer (Mgr5 active): 55r+5f+2×2s+25m(10)+40m(15)+SR145(30) = 55+5+4+10+15+30=119 bat, 5 common = 124
@@ -1346,7 +1340,7 @@ INSERT INTO league_player_match_scores (league_id, match_id, player_id, match_pl
   -- Jaiswal (Mgr7 active): 42r+5f+1×2s+25m(10)+40m(15)+SR150(30) = 42+5+2+10+15+30=104 bat, 10 field(catch), 10 common = 124
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000011', '40000000-0000-0000-0000-000000040204', '20000000-0000-0000-0000-000000000007', 124.0, 104.0, 0, 10.0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Rabada (Mgr8 active): 2w×30+8d+1lbw×5+2w(10)=83 bowl, 10 common = 93
-  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000208', '40000000-0000-0000-0000-000000040205', '20000000-0000-0000-0000-000000000008', 93.0, 0, 83.0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
+  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000092', '40000000-0000-0000-0000-000000040205', '20000000-0000-0000-0000-000000000008', 93.0, 0, 83.0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
 
   -- Match 200005: RR vs SRH
   -- Buttler (Mgr6 bench): 68r+7f+3×2s+25m(10)+40m(15)+60m(20)+SR162(30) = 68+7+6+10+15+20+30=156 bat, 20 field(2catch), 10 common = 186
