@@ -26,6 +26,7 @@ import JoinLeague from "@/pages/JoinLeague";
 import LiveScores from "@/pages/LiveScores";
 import ScoringRules from "@/pages/ScoringRules";
 import PointsCalculatorTest from "@/pages/PointsCalculatorTest";
+import PlatformAdmin from "@/pages/PlatformAdmin";
 
 import NotFound from "./pages/NotFound";
 
@@ -82,6 +83,23 @@ const ProtectedRoute = ({ children, requireUsername = true }: { children: React.
   return <>{children}</>;
 };
 
+// Guard for platform admin routes
+const PlatformAdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const isPlatformAdmin = useAuthStore(state => state.isPlatformAdmin());
+  const isLoading = useAuthStore(state => state.isLoading);
+  const userProfile = useAuthStore(state => state.userProfile);
+
+  if (isLoading || userProfile === null) {
+    return <div className="min-h-screen flex items-center justify-center p-4">Loading...</div>;
+  }
+
+  if (!isPlatformAdmin) {
+    return <Navigate to="/leagues" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 import { LeagueLayout } from "@/components/LeagueLayout";
 
 const AppRoutes = () => {
@@ -110,6 +128,9 @@ const AppRoutes = () => {
         <ProtectedRoute requireUsername={false}><LiveScores /></ProtectedRoute>
       } />
       <Route path="/test/points-calculator" element={<PointsCalculatorTest />} />
+      <Route path="/admin" element={
+        <ProtectedRoute><PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute></ProtectedRoute>
+      } />
 
       <Route element={<ProtectedRoute><LeagueLayout /></ProtectedRoute>}>
         <Route path="/:leagueId" element={<Dashboard />} />

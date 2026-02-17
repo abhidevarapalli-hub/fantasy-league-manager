@@ -6,8 +6,6 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
 import {
   ScoreInput,
-  StatsImport,
-  PlayerMapping,
   AddNewPlayer,
   RemovePlayer,
   RosterManagement,
@@ -48,8 +46,6 @@ const Admin = () => {
       <div className="px-4 py-4 space-y-6">
         <CurrentWeekSetting />
         <ScoreInput />
-        <StatsImport />
-        <PlayerMapping />
         <RosterConfig />
         <AddNewPlayer />
         <RemovePlayer />

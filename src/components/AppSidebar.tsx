@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Target, Shirt } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Target, Shirt, Shield } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -21,6 +21,7 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
+  const isPlatformAdmin = useAuthStore(state => state.isPlatformAdmin());
   const { leagueId } = useParams<{ leagueId: string }>();
   const currentManagerId = useGameStore(state => state.currentManagerId);
 
@@ -42,6 +43,9 @@ export function AppSidebar() {
     ] : []),
   ] : [
     { title: 'Leagues', url: '/leagues', icon: LayoutDashboard },
+    ...(isPlatformAdmin ? [
+      { title: 'Platform Admin', url: '/admin', icon: Shield },
+    ] : []),
   ];
 
   const isActive = (path: string) => {
