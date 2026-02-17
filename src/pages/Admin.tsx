@@ -15,6 +15,7 @@ import {
   LeagueMembers,
   DangerZone,
   RosterConfig,
+  CurrentWeekSetting,
 } from '@/components/admin';
 
 const Admin = () => {
@@ -45,6 +46,7 @@ const Admin = () => {
   return (
     <AppLayout title="League Manager Settings" subtitle="League management tools">
       <div className="px-4 py-4 space-y-6">
+        <CurrentWeekSetting />
         <ScoreInput />
         <StatsImport />
         <PlayerMapping />

@@ -8,3 +8,4 @@ export { TradeHub } from './TradeHub';
 export { LeagueMembers } from './LeagueMembers';
 export { DangerZone } from './DangerZone';
 export { RosterConfig } from './RosterConfig';
+export { CurrentWeekSetting } from './CurrentWeekSetting';

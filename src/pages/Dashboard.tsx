@@ -28,6 +28,7 @@ const Dashboard = () => {
   const currentWeek = useGameStore(state => state.currentWeek);
   const currentManagerId = useGameStore(state => state.currentManagerId);
   const loading = useGameStore(state => state.loading);
+  const draftState = useGameStore(state => state.draftState);
   const leagueName = useGameStore(state => state.leagueName);
   const managerProfile = useAuthStore(state => state.managerProfile);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
@@ -38,9 +39,8 @@ const Dashboard = () => {
 
   // Initialize selected week when currentWeek loads
   useEffect(() => {
-    if (currentWeek) {
-      setSelectedWeek(currentWeek);
-    }
+    // Week 0 = pre-season, no matchups — default to showing Week 1
+    setSelectedWeek(currentWeek === 0 ? 1 : currentWeek);
   }, [currentWeek]);
 
   // Find the logged-in user's manager ID
@@ -95,7 +95,7 @@ const Dashboard = () => {
   return (
     <AppLayout
       title={leagueName}
-      subtitle={`Week ${currentWeek} of ${totalWeeks}`}
+      subtitle={currentWeek === 0 ? 'Pre-Season' : `Week ${currentWeek} of ${totalWeeks}`}
       headerActions={
         <button
           onClick={handleRefresh}
@@ -109,35 +109,6 @@ const Dashboard = () => {
       }
     >
       <div className="px-4 py-6 space-y-8">
-
-        {/* Schedule Section */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold tracking-tight">Matchups</h2>
-            <Select
-              value={selectedWeek.toString()}
-              onValueChange={(val) => setSelectedWeek(parseInt(val))}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder={`Week ${selectedWeek}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
-                  <SelectItem key={week} value={week.toString()}>
-                    Week {week}
-                    {week === currentWeek && " (Current)"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <ScheduleGrid
-            matches={displayMatches}
-            managers={managers}
-            selectedWeek={selectedWeek}
-          />
-        </section>
 
         {/* Invite Card if needed */}
         {isLeagueManager && hasAvailableSlots && (
@@ -177,6 +148,37 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Schedule Section */}
+        {draftState?.isFinalized && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold tracking-tight">Matchups</h2>
+              <Select
+                value={selectedWeek.toString()}
+                onValueChange={(val) => setSelectedWeek(parseInt(val))}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder={`Week ${selectedWeek}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
+                    <SelectItem key={week} value={week.toString()}>
+                      Week {week}
+                      {week === currentWeek && " (Current)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <ScheduleGrid
+              matches={displayMatches}
+              managers={managers}
+              selectedWeek={selectedWeek}
+            />
+          </section>
         )}
 
         {/* Standings Section */}

@@ -24,7 +24,7 @@ export interface DbManager {
   created_at: string;
 }
 
-export interface DbLeagueSchedule {
+export interface DbLeagueMatchup {
   id: string;
   league_id: string;
   week: number;
@@ -38,11 +38,13 @@ export interface DbLeagueSchedule {
 }
 
 // Keep backward-compatible alias
-export type DbSchedule = DbLeagueSchedule;
+export type DbMatchup = DbLeagueMatchup;
+export type DbLeagueSchedule = DbLeagueMatchup; // Temporary compat
+export type DbSchedule = DbLeagueMatchup; // Temporary compat
 
 export interface DbTransaction {
   id: string;
-  type: 'add' | 'drop' | 'trade' | 'score';
+  type: 'add' | 'drop' | 'trade' | 'score' | 'admin';
   manager_id: string | null;
   description: string;
   players: PlayerTransaction[] | null;
@@ -77,6 +79,8 @@ export interface Manager {
   points: number;
   activeRoster: string[];
   bench: string[];
+  captainId?: string | null;
+  viceCaptainId?: string | null;
   userId?: string | null;
 }
 
@@ -94,7 +98,7 @@ export interface Match {
 export interface Activity {
   id: string;
   timestamp: Date;
-  type: 'add' | 'drop' | 'trade' | 'score';
+  type: 'add' | 'drop' | 'trade' | 'score' | 'admin';
   managerId: string;
   managerTeamName?: string;
   description: string;
@@ -125,7 +129,7 @@ export const mapDbManager = (db: DbManager): Manager => ({
   bench: [],
 });
 
-export const mapDbSchedule = (db: DbLeagueSchedule): Match => ({
+export const mapDbMatchup = (db: DbLeagueMatchup): Match => ({
   id: db.id,
   leagueId: db.league_id,
   week: db.week,
@@ -136,8 +140,9 @@ export const mapDbSchedule = (db: DbLeagueSchedule): Match => ({
   completed: db.is_finalized,
 });
 
-// Alias for new name
-export const mapDbLeagueSchedule = mapDbSchedule;
+// Alias for transition
+export const mapDbSchedule = mapDbMatchup;
+export const mapDbLeagueSchedule = mapDbMatchup;
 
 export const mapDbTransaction = (db: DbTransaction): Activity => ({
   id: db.id,

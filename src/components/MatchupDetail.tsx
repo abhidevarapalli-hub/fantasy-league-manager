@@ -20,6 +20,7 @@ interface MatchupDetailProps {
     match: Match;
     homeManager?: Manager;
     awayManager?: Manager;
+    displaySwapped?: boolean;
 }
 
 const RoleBadge = ({ role }: { role: string }) => {
@@ -77,11 +78,23 @@ const PlayerCard = ({
                                 {player.team}
                             </span>
                         </div>
-                        <p className="font-semibold text-sm truncate leading-tight">{player.name}</p>
+                        <p className="font-semibold text-sm truncate leading-tight">
+                            {player.name}
+                            {playerData.isCaptain && (
+                                <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/50 leading-none">C</span>
+                            )}
+                            {playerData.isViceCaptain && (
+                                <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-black rounded-full bg-slate-400/30 text-slate-300 border border-slate-400/50 leading-none">VC</span>
+                            )}
+                        </p>
                     </div>
                 </div>
                 <div className="text-right shrink-0">
-                    <p className="text-lg font-bold text-primary">{totalPoints.toFixed(1)}</p>
+                    <p className="text-lg font-bold text-primary">
+                        {totalPoints.toFixed(1)}
+                        {playerData.isCaptain && <span className="text-[10px] text-amber-400 ml-0.5">×2</span>}
+                        {playerData.isViceCaptain && <span className="text-[10px] text-slate-400 ml-0.5">×1.5</span>}
+                    </p>
                     <p className="text-[10px] text-muted-foreground">PTS</p>
                 </div>
             </div>
@@ -203,7 +216,14 @@ const MatchupRow = ({
                 {/* Info */}
                 <div className="flex-col overflow-hidden">
                     <p className="text-[11px] font-bold leading-tight truncate text-foreground/90">
-                        {player.name.split(' ').slice(-1)[0]} <span className="text-[9px] font-normal text-muted-foreground opacity-70">({player.team})</span>
+                        {player.name.split(' ').slice(-1)[0]}
+                        {playerData.isCaptain && (
+                            <span className="ml-1 px-1 py-0.5 text-[8px] font-black rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/50 leading-none">C</span>
+                        )}
+                        {playerData.isViceCaptain && (
+                            <span className="ml-1 px-1 py-0.5 text-[8px] font-black rounded-full bg-slate-400/30 text-slate-300 border border-slate-400/50 leading-none">VC</span>
+                        )}
+                        {' '}<span className="text-[9px] font-normal text-muted-foreground opacity-70">({player.team})</span>
                     </p>
                     <div className={cn(
                         "flex items-baseline gap-1 mt-0.5",
@@ -214,6 +234,8 @@ const MatchupRow = ({
                             totalPoints > 0 ? "text-primary" : "text-muted-foreground"
                         )}>
                             {totalPoints.toFixed(1)}
+                            {playerData.isCaptain && <span className="text-[8px] text-amber-400 ml-0.5">×2</span>}
+                            {playerData.isViceCaptain && <span className="text-[8px] text-slate-400 ml-0.5">×1.5</span>}
                         </span>
                         {cricketMatches.length > 0 && (
                             <span className="text-[9px] text-muted-foreground truncate max-w-[60px]">
@@ -270,8 +292,18 @@ const MobileRosterSection = ({
     const roleOrder = ['Wicket Keeper', 'Batsman', 'All Rounder', 'Bowler'];
     const sortParams = (p: PlayerWithMatches) => roleOrder.indexOf(p.player.role);
 
-    const sortedHome = [...homePlayers].sort((a, b) => sortParams(a) - sortParams(b));
-    const sortedAway = [...awayPlayers].sort((a, b) => sortParams(a) - sortParams(b));
+    const sortedHome = [...homePlayers].sort((a, b) => {
+        const aP = a.isCaptain ? -2 : a.isViceCaptain ? -1 : 0;
+        const bP = b.isCaptain ? -2 : b.isViceCaptain ? -1 : 0;
+        if (aP !== bP) return aP - bP;
+        return sortParams(a) - sortParams(b);
+    });
+    const sortedAway = [...awayPlayers].sort((a, b) => {
+        const aP = a.isCaptain ? -2 : a.isViceCaptain ? -1 : 0;
+        const bP = b.isCaptain ? -2 : b.isViceCaptain ? -1 : 0;
+        if (aP !== bP) return aP - bP;
+        return sortParams(a) - sortParams(b);
+    });
 
     const maxCount = Math.max(sortedHome.length, sortedAway.length);
 
@@ -320,9 +352,15 @@ export function MatchupDetail({
         currentLeagueId
     );
 
-    const homeStarters = matchupData.homeRoster.filter(r => r.isActive);
+    // Helper: sort C first, VC second, then by role
+    const captainFirst = (a: PlayerWithMatches, b: PlayerWithMatches) => {
+        const aP = a.isCaptain ? -2 : a.isViceCaptain ? -1 : 0;
+        const bP = b.isCaptain ? -2 : b.isViceCaptain ? -1 : 0;
+        return aP - bP;
+    };
+    const homeStarters = matchupData.homeRoster.filter(r => r.isActive).sort(captainFirst);
     const homeBench = matchupData.homeRoster.filter(r => !r.isActive);
-    const awayStarters = matchupData.awayRoster.filter(r => r.isActive);
+    const awayStarters = matchupData.awayRoster.filter(r => r.isActive).sort(captainFirst);
     const awayBench = matchupData.awayRoster.filter(r => !r.isActive);
 
     const selectedPlayer = players.find(p => p.id === selectedPlayerId) || null;
@@ -333,7 +371,7 @@ export function MatchupDetail({
                 <DialogHeader className="border-b border-border pb-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                         <Calendar className="w-4 h-4" />
-                        <span>Week {match.week}</span>
+                        <span>Week {match.week} Matchup</span>
                     </div>
                     <DialogTitle className="sr-only">Matchup Details</DialogTitle>
 
@@ -450,9 +488,11 @@ export function MatchupDetail({
                 )}
 
                 <PlayerDetailDialog
-                    player={selectedPlayer}
+                    player={selectedPlayer!}
                     open={!!selectedPlayerId}
                     onOpenChange={(open) => !open && setSelectedPlayerId(null)}
+                    // Provide minimal actions or at least consistent ones
+                    onAdd={() => setSelectedPlayerId(null)}
                 />
             </DialogContent>
         </Dialog>

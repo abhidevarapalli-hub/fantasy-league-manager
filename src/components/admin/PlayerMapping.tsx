@@ -52,8 +52,8 @@ export const PlayerMapping = () => {
     const loadMappings = async () => {
       const { data: leaguePlayers } = await supabase
         .from('league_players')
-        .select('id, cricbuzz_id')
-        .eq('league_id', currentLeagueId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select('*') as any;
 
       const mappingMap = new Map<string, string | null>();
       if (leaguePlayers) {

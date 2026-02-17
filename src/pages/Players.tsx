@@ -13,6 +13,7 @@ import { Player, Manager } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
 import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
 import { getTeamPillStyles } from '@/lib/team-colors';
+import { toast } from 'sonner';
 
 const ROLE_AND_NATIONALITY_FILTERS = {
   All: 'bg-primary/20 text-primary border-primary/30',
@@ -103,6 +104,7 @@ const Players = () => {
     if (player) {
       setSelectedPlayer(player);
       setDialogOpen(true);
+      setDetailSheetOpen(false); // Close detail dialog
     }
   };
 
@@ -115,6 +117,7 @@ const Players = () => {
       setTradeTargetPlayer(player);
       setTradeTargetManager(targetMgr);
       setTradeDialogOpen(true);
+      setDetailSheetOpen(false); // Close detail dialog
     }
   };
 
@@ -126,6 +129,12 @@ const Players = () => {
   const handlePlayerClick = (player: Player) => {
     setDetailPlayer(player);
     setDetailSheetOpen(true);
+  };
+
+  const handleDropPlayer = async (playerId: string) => {
+    if (!currentUserManagerId) return;
+    await useGameStore.getState().dropPlayerOnly(currentUserManagerId, playerId);
+    setDetailSheetOpen(false); // Close detail dialog
   };
 
   return (
@@ -292,6 +301,9 @@ const Players = () => {
           onOpenChange={setDetailSheetOpen}
           player={detailPlayer}
           seriesId={tournamentId}
+          onAdd={!playerToManagerMap[detailPlayer.id] && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(detailPlayer.id) : undefined}
+          onTrade={playerToManagerIdMap[detailPlayer.id] && playerToManagerIdMap[detailPlayer.id] !== currentUserManagerId && !!currentUserManagerId ? () => handleTradePlayer(detailPlayer.id) : undefined}
+          onDrop={playerToManagerIdMap[detailPlayer.id] === currentUserManagerId ? () => handleDropPlayer(detailPlayer.id) : undefined}
         />
       )}
     </AppLayout>

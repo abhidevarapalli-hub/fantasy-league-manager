@@ -330,8 +330,9 @@ export async function matchStatsToLeaguePlayers(
   // Fetch league players from the league_players view (joins master_players + league_player_pool)
   const { data: leaguePlayers } = await supabase
     .from('league_players')
-    .select('id, name, team, cricbuzz_id')
-    .eq('league_id', leagueId);
+    .select('*')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .eq('league_id', leagueId) as any;
 
   // Fetch managers and their roster entries from junction table
   const [managersRes, rosterRes] = await Promise.all([

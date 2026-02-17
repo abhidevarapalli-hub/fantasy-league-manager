@@ -9,6 +9,8 @@ export interface PlayerWithMatches {
     stats: PlayerMatchStats[];
     totalPoints: number;
     isActive: boolean;
+    isCaptain: boolean;
+    isViceCaptain: boolean;
 }
 
 export interface MatchupData {
@@ -48,9 +50,33 @@ export function useMatchupData(
             try {
                 setData(prev => ({ ...prev, loading: true, error: null }));
 
-                // Get all player IDs for both managers
-                const homePlayerIds = [...homeManager.activeRoster, ...homeManager.bench];
-                const awayPlayerIds = [...awayManager.activeRoster, ...awayManager.bench];
+                // Fetch per-week roster entries directly from DB for both managers
+                const { data: rosterData, error: rosterError } = await supabase
+                    .from('manager_roster')
+                    .select('*')
+                    .eq('league_id', leagueId)
+                    .eq('week', week)
+                    .in('manager_id', [homeManager.id, awayManager.id]);
+
+                if (rosterError) throw rosterError;
+
+                const rosterEntries = rosterData || [];
+                const homeEntries = rosterEntries.filter(e => e.manager_id === homeManager.id);
+                const awayEntries = rosterEntries.filter(e => e.manager_id === awayManager.id);
+
+                const homeActiveIds = homeEntries.filter(e => e.slot_type === 'active').map(e => e.player_id);
+                const homeBenchIds = homeEntries.filter(e => e.slot_type === 'bench').map(e => e.player_id);
+                const awayActiveIds = awayEntries.filter(e => e.slot_type === 'active').map(e => e.player_id);
+                const awayBenchIds = awayEntries.filter(e => e.slot_type === 'bench').map(e => e.player_id);
+
+                // Captain/VC lookups
+                const homeCaptainId = homeEntries.find(e => e.is_captain)?.player_id ?? null;
+                const homeVcId = homeEntries.find(e => e.is_vice_captain)?.player_id ?? null;
+                const awayCaptainId = awayEntries.find(e => e.is_captain)?.player_id ?? null;
+                const awayVcId = awayEntries.find(e => e.is_vice_captain)?.player_id ?? null;
+
+                const homePlayerIds = [...homeActiveIds, ...homeBenchIds];
+                const awayPlayerIds = [...awayActiveIds, ...awayBenchIds];
                 const allPlayerIds = [...homePlayerIds, ...awayPlayerIds];
 
                 if (allPlayerIds.length === 0) {
@@ -121,8 +147,12 @@ export function useMatchupData(
                             if (!s.fantasyPoints) s.fantasyPoints = getPoints(s);
                         });
 
-                        const totalPoints = playerStats.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
-                        const isActive = homeManager.activeRoster.includes(playerId);
+                        const totalPointsRaw = playerStats.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
+                        const isActive = homeActiveIds.includes(playerId);
+                        const isCaptain = playerId === homeCaptainId;
+                        const isViceCaptain = playerId === homeVcId;
+                        // Apply multipliers: 2× for captain, 1.5× for VC
+                        const totalPoints = isCaptain ? totalPointsRaw * 2 : isViceCaptain ? totalPointsRaw * 1.5 : totalPointsRaw;
 
                         // Get cricket matches for this player's team
                         const playerMatches = cricketMatches.filter(
@@ -139,6 +169,8 @@ export function useMatchupData(
                             stats: playerStats,
                             totalPoints,
                             isActive,
+                            isCaptain,
+                            isViceCaptain,
                         };
                     })
                     .filter((item): item is PlayerWithMatches => item !== null);
@@ -155,8 +187,11 @@ export function useMatchupData(
                             if (!s.fantasyPoints) s.fantasyPoints = getPoints(s);
                         });
 
-                        const totalPoints = playerStats.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
-                        const isActive = awayManager.activeRoster.includes(playerId);
+                        const totalPointsRaw = playerStats.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
+                        const isActive = awayActiveIds.includes(playerId);
+                        const isCaptain = playerId === awayCaptainId;
+                        const isViceCaptain = playerId === awayVcId;
+                        const totalPoints = isCaptain ? totalPointsRaw * 2 : isViceCaptain ? totalPointsRaw * 1.5 : totalPointsRaw;
 
                         // Get cricket matches for this player's team
                         const playerMatches = cricketMatches.filter(
@@ -173,6 +208,8 @@ export function useMatchupData(
                             stats: playerStats,
                             totalPoints,
                             isActive,
+                            isCaptain,
+                            isViceCaptain,
                         };
                     })
                     .filter((item): item is PlayerWithMatches => item !== null);

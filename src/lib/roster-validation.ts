@@ -93,8 +93,9 @@ export function validateActiveRoster(players: Player[], config: LeagueConfig = D
     errors.push(`Need at least ${config.minWks} Wicket Keeper(s) (currently ${counts.wicketKeepers})`);
   }
 
-  if (counts.batsmen < config.minBatsmen) {
-    errors.push(`Need at least ${config.minBatsmen} Batsman/Batsmen (currently ${counts.batsmen})`);
+  const batsmenPlusWk = counts.batsmen + counts.wicketKeepers;
+  if (batsmenPlusWk < config.minBatsmen) {
+    errors.push(`Need at least ${config.minBatsmen} Batsmen + WK (currently ${batsmenPlusWk})`);
   }
 
   if (counts.allRounders < config.minAllRounders) {
@@ -146,23 +147,24 @@ export function canAddToActive(currentActive: Player[], playerToAdd: Player, con
   // Forward-looking validation: Check if requirements CAN still be met
   const remainingSlots = config.activeSize - counts.total;
 
-  // Calculate strict deficits - exactly how many more of each SPECIFIC type we need
+  // Calculate strict deficits
   const wkDeficit = Math.max(0, config.minWks - counts.wicketKeepers);
-  const batDeficit = Math.max(0, config.minBatsmen - counts.batsmen);
+  const batPlusWkDeficit = Math.max(0, config.minBatsmen - (counts.batsmen + counts.wicketKeepers));
   const arDeficit = Math.max(0, config.minAllRounders - counts.allRounders);
   const bowlerDeficit = Math.max(0, config.minBowlers - counts.bowlers);
 
   // Total minimum slots needed exclusively for specific roles
-  // Since we removed the "combined" logic, this is much simpler.
-  // We just need to make sure we have enough slots left for ALL strictly required missing positions.
-  const totalMinSlotsNeeded = wkDeficit + batDeficit + arDeficit + bowlerDeficit;
+  // We need to satisfy the WK minimum AND the combined Bat+WK minimum.
+  // The number of slots reserved for the batting group is max(wkDeficit, batPlusWkDeficit).
+  const batWkSlotsNeeded = Math.max(wkDeficit, batPlusWkDeficit);
+  const totalMinSlotsNeeded = batWkSlotsNeeded + arDeficit + bowlerDeficit;
 
   if (totalMinSlotsNeeded > remainingSlots) {
     // Determine which requirement is impossible to meet
     if (wkDeficit > remainingSlots) {
       errors.push(`Cannot add this player: not enough slots remaining to add required Wicket Keeper(s)`);
-    } else if (batDeficit > remainingSlots) {
-      errors.push(`Cannot add this player: not enough slots remaining to add required Batsmen`);
+    } else if (batPlusWkDeficit > remainingSlots) {
+      errors.push(`Cannot add this player: not enough slots remaining to satisfy the ${config.minBatsmen} Batsmen + WK requirement`);
     } else if (arDeficit > remainingSlots) {
       errors.push(`Cannot add this player: not enough slots remaining to add required All Rounder(s)`);
     } else if (bowlerDeficit > remainingSlots) {
@@ -253,7 +255,7 @@ export function getActiveRosterSlots(players: Player[], config: LeagueConfig = D
 
   // Determine minimum requirements not yet met
   const wkNeeded = Math.max(0, config.minWks - wkAdded);
-  const batNeeded = Math.max(0, config.minBatsmen - batAdded);
+  const batNeeded = Math.max(0, config.minBatsmen - (batAdded + wkAdded));
   const arNeeded = Math.max(0, config.minAllRounders - arAdded);
   const bowlersNeeded = Math.max(0, config.minBowlers - bowlerAdded);
 

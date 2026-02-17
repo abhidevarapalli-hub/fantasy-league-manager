@@ -1,4 +1,4 @@
-import { Plus, Minus, ArrowUp, ArrowDown, Plane, ArrowLeftRight, Repeat } from 'lucide-react';
+import { Plus, Minus, ArrowUp, ArrowDown, Plane, ArrowUpDown, Repeat, Crown, Shield } from 'lucide-react';
 import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { cn } from '@/lib/utils';
 import { Player } from '@/lib/supabase-types';
@@ -10,15 +10,17 @@ import { getTeamColors } from '@/lib/team-colors';
 interface PlayerCardProps {
   player: Player;
   onAdd?: () => void;
-  onDrop?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onSwap?: () => void;
   onTrade?: () => void;
   onClick?: () => void;
+  onSetCaptain?: () => void;
+  onSetViceCaptain?: () => void;
   isOwned?: boolean;
   showActions?: boolean;
   variant?: 'compact' | 'full';
+  captainBadge?: 'C' | 'VC' | null;
 }
 
 // Team colors are now centralized in src/lib/team-colors.ts
@@ -35,15 +37,17 @@ const roleStyles: Record<string, string> = {
 export const PlayerCard = ({
   player,
   onAdd,
-  onDrop,
   onMoveUp,
   onMoveDown,
   onSwap,
   onTrade,
   onClick,
+  onSetCaptain,
+  onSetViceCaptain,
   isOwned = false,
   showActions = true,
   variant = 'full',
+  captainBadge,
   managerName
 }: PlayerCardProps & { managerName?: string }) => {
   const handleCardClick = (e: React.MouseEvent) => {
@@ -104,6 +108,16 @@ export const PlayerCard = ({
           )}>
             {player.name}
           </p>
+          {captainBadge && (
+            <span className={cn(
+              "px-1.5 py-0.5 text-[9px] font-black rounded-full border shadow-sm leading-none",
+              captainBadge === 'C'
+                ? "bg-amber-500/30 text-amber-300 border-amber-400/50"
+                : "bg-slate-400/30 text-slate-300 border-slate-400/50"
+            )}>
+              {captainBadge}
+            </span>
+          )}
           {player.isInternational && (
             <Plane className={cn(
               "w-3 h-3 flex-shrink-0 opacity-70",
@@ -140,66 +154,78 @@ export const PlayerCard = ({
 
         {showActions && (
           <div className="flex items-center gap-1">
+            {onSetCaptain && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 text-amber-300 bg-amber-500/20 hover:bg-amber-500/40 border border-amber-400/30 font-black text-sm shadow-sm"
+                onClick={onSetCaptain}
+                title="Set as Captain (2× points)"
+              >
+                C
+              </Button>
+            )}
+            {onSetViceCaptain && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 text-slate-300 bg-slate-500/20 hover:bg-slate-500/40 border border-slate-400/30 font-black text-sm shadow-sm"
+                onClick={onSetViceCaptain}
+                title="Set as Vice-Captain (1.5× points)"
+              >
+                VC
+              </Button>
+            )}
             {onTrade && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white bg-secondary/20 hover:bg-secondary/40 border border-white/10"
+                className="h-10 w-10 text-white bg-secondary/20 hover:bg-secondary/40 border border-white/10"
                 onClick={onTrade}
                 title="Propose trade"
               >
-                <Repeat className="w-4 h-4" />
+                <Repeat className="w-5 h-5" />
               </Button>
             )}
             {onSwap && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white bg-black/20 hover:bg-black/40 border border-white/10"
+                className="h-10 w-10 text-white bg-black/20 hover:bg-black/40 border border-white/10"
                 onClick={onSwap}
                 title="Swap player"
               >
-                <ArrowLeftRight className="w-4 h-4" />
+                <ArrowUpDown className="w-5 h-5" />
               </Button>
             )}
             {onMoveUp && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white bg-black/20 hover:bg-black/40 border border-white/10"
+                className="h-10 w-10 text-white bg-black/20 hover:bg-black/40 border border-white/10"
                 onClick={onMoveUp}
               >
-                <ArrowUp className="w-4 h-4" />
+                <ArrowUp className="w-5 h-5" />
               </Button>
             )}
             {onMoveDown && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white bg-black/20 hover:bg-black/40 border border-white/10"
+                className="h-10 w-10 text-white bg-black/20 hover:bg-black/40 border border-white/10"
                 onClick={onMoveDown}
               >
-                <ArrowDown className="w-4 h-4" />
+                <ArrowDown className="w-5 h-5" />
               </Button>
             )}
             {!isOwned && onAdd && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white bg-emerald-500/40 hover:bg-emerald-500/60 border border-emerald-400/30"
+                className="h-10 w-10 text-white bg-emerald-500/40 hover:bg-emerald-500/60 border border-emerald-400/30"
                 onClick={onAdd}
               >
-                <Plus className="w-4 h-4" />
-              </Button>
-            )}
-            {isOwned && onDrop && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-white bg-rose-500/40 hover:bg-rose-500/60 border border-rose-400/30"
-                onClick={onDrop}
-              >
-                <Minus className="w-4 h-4" />
+                <Plus className="w-5 h-5" />
               </Button>
             )}
           </div>

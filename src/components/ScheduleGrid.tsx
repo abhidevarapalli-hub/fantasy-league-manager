@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { LazyPlayerAvatar } from '@/components/LazyPlayerAvatar';
 import { MatchupDetail } from './MatchupDetail';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 
 interface ScheduleGridProps {
@@ -18,24 +18,40 @@ export const ScheduleGrid = ({ matches, managers, selectedWeek }: ScheduleGridPr
 
     const getManager = (id: string) => managers.find(m => m.id === id);
 
-    // Filter matches for the selected week
-    const weekMatches = matches.filter(m => m.week === selectedWeek);
-
     // Check if this match implies the logged-in user
     const isUserMatch = (match: Match) => {
         if (!managerProfile?.id) return false;
         return match.home === managerProfile.id || match.away === managerProfile.id;
     };
 
+    // Filter and sort matches for the selected week
+    const weekMatches = useMemo(() => {
+        const filtered = matches.filter(m => m.week === selectedWeek);
+        if (!managerProfile?.id) return filtered;
+
+        return [...filtered].sort((a, b) => {
+            const aIsUser = a.home === managerProfile.id || a.away === managerProfile.id;
+            const bIsUser = b.home === managerProfile.id || b.away === managerProfile.id;
+            if (aIsUser && !bIsUser) return -1;
+            if (!aIsUser && bIsUser) return 1;
+            return 0;
+        });
+    }, [matches, selectedWeek, managerProfile?.id]);
+
     return (
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {weekMatches.map((match) => {
-                    const homeManager = getManager(match.home);
-                    const awayManager = getManager(match.away);
+                    // Logic to ensure the logged-in user is always on the left (Home) for display
+                    const isAway = managerProfile?.id && match.away === managerProfile.id;
 
-                    const homeScore = match.homeScore ?? 0;
-                    const awayScore = match.awayScore ?? 0;
+                    const displayHomeId = isAway ? match.away : match.home;
+                    const displayAwayId = isAway ? match.home : match.away;
+                    const displayHomeScore = isAway ? (match.awayScore ?? 0) : (match.homeScore ?? 0);
+                    const displayAwayScore = isAway ? (match.homeScore ?? 0) : (match.awayScore ?? 0);
+
+                    const homeManager = getManager(displayHomeId);
+                    const awayManager = getManager(displayAwayId);
 
                     const userPlaying = isUserMatch(match);
 
@@ -72,7 +88,7 @@ export const ScheduleGrid = ({ matches, managers, selectedWeek }: ScheduleGridPr
                                     </div>
 
                                     <div className="flex justify-start items-end mt-1">
-                                        <span className="font-bold text-lg tabular-nums">{homeScore > 0 ? homeScore.toFixed(2) : '0.00'}</span>
+                                        <span className="font-bold text-lg tabular-nums">{displayHomeScore > 0 ? displayHomeScore.toFixed(2) : '0.00'}</span>
                                     </div>
                                 </div>
 
@@ -101,7 +117,7 @@ export const ScheduleGrid = ({ matches, managers, selectedWeek }: ScheduleGridPr
                                     </div>
 
                                     <div className="flex justify-start items-end mt-1 flex-row-reverse">
-                                        <span className="font-bold text-lg tabular-nums">{awayScore > 0 ? awayScore.toFixed(2) : '0.00'}</span>
+                                        <span className="font-bold text-lg tabular-nums">{displayAwayScore > 0 ? displayAwayScore.toFixed(2) : '0.00'}</span>
                                     </div>
                                 </div>
                             </CardContent>
@@ -112,15 +128,22 @@ export const ScheduleGrid = ({ matches, managers, selectedWeek }: ScheduleGridPr
 
             {/* Matchup Detail Modal */}
             {
-                selectedMatch && (
-                    <MatchupDetail
-                        open={!!selectedMatch}
-                        onOpenChange={(open) => !open && setSelectedMatch(null)}
-                        match={selectedMatch}
-                        homeManager={getManager(selectedMatch.home)}
-                        awayManager={getManager(selectedMatch.away)}
-                    />
-                )
+                selectedMatch && (() => {
+                    const isAway = managerProfile?.id && selectedMatch.away === managerProfile.id;
+                    const homeMan = getManager(isAway ? selectedMatch.away : selectedMatch.home);
+                    const awayMan = getManager(isAway ? selectedMatch.home : selectedMatch.away);
+
+                    return (
+                        <MatchupDetail
+                            open={!!selectedMatch}
+                            onOpenChange={(open) => !open && setSelectedMatch(null)}
+                            match={selectedMatch}
+                            homeManager={homeMan}
+                            awayManager={awayMan}
+                            displaySwapped={isAway}
+                        />
+                    );
+                })()
             }
         </>
     );

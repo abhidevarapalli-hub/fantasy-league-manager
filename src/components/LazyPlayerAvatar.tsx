@@ -56,11 +56,6 @@ export function LazyPlayerAvatar({
   }, [imageId, cachedUrl]);
 
   const initials = getPlayerInitials(name);
-  useEffect(() => {
-    if (cachedUrl && name) {
-      console.log(`using cached image for ${name}`);
-    }
-  }, [cachedUrl, name]);
 
   const imageUrl = (imageId || cachedUrl) ? getPlayerAvatarUrl(imageId, 'de', cachedUrl) : null;
 

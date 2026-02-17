@@ -412,7 +412,8 @@ class LivePollingService {
    * Sets auto_enabled = true so the lifecycle manager can pick it up again
    */
   async reEnableAuto(cricbuzzMatchId: number): Promise<boolean> {
-    const { error } = await supabase.rpc('reenable_auto_polling', {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.rpc as any)('reenable_auto_polling', {
       p_cricbuzz_match_id: cricbuzzMatchId,
     });
 

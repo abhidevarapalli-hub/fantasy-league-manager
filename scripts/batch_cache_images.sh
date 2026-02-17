@@ -1,7 +1,7 @@
 #!/bin/bash
 PROJECT_ID="hdffskijakgxcisxdinf"
 # Extract key cleanly, handling potential whitespace
-ANON_KEY=$(grep VITE_SUPABASE_PUBLISHABLE_KEY .env | cut -d '=' -f2 | tr -d '"' | tr -d ' ')
+ANON_KEY=$(grep VITE_SUPABASE_ANON_KEY .env | cut -d '=' -f2 | tr -d '"' | tr -d ' ')
 
 echo "Starting batch caching for project $PROJECT_ID..."
 

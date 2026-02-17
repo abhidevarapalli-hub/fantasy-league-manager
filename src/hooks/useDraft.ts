@@ -180,23 +180,38 @@ export const useDraft = () => {
         // Build optimal Active 11 based on positional requirements
         const { active, bench } = buildOptimalActive11(draftedPlayers);
 
-        // Prepare roster entries for insertion
-        const rosterEntries = [
-          ...active.map((p, idx) => ({
-            manager_id: managerId,
-            player_id: p.id,
-            league_id: leagueId,
-            slot_type: 'active' as const,
-            position: idx,
-          })),
-          ...bench.map((p, idx) => ({
-            manager_id: managerId,
-            player_id: p.id,
-            league_id: leagueId,
-            slot_type: 'bench' as const,
-            position: idx,
-          })),
-        ];
+        // Prepare roster entries for ALL weeks (1-7)
+        const totalWeeks = 7;
+        const rosterEntries = [];
+
+        // Top 2 drafted players become captain and vice-captain
+        const captainId = playerIds[0] || null;
+        const viceCaptainId = playerIds[1] || null;
+
+        for (let week = 1; week <= totalWeeks; week++) {
+          rosterEntries.push(
+            ...active.map((p, idx) => ({
+              manager_id: managerId,
+              player_id: p.id,
+              league_id: leagueId,
+              slot_type: 'active' as const,
+              position: idx,
+              week,
+              is_captain: p.id === captainId,
+              is_vice_captain: p.id === viceCaptainId,
+            })),
+            ...bench.map((p, idx) => ({
+              manager_id: managerId,
+              player_id: p.id,
+              league_id: leagueId,
+              slot_type: 'bench' as const,
+              position: idx,
+              week,
+              is_captain: false,
+              is_vice_captain: false,
+            })),
+          );
+        }
 
         if (rosterEntries.length > 0) {
           const { error } = await supabase
@@ -223,7 +238,7 @@ export const useDraft = () => {
       // --- Schedule Generation ---
       // Clear existing schedule for this league to avoid duplicates
       const { error: clearScheduleError } = await supabase
-        .from('league_schedules' as 'transactions') // Using actual DB table name
+        .from('league_matchups' as 'transactions') // Using actual DB table name
         .delete()
         .eq('league_id', leagueId);
 
@@ -247,7 +262,7 @@ export const useDraft = () => {
         }));
 
         const { error: scheduleError } = await supabase
-          .from('league_schedules')
+          .from('league_matchups')
           .insert(scheduleRows);
 
         if (scheduleError) {
@@ -266,7 +281,17 @@ export const useDraft = () => {
           .eq('league_id', leagueId);
       }
 
+      // Set current_week to 0 (pre-season) so managers can rearrange before Week 1
+      await supabase
+        .from('leagues' as const)
+        .update({ current_week: 0 } as Record<string, unknown>)
+        .eq('id', leagueId);
+
       toast.success(`Draft finalized! All rosters cleared and ${picksByManager.size} teams updated with optimized Active 11.`);
+
+      // Refresh all data to ensure UI is in sync immediately
+      await useGameStore.getState().fetchAllData(leagueId);
+
       return true;
     } catch (error) {
       console.error('Failed to finalize draft:', error);

@@ -292,6 +292,74 @@ export type Database = {
           },
         ]
       }
+      league_matchups: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_finalized: boolean
+          league_id: string
+          manager1_id: string
+          manager1_score: number | null
+          manager2_id: string | null
+          manager2_score: number | null
+          week: number
+          winner_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_finalized?: boolean
+          league_id: string
+          manager1_id: string
+          manager1_score?: number | null
+          manager2_id?: string | null
+          manager2_score?: number | null
+          week: number
+          winner_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_finalized?: boolean
+          league_id?: string
+          manager1_id?: string
+          manager1_score?: number | null
+          manager2_id?: string | null
+          manager2_score?: number | null
+          week?: number
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_schedules_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_schedules_manager1_id_fkey"
+            columns: ["manager1_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_schedules_manager2_id_fkey"
+            columns: ["manager2_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_schedules_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       league_player_match_scores: {
         Row: {
           batting_points: number
@@ -454,79 +522,12 @@ export type Database = {
           },
         ]
       }
-      league_schedules: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_finalized: boolean
-          league_id: string
-          manager1_id: string
-          manager1_score: number | null
-          manager2_id: string | null
-          manager2_score: number | null
-          week: number
-          winner_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_finalized?: boolean
-          league_id: string
-          manager1_id: string
-          manager1_score?: number | null
-          manager2_id?: string | null
-          manager2_score?: number | null
-          week: number
-          winner_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_finalized?: boolean
-          league_id?: string
-          manager1_id?: string
-          manager1_score?: number | null
-          manager2_id?: string | null
-          manager2_score?: number | null
-          week?: number
-          winner_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_schedules_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_manager1_id_fkey"
-            columns: ["manager1_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_manager2_id_fkey"
-            columns: ["manager2_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_winner_id_fkey"
-            columns: ["winner_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       leagues: {
         Row: {
           active_size: number
           bench_size: number
           created_at: string
+          current_week: number
           id: string
           league_manager_id: string | null
           manager_count: number
@@ -545,6 +546,7 @@ export type Database = {
           active_size?: number
           bench_size?: number
           created_at?: string
+          current_week?: number
           id?: string
           league_manager_id?: string | null
           manager_count?: number
@@ -563,6 +565,7 @@ export type Database = {
           active_size?: number
           bench_size?: number
           created_at?: string
+          current_week?: number
           id?: string
           league_manager_id?: string | null
           manager_count?: number
@@ -691,29 +694,38 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_captain: boolean
+          is_vice_captain: boolean
           league_id: string
           manager_id: string
           player_id: string
           position: number
           slot_type: string
+          week: number
         }
         Insert: {
           created_at?: string | null
           id?: string
+          is_captain?: boolean
+          is_vice_captain?: boolean
           league_id: string
           manager_id: string
           player_id: string
           position?: number
           slot_type: string
+          week?: number
         }
         Update: {
           created_at?: string | null
           id?: string
+          is_captain?: boolean
+          is_vice_captain?: boolean
           league_id?: string
           manager_id?: string
           player_id?: string
           position?: number
           slot_type?: string
+          week?: number
         }
         Relationships: [
           {
@@ -1284,7 +1296,6 @@ export type Database = {
           active: boolean | null
           cached_image_url: string | null
           created_at: string | null
-          cricbuzz_id: number | null
           id: string | null
           image_id: number | null
           is_international: boolean | null
@@ -1569,10 +1580,6 @@ export type Database = {
           match_id: string
         }[]
       }
-      reenable_auto_polling: {
-        Args: { p_cricbuzz_match_id: number }
-        Returns: undefined
-      }
       record_poll_error: {
         Args: { p_cricbuzz_match_id: number; p_error_message: string }
         Returns: undefined
@@ -1588,14 +1595,6 @@ export type Database = {
       update_league_standings: {
         Args: { league_uuid: string }
         Returns: undefined
-      }
-      upsert_match_polling_state: {
-        Args: {
-          p_cricbuzz_match_id: number
-          p_match_id?: string
-          p_match_state?: string
-        }
-        Returns: string
       }
       upsert_league_match: {
         Args: {
@@ -1639,116 +1638,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {

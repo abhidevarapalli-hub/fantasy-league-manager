@@ -37,6 +37,7 @@ export interface GameState {
   initializedDraftLeagueId: string | null;
   isTradesInitialized: boolean;
   isLeaguesInitialized: boolean;
+  selectedRosterWeek: number;
 
   // Setters (used internally and by real-time subscriptions)
   setPlayers: (players: Player[]) => void;
@@ -60,6 +61,8 @@ export interface GameState {
   setInitializedDraftLeagueId: (id: string | null) => void;
   setIsTradesInitialized: (isTradesInitialized: boolean) => void;
   setIsLeaguesInitialized: (isLeaguesInitialized: boolean) => void;
+  setSelectedRosterWeek: (week: number) => void;
+  setCurrentWeek: (week: number) => void;
 
   // Real-time mutations (called by Supabase subscriptions)
   addPlayer: (player: Player) => void;
@@ -82,9 +85,9 @@ export interface GameState {
   // Game actions
   addFreeAgent: (managerId: string, playerId: string, dropPlayerId?: string) => Promise<void>;
   dropPlayerOnly: (managerId: string, playerId: string) => Promise<void>;
-  moveToActive: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
-  moveToBench: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
-  swapPlayers: (managerId: string, player1Id: string, player2Id: string) => Promise<RosterMoveResult>;
+  moveToActive: (managerId: string, playerId: string, week?: number) => Promise<RosterMoveResult>;
+  moveToBench: (managerId: string, playerId: string, week?: number) => Promise<RosterMoveResult>;
+  swapPlayers: (managerId: string, player1Id: string, player2Id: string, week?: number) => Promise<RosterMoveResult>;
   updateMatchScore: (week: number, matchIndex: number, homeScore: number, awayScore: number) => Promise<void>;
   finalizeWeekScores: (week: number) => Promise<void>;
   addNewPlayer: (name: string, team: string, role: 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper', isInternational?: boolean) => Promise<void>;
@@ -93,9 +96,13 @@ export interface GameState {
   resetLeague: () => Promise<void>;
   updateScoringRules: (rules: ScoringRules) => Promise<ScoringRulesResult>;
   updateLeagueConfig: (config: Partial<LeagueConfig>) => Promise<{ success: boolean; error?: string }>;
+  updateCurrentWeek: (week: number) => Promise<{ success: boolean; error?: string }>;
+  setCaptain: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
+  setViceCaptain: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
 
   // Data fetching
   fetchAllData: (leagueId: string) => Promise<void>;
+  fetchRosterForWeek: (leagueId: string, week: number) => Promise<void>;
 
   // Real-time subscriptions
   subscribeToRealtime: (leagueId: string) => () => void;

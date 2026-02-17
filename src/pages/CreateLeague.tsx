@@ -336,7 +336,7 @@ const CreateLeague = () => {
             const step5Start = performance.now();
 
             const { error: scheduleError } = await supabase
-                .from('league_schedules')
+                .from('league_matchups')
                 .insert(matchups);
 
             const step5Duration = performance.now() - step5Start;

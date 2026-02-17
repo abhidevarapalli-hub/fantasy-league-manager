@@ -36,15 +36,17 @@ const mapDbManager = (db: Tables<"managers">): Manager => ({
   bench: [],
 });
 
-const mapDbSchedule = (db: Tables<"league_schedules">): Match => ({
-  id: db.id,
-  week: db.week,
+const mapDbMatchup = (db: Tables<"league_matchups">): Match => ({
+  id: db.id!,
+  week: db.week!,
   home: db.manager1_id || "",
   away: db.manager2_id || "",
   homeScore: db.manager1_score ?? undefined,
   awayScore: db.manager2_score ?? undefined,
-  completed: db.is_finalized,
+  completed: db.is_finalized ?? false,
 });
+
+const mapDbSchedule = mapDbMatchup;
 
 const mapDbTransaction = (db: Tables<"transactions">): Activity => ({
   id: db.id,
@@ -62,7 +64,7 @@ export const useRealtimeGame = (leagueId?: string) => {
   const [schedule, setSchedule] = useState<Match[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentWeek, setCurrentWeek] = useState(1);
+  const [currentWeek, setCurrentWeek] = useState(0);
   const [currentManagerId, setCurrentManagerId] = useState("");
   const [leagueName, setLeagueName] = useState("IPL Fantasy");
   const [leagueOwnerId, setLeagueOwnerId] = useState<string | null>(null);
@@ -118,7 +120,7 @@ export const useRealtimeGame = (leagueId?: string) => {
         supabase.from("managers").select("*").eq("league_id", leagueId).order("name"),
         // Fetch roster entries from junction table
         supabase.from("manager_roster").select("*").eq("league_id", leagueId),
-        supabase.from("league_schedules").select("*").eq("league_id", leagueId).order("week").order("created_at"),
+        supabase.from("league_matchups").select("*").eq("league_id", leagueId).order("week").order("created_at"),
         supabase.from("transactions").select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
       ]);
 
@@ -129,6 +131,9 @@ export const useRealtimeGame = (leagueId?: string) => {
         league_id: r.league_id,
         slot_type: r.slot_type as 'active' | 'bench',
         position: r.position,
+        week: r.week,
+        is_captain: r.is_captain,
+        is_vice_captain: r.is_vice_captain,
       }));
 
       if (playersRes.data) {
@@ -142,7 +147,7 @@ export const useRealtimeGame = (leagueId?: string) => {
         }
       }
       if (scheduleRes.data) {
-        setSchedule(scheduleRes.data.map(mapDbSchedule));
+        setSchedule((scheduleRes.data as Tables<"league_matchups">[]).map(mapDbMatchup));
       }
       if (transactionsRes.data) {
         setActivities(transactionsRes.data.map(mapDbTransaction));
@@ -213,22 +218,25 @@ export const useRealtimeGame = (leagueId?: string) => {
             league_id: r.league_id,
             slot_type: r.slot_type as 'active' | 'bench',
             position: r.position,
+            week: r.week ?? 0,
+            is_captain: r.is_captain ?? false,
+            is_vice_captain: r.is_vice_captain ?? false,
           }));
           const mappedManagers = managersRes.data.map(m => mapDbManagerWithRoster(m, rosterEntries));
           setManagers(mappedManagers);
         }
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "league_schedules", filter }, (payload) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "league_matchups", filter }, (payload) => {
         if (payload.eventType === "INSERT") {
           // Prevent duplicates: only add if match doesn't already exist
           setSchedule((prev) => {
             const existingMatch = prev.find(s => s.id === payload.new.id);
             if (existingMatch) return prev;
-            return [...prev, mapDbSchedule(payload.new as Tables<"league_schedules">)];
+            return [...prev, mapDbMatchup(payload.new as Tables<"league_matchups">)];
           });
         } else if (payload.eventType === "UPDATE") {
           setSchedule((prev) =>
-            prev.map((s) => (s.id === payload.new.id ? mapDbSchedule(payload.new as Tables<"league_schedules">) : s)),
+            prev.map((s) => (s.id === payload.new.id ? mapDbMatchup(payload.new as Tables<"league_matchups">) : s)),
           );
         } else if (payload.eventType === "DELETE") {
           setSchedule((prev) => prev.filter((s) => s.id !== payload.old.id));
@@ -476,13 +484,13 @@ export const useRealtimeGame = (leagueId?: string) => {
     const weekMatches = schedule.filter((m) => m.week === week);
     if (matchIndex >= weekMatches.length) return;
     const match = weekMatches[matchIndex];
-    await supabase.from("league_schedules").update({ manager1_score: homeScore, manager2_score: awayScore }).eq("id", match.id);
+    await supabase.from("league_matchups").update({ manager1_score: homeScore, manager2_score: awayScore }).eq("id", match.id);
   };
 
   const finalizeWeekScores = async (week: number) => {
     if (!leagueId) return;
     const { data: freshSchedule, error: scheduleError } = await supabase
-      .from("league_schedules")
+      .from("league_matchups")
       .select("*")
       .eq("league_id", leagueId)
       .eq("week", week);
@@ -492,7 +500,7 @@ export const useRealtimeGame = (leagueId?: string) => {
       return;
     }
 
-    const weekMatches = freshSchedule.map(mapDbSchedule);
+    const weekMatches = freshSchedule.map(mapDbMatchup);
     const allHaveScores = weekMatches.every((m) => m.homeScore !== undefined && m.awayScore !== undefined);
 
     if (!allHaveScores) return;
@@ -501,7 +509,7 @@ export const useRealtimeGame = (leagueId?: string) => {
     const scoreSummary: string[] = [];
 
     for (const match of weekMatches) {
-      await supabase.from("league_schedules").update({ is_finalized: true }).eq("id", match.id);
+      await supabase.from("league_matchups").update({ is_finalized: true }).eq("id", match.id);
       const homeManager = managers.find((m) => m.id === match.home);
       const awayManager = managers.find((m) => m.id === match.away);
       if (homeManager && awayManager) {
@@ -639,7 +647,7 @@ export const useRealtimeGame = (leagueId?: string) => {
     }
     for (const match of schedule) {
       await supabase
-        .from("league_schedules")
+        .from("league_matchups")
         .update({ manager1_score: null, manager2_score: null, is_finalized: false })
         .eq("id", match.id);
     }

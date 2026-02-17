@@ -409,7 +409,8 @@ export const StatsImport = () => {
             })
             .eq('id', existingMatch.id);
           // Update match_state in live_match_polling
-          await supabase.rpc('upsert_match_polling_state', {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase.rpc as any)('upsert_match_polling_state', {
             p_cricbuzz_match_id: match.matchId,
             p_match_id: existingMatch.id,
             p_match_state: matchState,
@@ -420,7 +421,8 @@ export const StatsImport = () => {
       }
 
       // Use the upsert_league_match function to handle both cricket_matches and league_matches
-      const { data, error } = await supabase.rpc('upsert_league_match', {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)('upsert_league_match', {
         p_league_id: currentLeagueId,
         p_cricbuzz_match_id: match.matchId,
         p_series_id: match.seriesId,
@@ -440,7 +442,8 @@ export const StatsImport = () => {
           .update({ state: matchState })
           .eq('id', data[0].out_match_id);
 
-        await supabase.rpc('upsert_match_polling_state', {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.rpc as any)('upsert_match_polling_state', {
           p_cricbuzz_match_id: match.matchId,
           p_match_id: data[0].out_match_id,
           p_match_state: matchState,
@@ -544,7 +547,8 @@ export const StatsImport = () => {
       }
 
       // Use the upsert_league_match function
-      const { data, error } = await supabase.rpc('upsert_league_match', {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)('upsert_league_match', {
         p_league_id: currentLeagueId,
         p_cricbuzz_match_id: cricbuzzMatchId,
         p_series_id: 0,
@@ -629,7 +633,8 @@ export const StatsImport = () => {
           .eq('id', match.id);
 
         // Update match_state in live_match_polling
-        await supabase.rpc('upsert_match_polling_state', {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.rpc as any)('upsert_match_polling_state', {
           p_cricbuzz_match_id: match.cricbuzzMatchId,
           p_match_id: match.id,
           p_match_state: isLive ? 'Live' : 'Complete',
@@ -703,7 +708,8 @@ export const StatsImport = () => {
             .update({ result: scorecard.status, state: 'Complete' })
             .eq('id', match.id);
 
-          await supabase.rpc('upsert_match_polling_state', {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase.rpc as any)('upsert_match_polling_state', {
             p_cricbuzz_match_id: match.cricbuzzMatchId,
             p_match_id: match.id,
             p_match_state: 'Complete',
@@ -843,18 +849,18 @@ export const StatsImport = () => {
       // Use live stats save if match is live
       const result = isMatchLive
         ? await saveMatchStatsLive(
-            currentLeagueId,
-            selectedMatch.id,
-            weekNum,
-            parsedStats,
-            true // isLive = true
-          )
+          currentLeagueId,
+          selectedMatch.id,
+          weekNum,
+          parsedStats,
+          true // isLive = true
+        )
         : await saveMatchStats(
-            currentLeagueId,
-            selectedMatch.id,
-            weekNum,
-            parsedStats
-          );
+          currentLeagueId,
+          selectedMatch.id,
+          weekNum,
+          parsedStats
+        );
 
       if (result.success) {
         if (isMatchLive) {
@@ -908,24 +914,24 @@ export const StatsImport = () => {
         pointsBreakdown:
           p.cricbuzzPlayerId === playerId
             ? {
-                ...p.pointsBreakdown,
-                common: {
-                  ...p.pointsBreakdown.common,
-                  manOfTheMatch:
-                    p.pointsBreakdown.common.manOfTheMatch > 0 ? 0 : 50,
-                  total:
-                    p.pointsBreakdown.common.total +
-                    (p.pointsBreakdown.common.manOfTheMatch > 0 ? -50 : 50),
-                },
+              ...p.pointsBreakdown,
+              common: {
+                ...p.pointsBreakdown.common,
+                manOfTheMatch:
+                  p.pointsBreakdown.common.manOfTheMatch > 0 ? 0 : 50,
                 total:
-                  p.pointsBreakdown.total +
+                  p.pointsBreakdown.common.total +
                   (p.pointsBreakdown.common.manOfTheMatch > 0 ? -50 : 50),
-              }
+              },
+              total:
+                p.pointsBreakdown.total +
+                (p.pointsBreakdown.common.manOfTheMatch > 0 ? -50 : 50),
+            }
             : p.pointsBreakdown,
         fantasyPoints:
           p.cricbuzzPlayerId === playerId
             ? p.fantasyPoints +
-              (p.pointsBreakdown.common.manOfTheMatch > 0 ? -50 : 50)
+            (p.pointsBreakdown.common.manOfTheMatch > 0 ? -50 : 50)
             : p.fantasyPoints,
       }))
     );
@@ -1152,11 +1158,10 @@ export const StatsImport = () => {
                   return (
                     <div
                       key={match.id}
-                      className={`p-3 rounded-lg border transition-colors ${
-                        selectedMatch?.id === match.id
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border hover:border-primary/50'
-                      } ${match.statsImported && !matchIsLive ? 'opacity-60' : ''}`}
+                      className={`p-3 rounded-lg border transition-colors ${selectedMatch?.id === match.id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/50'
+                        } ${match.statsImported && !matchIsLive ? 'opacity-60' : ''}`}
                     >
                       <div className="flex items-center justify-between">
                         <div
@@ -1478,11 +1483,10 @@ function PlayerStatsRow({
 
   return (
     <div
-      className={`p-3 rounded-lg border ${
-        player.isInActiveRoster
-          ? 'border-green-500/30 bg-green-500/5'
-          : 'border-border'
-      }`}
+      className={`p-3 rounded-lg border ${player.isInActiveRoster
+        ? 'border-green-500/30 bg-green-500/5'
+        : 'border-border'
+        }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">
@@ -1516,8 +1520,8 @@ function PlayerStatsRow({
               </span>
             ) : null}
             {player.catches > 0 ||
-            player.stumpings > 0 ||
-            player.runOuts > 0 ? (
+              player.stumpings > 0 ||
+              player.runOuts > 0 ? (
               <span>
                 Field: {player.catches}c {player.stumpings}st {player.runOuts}ro
               </span>
@@ -1539,9 +1543,8 @@ function PlayerStatsRow({
             </Label>
           </div>
           <div
-            className={`text-lg font-bold ${
-              player.fantasyPoints >= 0 ? 'text-green-500' : 'text-red-500'
-            }`}
+            className={`text-lg font-bold ${player.fantasyPoints >= 0 ? 'text-green-500' : 'text-red-500'
+              }`}
           >
             {player.fantasyPoints}
           </div>

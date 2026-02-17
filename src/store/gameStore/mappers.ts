@@ -10,6 +10,9 @@ export interface ManagerRosterEntry {
   league_id: string;
   slot_type: 'active' | 'bench';
   position: number;
+  week: number;
+  is_captain: boolean;
+  is_vice_captain: boolean;
 }
 
 // Maps data from league_players view (which joins master_players + league_player_pool)
@@ -56,6 +59,9 @@ export const mapDbManagerWithRoster = (
     .sort((a, b) => a.position - b.position)
     .map(e => e.player_id);
 
+  const captainEntry = managerEntries.find(e => e.is_captain);
+  const viceCaptainEntry = managerEntries.find(e => e.is_vice_captain);
+
   return {
     id: db.id,
     name: db.name,
@@ -66,18 +72,23 @@ export const mapDbManagerWithRoster = (
     userId: db.user_id,
     activeRoster,
     bench,
+    captainId: captainEntry?.player_id ?? null,
+    viceCaptainId: viceCaptainEntry?.player_id ?? null,
   };
 };
 
-export const mapDbSchedule = (db: Tables<"league_schedules">): Match => ({
-  id: db.id,
-  week: db.week,
+export const mapDbMatchup = (db: Tables<"league_matchups">): Match => ({
+  id: db.id!,
+  week: db.week!,
   home: db.manager1_id || "",
   away: db.manager2_id || "",
   homeScore: db.manager1_score ?? undefined,
   awayScore: db.manager2_score ?? undefined,
-  completed: db.is_finalized,
+  completed: db.is_finalized ?? false,
 });
+
+// Alias for transition
+export const mapDbSchedule = mapDbMatchup;
 
 export const mapDbTransaction = (db: Tables<"transactions">): Activity => ({
   id: db.id,

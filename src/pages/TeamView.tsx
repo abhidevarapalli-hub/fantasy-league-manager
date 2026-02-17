@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowLeftRight, Trophy, Lock } from 'lucide-react';
+import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowUpDown, Trophy, Lock, Info, Plus } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { PlayerCard } from '@/components/PlayerCard';
@@ -13,6 +13,8 @@ import {
   validateActiveRoster,
   sortPlayersByRole,
   canSwapInActive,
+  canAddToActive,
+  SlotRequirement,
 } from '@/lib/roster-validation';
 
 import { Player } from '@/lib/supabase-types';
@@ -46,17 +48,33 @@ const TeamView = () => {
   const moveToBench = useGameStore(state => state.moveToBench);
   const dropPlayerOnly = useGameStore(state => state.dropPlayerOnly);
   const swapPlayers = useGameStore(state => state.swapPlayers);
+  const selectedRosterWeek = useGameStore(state => state.selectedRosterWeek);
+  const currentWeek = useGameStore(state => state.currentWeek);
+  const schedule = useGameStore(state => state.schedule);
+  const setCaptain = useGameStore(state => state.setCaptain);
+  const setViceCaptain = useGameStore(state => state.setViceCaptain);
   const canEditTeam = useAuthStore(state => state.canEditTeam);
 
   // Swap states
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [playerToSwap, setPlayerToSwap] = useState<{ player: Player; from: 'active' | 'bench' } | null>(null);
+  const [slotToFill, setSlotToFill] = useState<SlotRequirement | null>(null);
   const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
+
+  // Compute if team is locked (current week is the last week)
+  const lastWeek = useMemo(() => {
+    const weeks = schedule.map(m => m.week);
+    return weeks.length > 0 ? Math.max(...weeks) : 7;
+  }, [schedule]);
+
+  const editingWeek = currentWeek + 1;
+  const isTeamLocked = currentWeek >= lastWeek;
 
   const manager = managers.find(m => m.id === teamId);
 
-  // Check if current user can edit this team
-  const canEdit = canEditTeam(teamId || '');
+  // Check if current user can edit this team (also respects team lock)
+  const canEditBase = canEditTeam(teamId || '');
+  const canEdit = canEditBase && !isTeamLocked;
 
   // Calculate standings position
   const standingsPosition = useMemo(() => {
@@ -115,6 +133,26 @@ const TeamView = () => {
   const handleStartSwap = (player: Player, from: 'active' | 'bench') => {
     setPlayerToSwap({ player, from });
     setSwapDialogOpen(true);
+  };
+
+  const handleSetCaptain = async (playerId: string) => {
+    if (!teamId) return;
+    const result = await setCaptain(teamId, playerId);
+    if (!result.success && result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Captain set successfully');
+    }
+  };
+
+  const handleSetViceCaptain = async (playerId: string) => {
+    if (!teamId) return;
+    const result = await setViceCaptain(teamId, playerId);
+    if (!result.success && result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Vice-Captain set successfully');
+    }
   };
 
   const handleSwap = async (targetPlayer: Player) => {
@@ -179,8 +217,29 @@ const TeamView = () => {
           Back
         </Button>
 
+        {/* Week & Lock Indicator */}
+        {isTeamLocked ? (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+            <Lock className="w-4 h-4 text-destructive" />
+            <p className="text-sm font-medium text-destructive">
+              Team is locked — the season is in its final week (Week {currentWeek})
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+            <Info className="w-4 h-4 text-primary" />
+            <p className="text-sm text-primary">
+              {currentWeek === 0 ? (
+                <>Pre-Season — editing roster for <strong>Week {editingWeek}</strong></>
+              ) : (
+                <>Editing roster for <strong>Week {editingWeek} onwards</strong> — current week is {currentWeek}</>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* Read-only notice */}
-        {!canEdit && (
+        {!canEdit && !isTeamLocked && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
             <Lock className="w-4 h-4 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
@@ -246,21 +305,34 @@ const TeamView = () => {
           </div>
 
           <div className="space-y-2">
-            {slots.map((slot, index) => (
+            {[...slots].sort((a, b) => {
+              const aC = a.player && manager.captainId === a.player.id ? -2 : a.player && manager.viceCaptainId === a.player.id ? -1 : 0;
+              const bC = b.player && manager.captainId === b.player.id ? -2 : b.player && manager.viceCaptainId === b.player.id ? -1 : 0;
+              return aC - bC;
+            }).map((slot, index) => (
               slot.filled && slot.player ? (
                 <PlayerCard
                   key={slot.player.id}
                   player={slot.player}
                   isOwned
+                  captainBadge={
+                    manager.captainId === slot.player.id ? 'C'
+                      : manager.viceCaptainId === slot.player.id ? 'VC'
+                        : null
+                  }
+                  onSetCaptain={canEdit && manager.captainId !== slot.player.id ? () => handleSetCaptain(slot.player!.id) : undefined}
+                  onSetViceCaptain={canEdit && manager.viceCaptainId !== slot.player.id ? () => handleSetViceCaptain(slot.player!.id) : undefined}
                   onSwap={canEdit && benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
-                  onMoveDown={canEdit && benchPlayers.length < maxBenchSize ? () => handleMoveToBench(slot.player!.id) : undefined}
-                  onDrop={canEdit ? () => dropPlayerOnly(teamId!, slot.player!.id) : undefined}
                   onClick={() => setDetailPlayer(slot.player!)}
                 />
               ) : (
-                <div
+                <button
                   key={`empty-${index}`}
-                  className="p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3"
+                  onClick={canEdit ? () => setSlotToFill(slot) : undefined}
+                  className={cn(
+                    "w-full p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3 transition-all text-left",
+                    canEdit && "hover:border-primary/50 hover:bg-primary/5 cursor-pointer"
+                  )}
                 >
                   <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
                     {roleIcons[slot.role] || '👤'}
@@ -272,7 +344,7 @@ const TeamView = () => {
                   <Badge variant="outline" className="text-xs">
                     {slot.label}
                   </Badge>
-                </div>
+                </button>
               )
             ))}
           </div>
@@ -297,9 +369,6 @@ const TeamView = () => {
                 player={player}
                 isOwned
                 onSwap={canEdit && activePlayers.length > 0 ? () => handleStartSwap(player, 'bench') : undefined}
-                onMoveUp={canEdit && activePlayers.length < config.activeSize ? () => handleMoveToActive(player.id) : undefined}
-
-                onDrop={canEdit ? () => dropPlayerOnly(teamId!, player.id) : undefined}
                 onClick={() => setDetailPlayer(player)}
               />
             ))}
@@ -328,7 +397,7 @@ const TeamView = () => {
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ArrowLeftRight className="w-5 h-5" />
+              <ArrowUpDown className="w-5 h-5" />
               Swap {playerToSwap?.player.name}
             </DialogTitle>
           </DialogHeader>
@@ -337,41 +406,182 @@ const TeamView = () => {
               Select a player from {playerToSwap?.from === 'active' ? 'bench' : 'active roster'} to swap with:
             </p>
             {playerToSwap && (
-              (playerToSwap.from === 'active' ? sortedBench : sortPlayersByRole(activePlayers)).map(player => {
-                // When swapping from active to bench: check if bringing bench player TO active is valid
-                // When swapping from bench to active: check if bringing bench player TO active is valid
-                const isValidSwap = playerToSwap.from === 'bench'
-                  ? canSwapInActive(activePlayers, playerToSwap.player, player, config).isValid
-                  : canSwapInActive(activePlayers, player, playerToSwap.player, config).isValid;
+              <>
+                {/* Regular Players */}
+                {(playerToSwap.from === 'active' ? sortedBench : sortPlayersByRole(activePlayers)).map(player => {
+                  const isValidSwap = playerToSwap.from === 'bench'
+                    ? canSwapInActive(activePlayers, playerToSwap.player, player, config).isValid
+                    : canSwapInActive(activePlayers, player, playerToSwap.player, config).isValid;
 
-
-                return (
-                  <button
-                    key={player.id}
-                    onClick={() => isValidSwap && handleSwap(player)}
-                    disabled={!isValidSwap}
-                    className={cn(
-                      "w-full text-left p-3 rounded-lg border transition-colors",
-                      isValidSwap
-                        ? "border-border hover:border-primary bg-card"
-                        : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
-                        {roleIcons[player.role] || '👤'}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{player.name}</p>
-                        <p className="text-xs text-muted-foreground">{player.team} • {player.role}</p>
-                      </div>
-                      {player.isInternational && (
-                        <Plane className="w-4 h-4 text-muted-foreground" />
+                  return (
+                    <button
+                      key={player.id}
+                      onClick={() => isValidSwap && handleSwap(player)}
+                      disabled={!isValidSwap}
+                      className={cn(
+                        "w-full text-left p-3 rounded-lg border transition-colors",
+                        isValidSwap
+                          ? "border-border hover:border-primary bg-card"
+                          : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
                       )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
+                          {roleIcons[player.role] || '👤'}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-foreground">{player.name}</p>
+                          <p className="text-xs text-muted-foreground">{player.team} • {player.role}</p>
+                        </div>
+                        {player.isInternational && (
+                          <Plane className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Empty Slot Option */}
+                {playerToSwap.from === 'active' ? (
+                  // Moving to Bench (if bench has space)
+                  benchPlayers.length < config.benchSize && (
+                    <button
+                      onClick={() => {
+                        handleMoveToBench(playerToSwap.player.id);
+                        setSwapDialogOpen(false);
+                      }}
+                      className="w-full text-left p-3 rounded-lg border border-dashed border-border hover:border-primary bg-muted/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm opacity-60">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 text-muted-foreground">
+                          <p className="font-medium">Move to Empty Bench Slot</p>
+                          <p className="text-[10px]">Bench space: {benchPlayers.length}/{config.benchSize}</p>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                ) : (
+                  // Moving to Active (if active has any empty slots)
+                  slots.filter(s => !s.filled).length > 0 && (
+                    <div className="pt-2 border-t border-border mt-2">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-2 px-1">Move to Empty Active Slot</p>
+                      {slots.filter(s => !s.filled).map((slot, i) => {
+                        const validation = canAddToActive(activePlayers, playerToSwap.player, config);
+                        const isValid = validation.isValid;
+
+                        return (
+                          <button
+                            key={`empty-active-${i}`}
+                            onClick={() => {
+                              if (isValid) {
+                                handleMoveToActive(playerToSwap.player.id);
+                                setSwapDialogOpen(false);
+                              }
+                            }}
+                            disabled={!isValid}
+                            className={cn(
+                              "w-full text-left p-3 rounded-lg border transition-colors mb-2",
+                              isValid
+                                ? "border-border hover:border-primary bg-card"
+                                : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
+                                {roleIcons[slot.role] || '👤'}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium text-foreground">{slot.label}</p>
+                                <p className="text-[10px] text-muted-foreground">Fill empty {slot.role} slot</p>
+                              </div>
+                              {!isValid && (
+                                <span className="text-[10px] text-destructive">{validation.errors[0]}</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  </button>
-                );
-              })
+                  )
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fill Slot Dialog */}
+      <Dialog open={!!slotToFill} onOpenChange={(open) => !open && setSlotToFill(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              Fill {slotToFill?.label} Slot
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground mb-4">
+              Select a player from your bench to move to the active roster:
+            </p>
+            {slotToFill && (
+              (() => {
+                // Filter bench players by role if it's a specific requirement
+                const availableBench = sortedBench.filter(p => {
+                  if (slotToFill.role === 'Any Position') return true;
+                  if (slotToFill.role === 'Batsman' && p.role === 'Wicket Keeper') return true; // User's rule
+                  return p.role === slotToFill.role;
+                });
+
+                if (availableBench.length === 0) {
+                  return (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-muted-foreground">No bench players available for this role.</p>
+                    </div>
+                  );
+                }
+
+                return availableBench.map(player => {
+                  const validation = canAddToActive(activePlayers, player, config);
+                  const isValid = validation.isValid;
+
+                  return (
+                    <button
+                      key={player.id}
+                      onClick={() => {
+                        if (isValid) {
+                          handleMoveToActive(player.id);
+                          setSlotToFill(null);
+                        }
+                      }}
+                      disabled={!isValid}
+                      className={cn(
+                        "w-full text-left p-3 rounded-lg border transition-colors",
+                        isValid
+                          ? "border-border hover:border-primary bg-card"
+                          : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
+                          {roleIcons[player.role] || '👤'}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-foreground">{player.name}</p>
+                          <p className="text-xs text-muted-foreground">{player.team} • {player.role}</p>
+                        </div>
+                        {!isValid && validation.errors.length > 0 && (
+                          <div className="text-[10px] text-destructive font-medium max-w-[100px] text-right">
+                            {validation.errors[0]}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                });
+              })()
             )}
           </div>
         </DialogContent>
@@ -381,6 +591,7 @@ const TeamView = () => {
         player={detailPlayer!}
         open={!!detailPlayer}
         onOpenChange={(open) => !open && setDetailPlayer(null)}
+        onDrop={canEdit && detailPlayer ? () => dropPlayerOnly(teamId!, detailPlayer.id) : undefined}
       />
     </AppLayout>
   );
