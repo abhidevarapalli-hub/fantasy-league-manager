@@ -25,12 +25,6 @@ RETURNS trigger AS $$
 BEGIN
   INSERT INTO public.profiles (id, full_name, avatar_url)
   VALUES (new.id, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'avatar_url');
-
-  -- Auto-grant platform admin for designated admin emails
-  IF new.email IN ('10krishnadonepudi@gmail.com', 'abhi.devarapalli@gmail.com', 'abhidev@gmail.com') THEN
-    UPDATE public.profiles SET is_platform_admin = true WHERE id = new.id;
-  END IF;
-
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
