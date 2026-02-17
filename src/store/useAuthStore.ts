@@ -17,6 +17,7 @@ interface UserProfile {
     username: string | null;
     full_name: string | null;
     avatar_url: string | null;
+    is_platform_admin: boolean;
 }
 
 interface AuthState {
@@ -44,6 +45,7 @@ interface AuthState {
 
     // Computed
     isLeagueManager: () => boolean;
+    isPlatformAdmin: () => boolean;
     canEditTeam: (teamId: string) => boolean;
 
     // Initialization
@@ -179,6 +181,11 @@ export const useAuthStore = create<AuthState>()(
             isLeagueManager: () => {
                 const { managerProfile } = get();
                 return managerProfile?.is_league_manager || false;
+            },
+
+            isPlatformAdmin: () => {
+                const { userProfile } = get();
+                return userProfile?.is_platform_admin || false;
             },
 
             canEditTeam: (teamId) => {
