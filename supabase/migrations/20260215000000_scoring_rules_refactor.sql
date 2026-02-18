@@ -68,6 +68,7 @@ GRANT ALL ON scoring_rules TO service_role;
 -- Wrap data migration in a block to safely handle missing source table on fresh installs
 DO $$
 BEGIN
+  -- Only migrate if scoring_rule_versions table exists (production path)
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'scoring_rule_versions') THEN
     INSERT INTO scoring_rules (league_id, rules, created_at)
     SELECT DISTINCT ON (league_id)
