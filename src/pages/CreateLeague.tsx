@@ -12,7 +12,7 @@ import type { Tables } from '@/integrations/supabase/types';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSeedDatabase } from '@/hooks/useSeedDatabase';
 import { SUPPORTED_TOURNAMENTS, type Tournament } from '@/lib/tournaments';
-import { validateLeagueMinimums, LeagueConfig } from '@/lib/roster-validation';
+import { validateLeagueMinimums, LeagueConfig, getDefaultMinimums } from '@/lib/roster-validation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { DEFAULT_SCORING_RULES, ScoringRules as ScoringRulesType, sanitizeScoringRules } from '@/lib/scoring-types';
 import type { Json } from '@/integrations/supabase/types';
 import { ScoringRulesForm } from '@/components/ScoringRulesForm';
+import { Switch } from '@/components/ui/switch';
 
 const STEP_LABELS = ['Configure Rules', 'Scoring Rules', 'Team Identity'] as const;
 
@@ -39,45 +40,32 @@ const CreateLeague = () => {
     const [benchSize, setBenchSize] = useState(3);
 
     // Position Minimums (Defaults for Size 11)
-    const [minWks, setMinWks] = useState(1);
-    const [minBatsmen, setMinBatsmen] = useState(1); // Standard default is 1, but we might want 3 for size 11
+    const [minBatWk, setMinBatWk] = useState(4);
+    const [requireWk, setRequireWk] = useState(true);
     const [minBowlers, setMinBowlers] = useState(3);
-    const [minAllRounders, setMinAllRounders] = useState(1);
+    const [minAllRounders, setMinAllRounders] = useState(2);
 
-    // Dynamic Defaults based on Active Size
     useEffect(() => {
-        // Only set intelligent defaults if the user hasn't heavily customized (optional refinement, but simple overwrite is easier for now)
-        switch (activeSize) {
-            case 11:
-                setMinWks(1); setMinBatsmen(3); setMinBowlers(3); setMinAllRounders(1);
-                break;
-            case 10:
-                setMinWks(1); setMinBatsmen(2); setMinBowlers(3); setMinAllRounders(1);
-                break;
-            case 9:
-                setMinWks(1); setMinBatsmen(2); setMinBowlers(2); setMinAllRounders(1);
-                break;
-            case 8:
-                setMinWks(1); setMinBatsmen(2); setMinBowlers(2); setMinAllRounders(1);
-                break;
-            case 7:
-                setMinWks(1); setMinBatsmen(1); setMinBowlers(2); setMinAllRounders(1);
-                break;
-            case 6:
-                setMinWks(1); setMinBatsmen(1); setMinBowlers(1); setMinAllRounders(1);
-                break;
-            default:
-                // Safe fallbacks for other sizes
-                setMinWks(1); setMinBatsmen(1); setMinBowlers(1); setMinAllRounders(1);
-        }
+        const defaults = getDefaultMinimums(activeSize);
+        setMinBatWk(defaults.minBatWk);
+        setMinBowlers(defaults.minBowlers);
+        setMinAllRounders(defaults.minAllRounders);
+        setRequireWk(true);
     }, [activeSize]);
 
     // Validation
     const leagueConfigForValidation: LeagueConfig = {
-        managerCount, activeSize, benchSize,
-        minWks, minBatsmen, minBowlers, minAllRounders,
-        maxBatsmen: 10, // Not used in UI yet, but required by type
-        maxInternational: 4 // Not user configurable yet
+        managerCount,
+        activeSize,
+        benchSize,
+        minBatWk,
+        maxBatWk: 7, // Default
+        minBowlers,
+        maxBowlers: 6, // Default
+        minAllRounders,
+        maxAllRounders: 4, // Default
+        maxInternational: 4,
+        requireWk
     };
     const validationResult = validateLeagueMinimums(leagueConfigForValidation);
 
@@ -123,12 +111,12 @@ const CreateLeague = () => {
                 manager_count: managerCount,
                 active_size: activeSize,
                 bench_size: benchSize,
-                min_batsmen: minBatsmen,
-                max_batsmen: 6, // Kept for schema compat, or update if we add a slider
+                min_bat_wk: minBatWk,
                 min_bowlers: minBowlers,
-                min_wks: minWks,
                 min_all_rounders: minAllRounders,
-                max_international: selectedTournament.type === 'international' ? 11 : 4, // Allow all international for T20 WC
+                require_wk: requireWk,
+                max_from_team: 11, // Default for now
+                max_international: selectedTournament.type === 'international' ? 11 : 4,
             };
 
             // First try with tournament fields
@@ -142,12 +130,32 @@ const CreateLeague = () => {
                 .select()
                 .single();
 
-            if (resultWithTournament.error?.message?.includes('tournament_id')) {
-                // Migration not applied yet, try without tournament fields
-                console.warn('[CreateLeague] ⚠️ Tournament columns not found, creating without them');
+            if (resultWithTournament.error?.message?.includes('tournament_id') || resultWithTournament.error?.message?.includes('min_bat_wk')) {
+                // Migration not applied yet (either tournament or bat_wk), try without them
+                console.warn('[CreateLeague] ⚠️ Columns not found, creating with legacy fields');
+
+                // Legacy mapping for fallback
+                const legacyData = {
+                    name: leagueName,
+                    league_manager_id: user.id,
+                    manager_count: managerCount,
+                    active_size: activeSize,
+                    bench_size: benchSize,
+                    min_batsmen: minBatWk,
+                    max_batsmen: 6,
+                    min_bowlers: minBowlers,
+                    max_bowlers: 6,
+                    min_wks: 1,
+                    max_wks: 2,
+                    min_all_rounders: minAllRounders,
+                    max_all_rounders: 4,
+                    max_from_team: 11,
+                    max_international: selectedTournament.type === 'international' ? 11 : 4,
+                };
+
                 const resultWithoutTournament = await supabase
                     .from('leagues')
-                    .insert(baseLeagueData)
+                    .insert(legacyData)
                     .select()
                     .single();
                 league = resultWithoutTournament.data;
@@ -542,7 +550,7 @@ const CreateLeague = () => {
                                             </h3>
                                             <div className="flex flex-col items-end">
                                                 <span className={`text-sm font-bold px-2 py-0.5 rounded-md ${!validationResult.isValid ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
-                                                    Total: {minWks + minBatsmen + minBowlers + minAllRounders} / {activeSize}
+                                                    Total: {minBatWk + minBowlers + minAllRounders} / {activeSize}
                                                 </span>
                                             </div>
                                         </div>
@@ -557,37 +565,70 @@ const CreateLeague = () => {
                                             </Alert>
                                         )}
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                                            {/* BAT / WK Group */}
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center">
-                                                    <Label>Min Wicket Keepers</Label>
-                                                    <span className="text-sm font-bold bg-muted px-2 rounded">{minWks}</span>
+                                                    <div className="flex flex-col">
+                                                        <Label className="font-medium text-sm">BAT / WK Group</Label>
+                                                        <span className="text-[10px] text-muted-foreground">Combined Batsmen and Wicket Keepers</span>
+                                                    </div>
+                                                    <span className="text-xs font-bold bg-muted px-2 py-0.5 rounded text-muted-foreground whitespace-nowrap">
+                                                        Min {minBatWk} Players
+                                                    </span>
                                                 </div>
-                                                <Slider value={[minWks]} min={0} max={5} step={1} onValueChange={([v]) => setMinWks(v)} />
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-[10px] text-muted-foreground w-8">Min</span>
+                                                        <Slider value={[minBatWk]} min={1} max={8} step={1} onValueChange={([v]) => setMinBatWk(v)} className="flex-1" />
+                                                        <span className="text-[10px] font-mono w-4">{minBatWk}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between p-2 rounded bg-muted/20 border border-border/50">
+                                                    <div className="space-y-0.5">
+                                                        <p className="text-[11px] font-medium">Require 1 Wicket Keeper</p>
+                                                        <p className="text-[9px] text-muted-foreground italic">Ensures at least 1 WK is in active XI</p>
+                                                    </div>
+                                                    <Switch
+                                                        checked={requireWk}
+                                                        onCheckedChange={setRequireWk}
+                                                    />
+                                                </div>
                                             </div>
 
+                                            {/* All-Rounders */}
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center">
-                                                    <Label>Min Batsmen</Label>
-                                                    <span className="text-sm font-bold bg-muted px-2 rounded">{minBatsmen}</span>
+                                                    <Label className="font-medium text-sm">All-Rounders</Label>
+                                                    <span className="text-xs font-bold bg-muted px-2 py-0.5 rounded text-muted-foreground whitespace-nowrap">
+                                                        Min {minAllRounders} Player{minAllRounders !== 1 ? 's' : ''}
+                                                    </span>
                                                 </div>
-                                                <Slider value={[minBatsmen]} min={0} max={6} step={1} onValueChange={([v]) => setMinBatsmen(v)} />
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-[10px] text-muted-foreground w-8">Min</span>
+                                                        <Slider value={[minAllRounders]} min={0} max={6} step={1} onValueChange={([v]) => setMinAllRounders(v)} className="flex-1" />
+                                                        <span className="text-[10px] font-mono w-4">{minAllRounders}</span>
+                                                    </div>
+                                                </div>
                                             </div>
 
+                                            {/* Bowlers */}
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center">
-                                                    <Label>Min All-Rounders</Label>
-                                                    <span className="text-sm font-bold bg-muted px-2 rounded">{minAllRounders}</span>
+                                                    <Label className="font-medium text-sm">Bowlers</Label>
+                                                    <span className="text-xs font-bold bg-muted px-2 py-0.5 rounded text-muted-foreground whitespace-nowrap">
+                                                        Min {minBowlers} Players
+                                                    </span>
                                                 </div>
-                                                <Slider value={[minAllRounders]} min={0} max={6} step={1} onValueChange={([v]) => setMinAllRounders(v)} />
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-center">
-                                                    <Label>Min Bowlers</Label>
-                                                    <span className="text-sm font-bold bg-muted px-2 rounded">{minBowlers}</span>
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-[10px] text-muted-foreground w-8">Min</span>
+                                                        <Slider value={[minBowlers]} min={1} max={8} step={1} onValueChange={([v]) => setMinBowlers(v)} className="flex-1" />
+                                                        <span className="text-[10px] font-mono w-4">{minBowlers}</span>
+                                                    </div>
                                                 </div>
-                                                <Slider value={[minBowlers]} min={0} max={6} step={1} onValueChange={([v]) => setMinBowlers(v)} />
                                             </div>
                                         </div>
                                     </div>

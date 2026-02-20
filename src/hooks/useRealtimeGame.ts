@@ -95,12 +95,15 @@ export const useRealtimeGame = (leagueId?: string) => {
           managerCount: leagueData.manager_count,
           activeSize: leagueData.active_size,
           benchSize: leagueData.bench_size,
-          minBatsmen: leagueData.min_batsmen,
-          maxBatsmen: leagueData.max_batsmen,
+          minBatWk: leagueData.min_bat_wk,
+          maxBatWk: leagueData.max_batsmen,
+          requireWk: leagueData.require_wk,
           minBowlers: leagueData.min_bowlers,
-          minWks: leagueData.min_wks,
+          maxBowlers: leagueData.max_bowlers,
           minAllRounders: leagueData.min_all_rounders,
-          maxInternational: leagueData.max_international,
+          maxAllRounders: leagueData.max_all_rounders,
+          maxInternational: leagueData.max_international, // Should strictly be 4 but keeping for schema compatibility
+          maxFromTeam: leagueData.max_from_team,
         });
       }
 
@@ -204,26 +207,20 @@ export const useRealtimeGame = (leagueId?: string) => {
         }
       })
       // Subscribe to manager_roster changes - refetch managers when rosters change
-      .on("postgres_changes", { event: "*", schema: "public", table: "manager_roster", filter }, async () => {
-        // Refetch managers with their rosters when junction table changes
-        const [managersRes, rosterRes] = await Promise.all([
-          supabase.from("managers").select("*").eq("league_id", leagueId).order("name"),
-          supabase.from("manager_roster").select("*").eq("league_id", leagueId),
-        ]);
-        if (managersRes.data && rosterRes.data) {
-          const rosterEntries: ManagerRosterEntry[] = rosterRes.data.map(r => ({
-            id: r.id,
-            manager_id: r.manager_id,
-            player_id: r.player_id,
-            league_id: r.league_id,
-            slot_type: r.slot_type as 'active' | 'bench',
-            position: r.position,
-            week: r.week ?? 0,
-            is_captain: r.is_captain ?? false,
-            is_vice_captain: r.is_vice_captain ?? false,
-          }));
-          const mappedManagers = managersRes.data.map(m => mapDbManagerWithRoster(m, rosterEntries));
-          setManagers(mappedManagers);
+      .on("postgres_changes", { event: "*", schema: "public", table: "manager_roster", filter }, async (payload) => {
+        // Refetch EVERYTHING when rosters change, especially at draft end
+        console.log("[useRealtimeGame] 🔄 Roster changed, refetching all data", payload.eventType);
+        fetchAllData();
+      })
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "draft_state",
+        filter: isLegacy ? undefined : `league_id=eq.${leagueId}`
+      }, async (payload) => {
+        if (payload.new.status === 'completed' || payload.old.status !== payload.new.status) {
+          console.log("[useRealtimeGame] 🏁 Draft state changed, refetching all data", payload.new.status);
+          fetchAllData();
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "league_matchups", filter }, (payload) => {

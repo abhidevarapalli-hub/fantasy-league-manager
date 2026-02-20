@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowUpDown, Trophy, Lock, Info, Plus } from 'lucide-react';
+import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowUpDown, Trophy, Lock, Info, Plus, Shield } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { PlayerCard } from '@/components/PlayerCard';
@@ -385,6 +385,84 @@ const TeamView = () => {
                 <p className="text-xs font-medium text-muted-foreground">Empty Bench Slot</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* League Roster Key */}
+        <section className="pt-4 border-t border-border">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-foreground text-sm">League Roster Key</h2>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Configuration & Constraints</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {/* BAT / WK Group */}
+            <div className="bg-muted/30 rounded-lg p-3 border border-border/50">
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">BAT / WK Group</span>
+                <span className="text-xs font-mono">{roleIcons['Batsman']} + {roleIcons['Wicket Keeper']}</span>
+              </div>
+              <p className="text-sm font-semibold">Min {config.minBatWk} Players</p>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <Badge variant={config.requireWk ? "default" : "outline"} className="text-[8px] h-3.5 px-1 uppercase">
+                  {config.requireWk ? "WK Required" : "WK Optional"}
+                </Badge>
+                <p className="text-[9px] text-muted-foreground italic truncate">WKs count for batting min</p>
+              </div>
+            </div>
+
+            {/* All Rounders */}
+            <div className="bg-muted/30 rounded-lg p-3 border border-border/50">
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">All Rounders</span>
+                <span className="text-xs font-mono">{roleIcons['All Rounder']}</span>
+              </div>
+              <p className="text-sm font-semibold">Min {config.minAllRounders} Player{config.minAllRounders !== 1 ? 's' : ''}</p>
+            </div>
+
+            {/* Bowlers */}
+            <div className="bg-muted/30 rounded-lg p-3 border border-border/50">
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">Bowlers</span>
+                <span className="text-xs font-mono">{roleIcons['Bowler']}</span>
+              </div>
+              <p className="text-sm font-semibold">Min {config.minBowlers} Players</p>
+            </div>
+
+            {/* Flex Slots */}
+            <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-[10px] font-bold text-primary uppercase">Flex Slots</span>
+                <span className="text-xs font-mono">Any</span>
+              </div>
+              <p className="text-sm font-semibold">
+                {config.activeSize - (config.minBatWk + config.minAllRounders + config.minBowlers)} Slots
+              </p>
+              <p className="text-[9px] text-muted-foreground mt-1">Extra players of any role</p>
+            </div>
+
+            {/* International */}
+            <div className="bg-muted/30 rounded-lg p-3 border border-border/50">
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">International</span>
+                <Plane className="w-3 h-3 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-semibold">Max {config.maxInternational}</p>
+            </div>
+
+            {/* Max From Team */}
+            <div className="bg-muted/30 rounded-lg p-3 border border-border/50">
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">From Team</span>
+                <Users className="w-3 h-3 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-semibold">Max {config.maxFromTeam || 11}</p>
+            </div>
           </div>
         </section>
       </div>

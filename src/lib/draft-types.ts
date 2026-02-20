@@ -4,12 +4,11 @@ export interface DraftPick {
   id: string;
   leagueId: string;
   round: number;
-  pickPosition: number;
+  pickNumber: number;
   managerId: string | null;
   playerId: string | null;
   isAutoDraft: boolean;
   createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface DraftOrder {
@@ -21,13 +20,19 @@ export interface DraftOrder {
 }
 
 export interface DraftState {
-  id: string;
   leagueId: string;
-  isFinalized: boolean;
-  finalizedAt: Date | null;
-  isActive: boolean;
-  currentPickStartAt: Date | null;
+  status: 'pre_draft' | 'active' | 'paused' | 'completed';
+  currentRound: number;
+  currentPosition: number;
+  clockDurationSeconds: number;
+  lastPickAt: Date;
   pausedAt: Date | null;
+  totalPausedDurationMs: number;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+  isActive: boolean;
+  isFinalized: boolean;
 }
 
 // Database row types
@@ -35,12 +40,11 @@ export interface DbDraftPick {
   id: string;
   league_id: string;
   round: number;
-  pick_position: number;
+  pick_number: number;
   manager_id: string | null;
   player_id: string | null;
   is_auto_draft: boolean;
   created_at: string;
-  updated_at: string;
 }
 
 export interface DbDraftOrder {
@@ -49,18 +53,20 @@ export interface DbDraftOrder {
   position: number;
   manager_id: string | null;
   auto_draft_enabled: boolean;
-  created_at: string;
 }
 
 export interface DbDraftState {
-  id: string;
   league_id: string;
-  is_finalized: boolean;
-  finalized_at: string | null;
-  is_active: boolean;
-  current_pick_start_at: string | null;
+  status: 'pre_draft' | 'active' | 'paused' | 'completed';
+  current_round: number;
+  current_position: number;
+  clock_duration_seconds: number;
+  last_pick_at: string;
   paused_at: string | null;
+  total_paused_duration_ms: number;
+  version: number;
   created_at: string;
+  updated_at: string;
 }
 
 // Mappers
@@ -68,12 +74,11 @@ export const mapDbDraftPick = (db: DbDraftPick): DraftPick => ({
   id: db.id,
   leagueId: db.league_id,
   round: db.round,
-  pickPosition: db.pick_position,
+  pickNumber: db.pick_number,
   managerId: db.manager_id,
   playerId: db.player_id,
   isAutoDraft: db.is_auto_draft,
   createdAt: new Date(db.created_at),
-  updatedAt: new Date(db.updated_at),
 });
 
 export const mapDbDraftOrder = (db: DbDraftOrder): DraftOrder => ({
@@ -85,11 +90,17 @@ export const mapDbDraftOrder = (db: DbDraftOrder): DraftOrder => ({
 });
 
 export const mapDbDraftState = (db: DbDraftState): DraftState => ({
-  id: db.id,
   leagueId: db.league_id,
-  isFinalized: db.is_finalized,
-  finalizedAt: db.finalized_at ? new Date(db.finalized_at) : null,
-  isActive: db.is_active,
-  currentPickStartAt: db.current_pick_start_at ? new Date(db.current_pick_start_at) : null,
+  status: db.status,
+  currentRound: db.current_round,
+  currentPosition: db.current_position,
+  clockDurationSeconds: db.clock_duration_seconds,
+  lastPickAt: new Date(db.last_pick_at),
   pausedAt: db.paused_at ? new Date(db.paused_at) : null,
+  totalPausedDurationMs: db.total_paused_duration_ms,
+  version: db.version,
+  createdAt: new Date(db.created_at),
+  updatedAt: new Date(db.updated_at),
+  isActive: db.status === 'active' || db.status === 'paused',
+  isFinalized: db.status === 'completed',
 });

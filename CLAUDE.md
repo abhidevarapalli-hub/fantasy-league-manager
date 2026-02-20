@@ -144,3 +144,6 @@ If Claude notices:
 - Architectural drift
 - Painful workflows
 It should propose updates to this file, not just code changes.
+
+### Architecture Docs
+- [Real-Time Draft Engine](docs/architecture/realtime-draft-engine.md): Explains the server-authoritative, low-latency draft architecture using Supabase Realtime, Edge Functions, and Zustand.

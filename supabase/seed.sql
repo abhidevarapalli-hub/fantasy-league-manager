@@ -865,8 +865,8 @@ INSERT INTO managers (id, name, team_name, league_id, user_id) VALUES
 -- =============================================
 
 -- T20 WC league draft
-INSERT INTO draft_state (league_id, is_finalized) VALUES
-  ('10000000-0000-0000-0000-000000000001', false);
+INSERT INTO draft_state (league_id, status) VALUES
+  ('10000000-0000-0000-0000-000000000001', 'pre_draft');
 
 INSERT INTO draft_order (league_id, position, manager_id) VALUES
   ('10000000-0000-0000-0000-000000000001', 1, '20000000-0000-0000-0000-000000000001'),
@@ -875,8 +875,8 @@ INSERT INTO draft_order (league_id, position, manager_id) VALUES
   ('10000000-0000-0000-0000-000000000001', 4, '20000000-0000-0000-0000-000000000004');
 
 -- IPL league draft (finalized — post-draft state)
-INSERT INTO draft_state (league_id, is_finalized, finalized_at) VALUES
-  ('10000000-0000-0000-0000-000000000002', true, '2026-03-13T12:00:00.000Z');
+INSERT INTO draft_state (league_id, status, last_pick_at) VALUES
+  ('10000000-0000-0000-0000-000000000002', 'completed', '2026-03-13T12:00:00.000Z');
 
 INSERT INTO draft_order (league_id, position, manager_id) VALUES
   ('10000000-0000-0000-0000-000000000002', 1, '20000000-0000-0000-0000-000000000005'),
@@ -895,7 +895,7 @@ INSERT INTO draft_order (league_id, position, manager_id) VALUES
 -- Manager 7 (Royal Strikers):  Jaiswal, Rinku, Sudharsan, Axar, Samson, Siraj, Chahal, Avesh, Hazlewood, Russell, Starc, Patidar, V.Iyer, Pooran
 -- Manager 8 (Knight Warriors): Dhawan, Padikkal, KL Rahul, W.Sundar, Dube, R.Chahar, Umran, Khaleel, Stoinis, Salt, Rabada, Fraser-McGurk, Badoni, Ishant
 
-INSERT INTO draft_picks (league_id, round, pick_position, manager_id, player_id) VALUES
+INSERT INTO draft_picks (league_id, round, pick_number, manager_id, player_id) VALUES
   -- Round 1 (odd): Mgr5, Mgr6, Mgr7, Mgr8
   ('10000000-0000-0000-0000-000000000002', 1, 1, '20000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000001'),  -- Kohli
   ('10000000-0000-0000-0000-000000000002', 1, 2, '20000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000004'),  -- SKY

@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, Json } from '@/integrations/supabase/types';
-import { Activity, PlayerTransaction } from '@/lib/supabase-types';
-import { DEFAULT_LEAGUE_CONFIG, canAddToActive } from '@/lib/roster-validation';
+import { Player, Manager, Activity, PlayerTransaction } from '@/lib/supabase-types';
+import { DEFAULT_LEAGUE_CONFIG, canAddToActive, buildOptimalActive11 } from '@/lib/roster-validation';
 import { DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
 import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
 import { toast } from 'sonner';
@@ -153,7 +153,10 @@ export const useGameStore = create<GameState>()(
           // Delete from junction table
           // Drop from all future weeks (currentWeek + 1 onward)
           const { currentWeek } = get();
-          await supabase.from("manager_roster").delete().eq("player_id", dropPlayerId).eq("league_id", currentLeagueId).gte("week", currentWeek + 1);
+          const { error: deleteErrorResult } = await supabase.from("manager_roster").delete().eq("player_id", dropPlayerId).eq("league_id", currentLeagueId).gte("week", currentWeek + 1);
+          if (deleteErrorResult) {
+            toast.error(`Add/Drop: Error dropping player: ${deleteErrorResult.message}`);
+          }
         }
 
         const activeNotFull = newActiveCount < config.activeSize;
@@ -187,11 +190,11 @@ export const useGameStore = create<GameState>()(
           ? await supabase.from("manager_roster").insert(insertRows)
           : { error: null };
 
-        if (error) {
-          toast.error(`Failed to add player: ${error.message}`);
-          return;
-        }
 
+        // Re-optimize rosters after add/drop
+        await get().finalizeRosters(currentLeagueId);
+
+        toast.success(dropPlayerId ? 'Player added and dropped successfully' : 'Player added successfully');
         const playerTransactions: PlayerTransaction[] = [];
         if (dropPlayer) {
           playerTransactions.push({ type: "drop", playerName: dropPlayer.name, role: dropPlayer.role, team: dropPlayer.team });
@@ -666,6 +669,9 @@ export const useGameStore = create<GameState>()(
         });
 
         toast.success(`Trade completed: ${player1Names} ↔ ${player2Names}`);
+
+        // Re-optimize both rosters after trade
+        await get().finalizeRosters(currentLeagueId);
       },
 
       resetLeague: async () => {
@@ -743,25 +749,17 @@ export const useGameStore = create<GameState>()(
             dbUpdate.bench_size = configUpdate.benchSize;
             changes.push(`Bench size: ${config.benchSize} → ${configUpdate.benchSize}`);
           }
-          if (configUpdate.minBatsmen !== undefined && configUpdate.minBatsmen !== config.minBatsmen) {
-            dbUpdate.min_batsmen = configUpdate.minBatsmen;
-            changes.push(`Min batsmen: ${config.minBatsmen} → ${configUpdate.minBatsmen}`);
+          if (configUpdate.minBatWk !== undefined && configUpdate.minBatWk !== config.minBatWk) {
+            dbUpdate.min_bat_wk = configUpdate.minBatWk;
+            changes.push(`Min BAT/WK: ${config.minBatWk} → ${configUpdate.minBatWk}`);
           }
-          if (configUpdate.maxBatsmen !== undefined && configUpdate.maxBatsmen !== config.maxBatsmen) {
-            dbUpdate.max_batsmen = configUpdate.maxBatsmen;
-            changes.push(`Max batsmen: ${config.maxBatsmen} → ${configUpdate.maxBatsmen}`);
+          if (configUpdate.requireWk !== undefined && configUpdate.requireWk !== config.requireWk) {
+            dbUpdate.require_wk = configUpdate.requireWk;
+            changes.push(`Require 1 WK: ${config.requireWk} → ${configUpdate.requireWk}`);
           }
           if (configUpdate.minBowlers !== undefined && configUpdate.minBowlers !== config.minBowlers) {
             dbUpdate.min_bowlers = configUpdate.minBowlers;
             changes.push(`Min bowlers: ${config.minBowlers} → ${configUpdate.minBowlers}`);
-          }
-          if (configUpdate.minWks !== undefined && configUpdate.minWks !== config.minWks) {
-            dbUpdate.min_wks = configUpdate.minWks;
-            changes.push(`Min wicket keepers: ${config.minWks} → ${configUpdate.minWks}`);
-          }
-          if (configUpdate.minAllRounders !== undefined && configUpdate.minAllRounders !== config.minAllRounders) {
-            dbUpdate.min_all_rounders = configUpdate.minAllRounders;
-            changes.push(`Min all-rounders: ${config.minAllRounders} → ${configUpdate.minAllRounders}`);
           }
           if (configUpdate.maxInternational !== undefined && configUpdate.maxInternational !== config.maxInternational) {
             dbUpdate.max_international = configUpdate.maxInternational;
@@ -810,6 +808,10 @@ export const useGameStore = create<GameState>()(
           set({ config: newConfig });
 
           toast.success('Roster configuration updated');
+
+          // Re-optimize all rosters after config change
+          await get().finalizeRosters(currentLeagueId);
+
           return { success: true };
         } catch (e) {
           console.error('Exception updating league config:', e);
@@ -859,6 +861,104 @@ export const useGameStore = create<GameState>()(
         }
       },
 
+      finalizeRosters: async (leagueId) => {
+        const { config, currentWeek, players } = get();
+
+        try {
+          // 1. Fetch current rosters for all managers in this league
+          const { data: allRosterEntries, error: fetchError } = await supabase
+            .from("manager_roster")
+            .select("*")
+            .eq("league_id", leagueId);
+
+          if (fetchError) return { success: false, error: fetchError.message };
+
+          // 2. Fetch all managers
+          const { data: managersData, error: managersError } = await supabase
+            .from("managers")
+            .select("*")
+            .eq("league_id", leagueId);
+
+          if (managersError) return { success: false, error: managersError.message };
+
+          // 3. Process each manager separately
+          for (const manager of managersData) {
+            // Get all unique players this manager has across all weeks
+            // Use week 1 if draft is pre-draft or ongoing, otherwise use currentWeek
+            const baselineWeek = Math.max(1, currentWeek);
+            const playerIds = Array.from(new Set(
+              (allRosterEntries as Tables<'manager_roster'>[])
+                .filter(e => e.manager_id === manager.id && (e.week === baselineWeek || e.week === 1))
+                .map(e => e.player_id)
+            ));
+
+            const managerPlayers = playerIds
+              .map(id => players.find(p => p.id === id))
+              .filter(Boolean) as Player[];
+
+            if (managerPlayers.length === 0) continue;
+
+            const { active, bench } = buildOptimalActive11(managerPlayers, config);
+
+            // Prepare list of player IDs for active and bench
+            const activeIds = new Set(active.map(p => p.id));
+            const benchIds = new Set(bench.map(p => p.id));
+
+            // To be simple, we update all weeks 1-7
+            // This ensures future weeks are also correct if they were pre-populated
+            const upsertData = [];
+            for (let week = 1; week <= 7; week++) {
+              // Note: We only update if the player is still with this manager in that specific week
+              // but for a fresh draft finalize, everything is consistent.
+
+              active.forEach((p, idx) => {
+                upsertData.push({
+                  league_id: leagueId,
+                  manager_id: manager.id,
+                  player_id: p.id,
+                  slot_type: 'active',
+                  position: idx,
+                  week: week,
+                  // Preserve captaincy if possible or reset? Let's reset for now to be safe, 
+                  // or better, if they are already captain keep them. 
+                });
+              });
+
+              bench.forEach((p, idx) => {
+                upsertData.push({
+                  league_id: leagueId,
+                  manager_id: manager.id,
+                  player_id: p.id,
+                  slot_type: 'bench',
+                  position: idx,
+                  week: week
+                });
+              });
+            }
+
+            if (upsertData.length > 0) {
+              // Batch upsert for this manager
+              const { error: upsertError } = await supabase
+                .from("manager_roster")
+                .upsert(upsertData, { onConflict: 'player_id,league_id,week' });
+
+              if (upsertError) {
+                console.error(`Error finalizing roster for manager ${manager.id}:`, upsertError);
+              }
+            }
+          }
+
+          // Refresh store data for the currently selected week
+          const { selectedRosterWeek: rw, currentLeagueId: rl } = get();
+          if (rl) await get().fetchRosterForWeek(rl, rw);
+
+          return { success: true };
+        } catch (e) {
+          console.error('Exception in finalizeRosters:', e);
+          return { success: false, error: e instanceof Error ? e.message : String(e) };
+        }
+      },
+
       // Data fetching
       fetchAllData: async (leagueId) => {
         const fetchStartTime = performance.now();
@@ -885,12 +985,15 @@ export const useGameStore = create<GameState>()(
                 managerCount: leagueData.manager_count as number,
                 activeSize: leagueData.active_size as number,
                 benchSize: leagueData.bench_size as number,
-                minBatsmen: leagueData.min_batsmen as number,
-                maxBatsmen: leagueData.max_batsmen as number,
-                minBowlers: leagueData.min_bowlers as number,
-                minWks: leagueData.min_wks as number,
-                minAllRounders: leagueData.min_all_rounders as number,
-                maxInternational: leagueData.max_international as number,
+                minBatWk: (leagueData.min_bat_wk as number) ?? 4,
+                maxBatWk: (leagueData.max_batsmen as number) ?? 7,
+                minBowlers: (leagueData.min_bowlers as number) ?? 3,
+                maxBowlers: (leagueData.max_bowlers as number) ?? 6,
+                minAllRounders: (leagueData.min_all_rounders as number) ?? 2,
+                maxAllRounders: (leagueData.max_all_rounders as number) ?? 4,
+                maxInternational: (leagueData.max_international as number) ?? 4,
+                requireWk: (leagueData.require_wk as boolean) ?? true,
+                maxFromTeam: (leagueData.max_from_team as number) ?? 11,
               },
             });
           }
@@ -917,7 +1020,7 @@ export const useGameStore = create<GameState>()(
             supabase.from("manager_roster").select("*").eq("league_id", leagueId),
             supabase.from("league_matchups").select("*").eq("league_id", leagueId).order("week").order("created_at"),
             supabase.from("transactions").select("*").eq("league_id", leagueId).order("created_at", { ascending: false }).limit(50),
-            supabase.from("draft_picks").select("*").eq("league_id", leagueId).order("round").order("pick_position"),
+            supabase.from("draft_picks").select("*").eq("league_id", leagueId).order("round").order("pick_number"),
             supabase.from("draft_order").select("*").eq("league_id", leagueId).order("position"),
             supabase.from("draft_state").select("*").eq("league_id", leagueId).maybeSingle(),
           ]);
@@ -1072,13 +1175,24 @@ export const useGameStore = create<GameState>()(
             }
             else if (payload.eventType === "DELETE") get().removeActivity(payload.old.id);
           })
-          .on("postgres_changes", { event: "*", schema: "public", table: "draft_picks", filter }, (payload) => {
-            if (payload.eventType === "INSERT") {
-              const existing = get().draftPicks.find(p => p.id === payload.new.id);
-              if (!existing) set({ draftPicks: [...get().draftPicks, mapDbDraftPick(payload.new)] });
+          .subscribe((status, err) => {
+            console.log(`📡 REALTIME CHANNEL STATUS [league-${leagueId}]:`, status);
+            if (err) {
+              console.error(`📡 REALTIME CHANNEL ERROR [league-${leagueId}]:`, err);
             }
-            else if (payload.eventType === "UPDATE") {
-              set({ draftPicks: get().draftPicks.map(p => p.id === payload.new.id ? mapDbDraftPick(payload.new) : p) });
+          });
+
+        const draftChannel = supabase
+          .channel(`draft-changes-${leagueId}`)
+          .on("postgres_changes", { event: "*", schema: "public", table: "draft_picks", filter }, (payload) => {
+            if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+              const mapped = mapDbDraftPick(payload.new);
+              const exists = get().draftPicks.find(p => p.id === payload.new.id || (p.round === mapped.round && p.pickNumber === mapped.pickNumber));
+              if (exists) {
+                set({ draftPicks: get().draftPicks.map(p => (p.id === payload.new.id || (p.round === mapped.round && p.pickNumber === mapped.pickNumber)) ? mapped : p) });
+              } else {
+                set({ draftPicks: [...get().draftPicks, mapped] });
+              }
             }
             else if (payload.eventType === "DELETE") {
               set({ draftPicks: get().draftPicks.filter(p => p.id !== payload.old.id) });
@@ -1087,9 +1201,10 @@ export const useGameStore = create<GameState>()(
           .on("postgres_changes", { event: "*", schema: "public", table: "draft_order", filter }, (payload) => {
             if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
               const mapped = mapDbDraftOrder(payload.new);
-              const exists = get().draftOrder.find(o => o.id === payload.new.id);
+              const exists = get().draftOrder.find(o => o.id === payload.new.id || o.position === mapped.position);
+
               if (exists) {
-                set({ draftOrder: get().draftOrder.map(o => o.id === payload.new.id ? mapped : o) });
+                set({ draftOrder: get().draftOrder.map(o => (o.id === payload.new.id || o.position === mapped.position) ? mapped : o) });
               } else {
                 set({ draftOrder: [...get().draftOrder, mapped].sort((a, b) => a.position - b.position) });
               }
@@ -1103,9 +1218,18 @@ export const useGameStore = create<GameState>()(
               set({ draftState: mapDbDraftState(payload.new) });
             }
           })
-          .subscribe();
+          .subscribe((status, err) => {
+            console.log(`📡 DRAFT REALTIME CHANNEL STATUS [league-${leagueId}]:`, status);
+            if (err) {
+              console.error(`📡 DRAFT REALTIME CHANNEL ERROR [league-${leagueId}]:`, err);
+            }
+          });
 
-        return () => supabase.removeChannel(channel);
+        return () => {
+          console.log(`📡 REMOVING REALTIME CHANNELS [league-${leagueId}]`);
+          supabase.removeChannel(channel);
+          supabase.removeChannel(draftChannel);
+        };
       },
     }),
     { name: 'GameStore' }

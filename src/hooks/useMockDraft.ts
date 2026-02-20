@@ -68,15 +68,28 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
   const getNeededRoles = useCallback((counts: RosterCounts): string[] => {
     const neededRoles: string[] = [];
 
-    if (counts.wicketKeepers < config.minWks) neededRoles.push('Wicket Keeper');
-    if (counts.allRounders < config.minAllRounders) neededRoles.push('All Rounder');
+    // Prioritize WK if required and none drafted
+    if (config.requireWk && counts.wicketKeepers < 1) {
+      neededRoles.push('Wicket Keeper');
+    }
 
+    if (counts.allRounders < config.minAllRounders) neededRoles.push('All Rounder');
     if (counts.bowlers < config.minBowlers) neededRoles.push('Bowler');
-    if (counts.batsmen < config.minBatsmen) neededRoles.push('Batsman');
+
+    // Check grouped minimum for Bat+WK
+    const batWkCount = counts.batsmen + counts.wicketKeepers;
+    if (batWkCount < config.minBatWk) {
+      neededRoles.push('Batsman');
+      neededRoles.push('Wicket Keeper');
+    }
 
     if (neededRoles.length === 0) {
-      if (counts.batsmen < config.maxBatsmen) neededRoles.push('Batsman');
-      neededRoles.push('Wicket Keeper', 'All Rounder', 'Bowler');
+      // If all minimums met, allow everything within caps
+      if (batWkCount < config.maxBatWk) {
+        neededRoles.push('Batsman', 'Wicket Keeper');
+      }
+      if (counts.bowlers < config.maxBowlers) neededRoles.push('Bowler');
+      if (counts.allRounders < config.maxAllRounders) neededRoles.push('All Rounder');
     }
 
     return [...new Set(neededRoles)];
@@ -116,6 +129,7 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
 
     const neededRoles = getNeededRoles(counts);
     const canAddInternational = counts.international < config.maxInternational;
+    const batWkCount = counts.batsmen + counts.wicketKeepers;
 
     let eligiblePlayers = availablePlayers.filter(p => {
       if (!canAddInternational && p.isInternational) return false;
@@ -125,7 +139,9 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
     if (eligiblePlayers.length === 0) {
       eligiblePlayers = availablePlayers.filter(p => {
         if (!canAddInternational && p.isInternational) return false;
-        if (p.role === 'Batsman' && counts.batsmen >= config.maxBatsmen) return false;
+        if ((p.role === 'Batsman' || p.role === 'Wicket Keeper') && batWkCount >= config.maxBatWk) return false;
+        if (p.role === 'Bowler' && counts.bowlers >= config.maxBowlers) return false;
+        if (p.role === 'All Rounder' && counts.allRounders >= config.maxAllRounders) return false;
         return true;
       });
     }

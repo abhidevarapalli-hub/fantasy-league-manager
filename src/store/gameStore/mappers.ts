@@ -105,12 +105,11 @@ export const mapDbDraftPick = (db: DbDraftPick | Tables<"draft_picks"> | Record<
     id: row.id,
     leagueId: row.league_id,
     round: row.round,
-    pickPosition: row.pick_position,
+    pickNumber: row.pick_number,
     managerId: row.manager_id,
     playerId: row.player_id,
     isAutoDraft: row.is_auto_draft,
     createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
   };
 };
 
@@ -128,12 +127,18 @@ export const mapDbDraftOrder = (db: DbDraftOrder | Tables<"draft_order"> | Recor
 export const mapDbDraftState = (db: DbDraftState | Tables<"draft_state"> | Record<string, unknown>): DraftState => {
   const row = db as DbDraftState;
   return {
-    id: row.id,
     leagueId: row.league_id,
-    isFinalized: row.is_finalized,
-    finalizedAt: row.finalized_at ? new Date(row.finalized_at) : null,
-    isActive: row.is_active,
-    currentPickStartAt: row.current_pick_start_at ? new Date(row.current_pick_start_at) : null,
+    status: row.status as DraftState['status'],
+    currentRound: row.current_round,
+    currentPosition: row.current_position,
+    clockDurationSeconds: row.clock_duration_seconds,
+    lastPickAt: new Date(row.last_pick_at),
     pausedAt: row.paused_at ? new Date(row.paused_at) : null,
+    totalPausedDurationMs: row.total_paused_duration_ms,
+    version: row.version,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+    isActive: row.status === 'active' || row.status === 'paused',
+    isFinalized: row.status === 'completed',
   };
 };

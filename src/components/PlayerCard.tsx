@@ -64,9 +64,13 @@ export const PlayerCard = ({
     <div
       className={cn(
         "group flex items-center gap-3 p-3 rounded-xl border transition-all relative overflow-hidden",
-        teamColors.bg === 'bg-muted' && "bg-card border-border hover:border-primary/30",
+        teamColors.bg === 'bg-muted' && "bg-card border-border",
         variant === 'compact' && "p-2 gap-2",
-        onClick && "cursor-pointer hover:scale-[1.01] active:scale-[0.99] hover:shadow-lg"
+        // Only apply card-level hover effects when NOT hovering over buttons/actions
+        onClick && "cursor-pointer hover:shadow-lg active:scale-[0.99]",
+        onClick && teamColors.bg === 'bg-muted' && "hover:border-primary/30",
+        // Use group-hover with a backdrop highlight that is less intrusive than scaling
+        onClick && "after:absolute after:inset-0 after:bg-primary/0 after:transition-colors hover:after:bg-primary/5 clickable-card"
       )}
       style={teamColors.bg !== 'bg-muted' ? {
         backgroundColor: teamColors.raw,

@@ -6,12 +6,15 @@ export interface LeagueConfig {
   managerCount: number;
   activeSize: number;
   benchSize: number;
-  minBatsmen: number;
-  maxBatsmen: number;
+  minBatWk: number;
+  maxBatWk: number;
   minBowlers: number;
-  minWks: number;
+  maxBowlers: number;
   minAllRounders: number;
+  maxAllRounders: number;
   maxInternational: number;
+  requireWk: boolean;
+  maxFromTeam?: number;
 }
 
 // Default configuration for backwards compatibility and fallback
@@ -19,13 +22,36 @@ export const DEFAULT_LEAGUE_CONFIG: LeagueConfig = {
   managerCount: 8,
   activeSize: 11,
   benchSize: 3,
-  minBatsmen: 1,
-  maxBatsmen: 6,
+  minBatWk: 4,
+  maxBatWk: 7,
   minBowlers: 3,
-  minWks: 1,
-  minAllRounders: 1,
-  maxInternational: 4
+  maxBowlers: 6,
+  minAllRounders: 2,
+  maxAllRounders: 4,
+  maxInternational: 4,
+  requireWk: true,
+  maxFromTeam: 11
 };
+
+/**
+ * Gets default minimum requirements based on roster size.
+ * Mapping: size -> [BatWk, AllRounder, Bowler]
+ */
+export function getDefaultMinimums(rosterSize: number): { minBatWk: number; minAllRounders: number; minBowlers: number } {
+  switch (rosterSize) {
+    case 11: return { minBatWk: 4, minAllRounders: 2, minBowlers: 3 };
+    case 10: return { minBatWk: 3, minAllRounders: 1, minBowlers: 3 };
+    case 9: return { minBatWk: 3, minAllRounders: 1, minBowlers: 3 };
+    case 8: return { minBatWk: 2, minAllRounders: 1, minBowlers: 2 };
+    case 7: return { minBatWk: 2, minAllRounders: 1, minBowlers: 2 };
+    case 6: return { minBatWk: 2, minAllRounders: 1, minBowlers: 1 };
+    default:
+      // Fallback for other sizes
+      if (rosterSize > 11) return { minBatWk: 4, minAllRounders: 2, minBowlers: 3 };
+      if (rosterSize < 6) return { minBatWk: 1, minAllRounders: 1, minBowlers: 1 };
+      return { minBatWk: 2, minAllRounders: 1, minBowlers: 1 };
+  }
+}
 
 export type PlayerRole = 'Wicket Keeper' | 'Batsman' | 'All Rounder' | 'Bowler';
 
@@ -56,7 +82,7 @@ export interface SlotRequirement {
  * Specifically, the sum of position minimums must not exceed the active roster size.
  */
 export function validateLeagueMinimums(config: LeagueConfig): { isValid: boolean; message?: string } {
-  const totalMin = config.minWks + config.minBatsmen + config.minBowlers + config.minAllRounders;
+  const totalMin = config.minBatWk + config.minBowlers + config.minAllRounders;
   if (totalMin > config.activeSize) {
     return {
       isValid: false,
@@ -88,20 +114,23 @@ export function validateActiveRoster(players: Player[], config: LeagueConfig = D
     errors.push(`Active roster cannot exceed ${config.activeSize} players (currently ${counts.total})`);
   }
 
-  // Check strict minimums
-  if (counts.wicketKeepers < config.minWks) {
-    errors.push(`Need at least ${config.minWks} Wicket Keeper(s) (currently ${counts.wicketKeepers})`);
+  // Wicket Keeper requirement
+  if (config.requireWk && counts.wicketKeepers < 1) {
+    errors.push("Need at least 1 Wicket Keeper");
   }
 
-  const batsmenPlusWk = counts.batsmen + counts.wicketKeepers;
-  if (batsmenPlusWk < config.minBatsmen) {
-    errors.push(`Need at least ${config.minBatsmen} Batsmen + WK (currently ${batsmenPlusWk})`);
+  // Bat + WK Group
+  const batWkCount = counts.batsmen + counts.wicketKeepers;
+  if (batWkCount < config.minBatWk) {
+    errors.push(`Need at least ${config.minBatWk} Batsmen/WKs (currently ${batWkCount})`);
   }
 
+  // All Rounders
   if (counts.allRounders < config.minAllRounders) {
     errors.push(`Need at least ${config.minAllRounders} All Rounder(s) (currently ${counts.allRounders})`);
   }
 
+  // Bowlers
   if (counts.bowlers < config.minBowlers) {
     errors.push(`Need at least ${config.minBowlers} Bowler(s) (currently ${counts.bowlers})`);
   }
@@ -121,15 +150,12 @@ export function validateActiveRoster(players: Player[], config: LeagueConfig = D
 
 /**
  * Forward-looking validation: Only block moves that make requirements IMPOSSIBLE to meet.
- * This checks if adding a player would violate maximums or leave insufficient slots
- * for required minimums to be filled.
+ * This checks if adding a player would leave insufficient slots for required minimums.
  */
 export function canAddToActive(currentActive: Player[], playerToAdd: Player, config: LeagueConfig = DEFAULT_LEAGUE_CONFIG): RosterValidationResult {
   const newActive = [...currentActive, playerToAdd];
   const counts = countRosterPlayers(newActive);
   const errors: string[] = [];
-
-  // Immediate violations - these are always errors
 
   // Max players
   if (counts.total > config.activeSize) {
@@ -148,23 +174,20 @@ export function canAddToActive(currentActive: Player[], playerToAdd: Player, con
   const remainingSlots = config.activeSize - counts.total;
 
   // Calculate strict deficits
-  const wkDeficit = Math.max(0, config.minWks - counts.wicketKeepers);
-  const batPlusWkDeficit = Math.max(0, config.minBatsmen - (counts.batsmen + counts.wicketKeepers));
+  const wkDeficit = (config.requireWk && counts.wicketKeepers < 1) ? 1 : 0;
+  const batWkDeficit = Math.max(0, config.minBatWk - (counts.batsmen + counts.wicketKeepers));
   const arDeficit = Math.max(0, config.minAllRounders - counts.allRounders);
   const bowlerDeficit = Math.max(0, config.minBowlers - counts.bowlers);
 
   // Total minimum slots needed exclusively for specific roles
-  // We need to satisfy the WK minimum AND the combined Bat+WK minimum.
-  // The number of slots reserved for the batting group is max(wkDeficit, batPlusWkDeficit).
-  const batWkSlotsNeeded = Math.max(wkDeficit, batPlusWkDeficit);
+  const batWkSlotsNeeded = Math.max(wkDeficit, batWkDeficit);
   const totalMinSlotsNeeded = batWkSlotsNeeded + arDeficit + bowlerDeficit;
 
   if (totalMinSlotsNeeded > remainingSlots) {
-    // Determine which requirement is impossible to meet
     if (wkDeficit > remainingSlots) {
-      errors.push(`Cannot add this player: not enough slots remaining to add required Wicket Keeper(s)`);
-    } else if (batPlusWkDeficit > remainingSlots) {
-      errors.push(`Cannot add this player: not enough slots remaining to satisfy the ${config.minBatsmen} Batsmen + WK requirement`);
+      errors.push(`Cannot add this player: not enough slots remaining to add required Wicket Keeper`);
+    } else if (batWkDeficit > remainingSlots) {
+      errors.push(`Cannot add this player: not enough slots remaining to satisfy the ${config.minBatWk} Batsmen/WK requirement`);
     } else if (arDeficit > remainingSlots) {
       errors.push(`Cannot add this player: not enough slots remaining to add required All Rounder(s)`);
     } else if (bowlerDeficit > remainingSlots) {
@@ -180,11 +203,9 @@ export function canAddToActive(currentActive: Player[], playerToAdd: Player, con
 
 
 // Check if removing a player from active roster would still be valid
-// (Note: Removal is always allowed since the roster is incomplete)
 export function canRemoveFromActive(currentActive: Player[], playerToRemove: Player): RosterValidationResult {
   const newActive = currentActive.filter(p => p.id !== playerToRemove.id);
   const counts = countRosterPlayers(newActive);
-  // Removal is always valid - we're just making the roster smaller
   return { isValid: true, errors: [], counts };
 }
 
@@ -196,7 +217,6 @@ export function canSwapInActive(
   config: LeagueConfig = DEFAULT_LEAGUE_CONFIG
 ): RosterValidationResult {
   const newActive = currentActive.filter(p => p.id !== playerToRemove.id);
-  // Use canAddToActive for forward-looking validation
   return canAddToActive(newActive, playerToAdd, config);
 }
 
@@ -254,47 +274,53 @@ export function getActiveRosterSlots(players: Player[], config: LeagueConfig = D
   if (emptySlots <= 0) return slots;
 
   // Determine minimum requirements not yet met
-  const wkNeeded = Math.max(0, config.minWks - wkAdded);
-  const batNeeded = Math.max(0, config.minBatsmen - (batAdded + wkAdded));
+  const batWkAdded = batAdded + wkAdded;
+  const batWkNeeded = Math.max(0, config.minBatWk - batWkAdded);
   const arNeeded = Math.max(0, config.minAllRounders - arAdded);
   const bowlersNeeded = Math.max(0, config.minBowlers - bowlerAdded);
 
+  // Specialist WK requirement check
+  const wkDeficit = (config.requireWk && wkAdded < 1) ? 1 : 0;
+
+  // Track slots we are adding
   let slotsToFill = emptySlots;
 
-  // Add specific needed slots
-  for (let i = 0; i < wkNeeded && slotsToFill > 0; i++) {
-    slots.push({ role: 'Wicket Keeper', label: 'Wicket Keeper', filled: false });
+  // 1. Mandatory Wicket Keeper (if required and not present)
+  // This counts towards both the WK requirement AND the BAT/WK group minimum.
+  if (wkDeficit > 0 && slotsToFill > 0) {
+    slots.push({ role: 'Wicket Keeper', label: 'WK Required', filled: false });
     slotsToFill--;
   }
 
-  for (let i = 0; i < batNeeded && slotsToFill > 0; i++) {
-    slots.push({ role: 'Batsman', label: 'Batsman', filled: false });
+  // 2. Remaining BAT / WK requirements
+  // We subtract the WK we just added (if any) from the batWkNeeded
+  const remainingBatWkToFill = Math.max(0, batWkNeeded - (wkDeficit > 0 ? 1 : 0));
+  for (let i = 0; i < remainingBatWkToFill && slotsToFill > 0; i++) {
+    slots.push({ role: 'Batsman', label: 'BAT / WK', filled: false });
     slotsToFill--;
   }
 
+  // 3. All Rounder requirements
   for (let i = 0; i < arNeeded && slotsToFill > 0; i++) {
     slots.push({ role: 'All Rounder', label: 'All Rounder', filled: false });
     slotsToFill--;
   }
 
+  // 4. Bowler requirements
   for (let i = 0; i < bowlersNeeded && slotsToFill > 0; i++) {
     slots.push({ role: 'Bowler', label: 'Bowler', filled: false });
     slotsToFill--;
   }
 
-  // Fill remaining with generic Any Position slots
+  // 5. Fill remaining with generic Flex slots
   for (let i = 0; i < slotsToFill; i++) {
-    slots.push({ role: 'Any Position', label: 'Any Position', filled: false });
+    slots.push({ role: 'Any Position', label: 'Flex Slot', filled: false });
   }
 
-  // Re-sort slots for cleaner display
-  // Order: Filled Players -> Required Empty Slots -> Flexible Empty Slots
   return slots.sort((a, b) => {
-    // 1. Filled vs Empty
     if (a.filled && !b.filled) return -1;
     if (!a.filled && b.filled) return 1;
 
-    // 2. Role Order
     const roleOrder: Record<string, number> = {
       'Wicket Keeper': 0,
       'Batsman': 1,
@@ -303,7 +329,6 @@ export function getActiveRosterSlots(players: Player[], config: LeagueConfig = D
       'Any Position': 4
     };
 
-    // Safety check for role existing in map, though typed
     const aRole = a.player ? a.player.role : a.role;
     const bRole = b.player ? b.player.role : b.role;
 
@@ -315,87 +340,90 @@ export function getActiveRosterSlots(players: Player[], config: LeagueConfig = D
 export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig = DEFAULT_LEAGUE_CONFIG): { active: Player[]; bench: Player[] } {
   const active: Player[] = [];
   const bench: Player[] = [];
-
-  // Sort by role priority for selection
-  const wks = allPlayers.filter(p => p.role === 'Wicket Keeper');
-  const bats = allPlayers.filter(p => p.role === 'Batsman');
-  const ars = allPlayers.filter(p => p.role === 'All Rounder');
-  const bowlers = allPlayers.filter(p => p.role === 'Bowler');
-
-  // Track international count active
-  let internationalCount = 0;
   const STRICT_MAX_INTL = 4;
+  let internationalCount = 0;
+
+  // Track players already assigned to active
+  const assignedIds = new Set<string>();
+
+  const canAddIntl = (player: Player) => {
+    return !player.isInternational || internationalCount < STRICT_MAX_INTL;
+  };
 
   const tryAdd = (player: Player): boolean => {
-    // Basic Active Cap Check (should strictly shouldn't be hit if logic is right, but good safety)
-    if (active.length >= config.activeSize) return false;
-
-    // International Limit Check
-    if (player.isInternational && internationalCount >= STRICT_MAX_INTL) return false;
-
-    // Duplicate Check
-    if (active.some(p => p.id === player.id)) return false;
+    if (assignedIds.has(player.id)) return false;
+    if (!canAddIntl(player)) return false;
 
     active.push(player);
+    assignedIds.add(player.id);
     if (player.isInternational) internationalCount++;
     return true;
   };
 
-  // Helper: Try to add countNeeded from a specific list
-  const addMandatory = (list: Player[], countNeeded: number) => {
-    // Prioritize domestic to save international slots for flex/impact
-    const domestic = list.filter(p => !p.isInternational);
-    const international = list.filter(p => p.isInternational);
-
-    let addedForCategory = 0;
-
-    // 1. Domestic
-    for (const p of domestic) {
-      if (addedForCategory >= countNeeded) break;
-      if (tryAdd(p)) addedForCategory++;
-    }
-
-    // 2. International
-    for (const p of international) {
-      if (addedForCategory >= countNeeded) break;
-      if (tryAdd(p)) addedForCategory++;
-    }
-  };
-
-  // 1. Fill Mandatory Slots
-  // We strictly try to fill only the minimums here.
-  addMandatory(wks, config.minWks);
-  addMandatory(bats, config.minBatsmen);
-  addMandatory(ars, config.minAllRounders);
-  addMandatory(bowlers, config.minBowlers);
-
-  // 2. Fill Flex Slots
-  // "Flex" slots are the difference between Active Size and Total Minimums.
-  // We CANNOT use a "Mandatory Slot" (e.g. a missing Wicket Keeper slot) for a flex player.
-  // So we strictly limit how many *more* players we add based on the flex count.
-  const totalMinReq = config.minWks + config.minBatsmen + config.minAllRounders + config.minBowlers;
-  const maxFlexSlots = Math.max(0, config.activeSize - totalMinReq);
-
-  // Players not yet active
-  const remainingPlayers = allPlayers.filter(p => !active.some(a => a.id === p.id));
-
-  // Sort remaining by some priority? 
-  // Maybe International first since we might have saved slots? Or just best available?
-  // Let's stick to initial order (usually name or previously sorted) or simple diversity.
-  // For now, simple iteration.
-
-  let flexAdded = 0;
-  for (const p of remainingPlayers) {
-    if (flexAdded >= maxFlexSlots) break;
-    // tryAdd handles intl limits and duplicates
-    if (tryAdd(p)) {
-      flexAdded++;
+  // 1. Fill Mandatory WK (if required)
+  if (config.requireWk) {
+    const wks = allPlayers.filter(p => p.role === 'Wicket Keeper' && !assignedIds.has(p.id));
+    for (const wk of wks) {
+      if (tryAdd(wk)) break; // Just need one
     }
   }
 
-  // 3. Everyone else to Bench
+  // 2. Fill Mandatory Bowlers
+  const bowlers = allPlayers.filter(p => p.role === 'Bowler' && !assignedIds.has(p.id));
+  let bowlersAdded = active.filter(p => p.role === 'Bowler').length;
+  for (const b of bowlers) {
+    if (bowlersAdded >= config.minBowlers) break;
+    if (tryAdd(b)) bowlersAdded++;
+  }
+
+  // 3. Fill Mandatory All Rounders
+  const allRounders = allPlayers.filter(p => p.role === 'All Rounder' && !assignedIds.has(p.id));
+  let arAdded = active.filter(p => p.role === 'All Rounder').length;
+  for (const ar of allRounders) {
+    if (arAdded >= config.minAllRounders) break;
+    if (tryAdd(ar)) arAdded++;
+  }
+
+  // 4. Fill Mandatory Batsmen/WKs
+  const batWks = allPlayers.filter(p => (p.role === 'Batsman' || p.role === 'Wicket Keeper') && !assignedIds.has(p.id));
+  let batWkCount = active.filter(p => p.role === 'Batsman' || p.role === 'Wicket Keeper').length;
+  for (const bw of batWks) {
+    if (batWkCount >= config.minBatWk) break;
+    if (tryAdd(bw)) batWkCount++;
+  }
+
+  // 5. Fill Flex Slots
+  // Total mandatory slots are defined by config
+  const totalMandatoryNeeded = config.minBatWk + config.minAllRounders + config.minBowlers;
+  // If requireWk is true, it's already part of minBatWk technically, 
+  // but let's be careful. In this app, Wicket Keeper IS a role that counts towards minBatWk.
+
+  const totalSlots = config.activeSize;
+  const flexSlotsAvailable = totalSlots - totalMandatoryNeeded;
+
+  if (flexSlotsAvailable > 0) {
+    const remainingPlayers = allPlayers.filter(p => !assignedIds.has(p.id));
+    let flexFilled = 0;
+    for (const p of remainingPlayers) {
+      if (flexFilled >= flexSlotsAvailable) break;
+      // Note: we don't use tryAdd here because we want to cap at flexSlotsAvailable
+      // but tryAdd checks active.length < config.activeSize, which might be bigger 
+      // if we have vacant mandatory slots. 
+      // Actually, if we have vacant mandatory slots, we SHOULD NOT fill them with 
+      // players of other roles yet. We only fill the "Flex" portion of the roster.
+
+      if (canAddIntl(p)) {
+        active.push(p);
+        assignedIds.add(p.id);
+        if (p.isInternational) internationalCount++;
+        flexFilled++;
+      }
+    }
+  }
+
+  // Everything else goes to bench
   for (const p of allPlayers) {
-    if (!active.some(a => a.id === p.id)) {
+    if (!assignedIds.has(p.id)) {
       bench.push(p);
     }
   }
@@ -413,39 +441,31 @@ export type ConstraintStatus = 'met' | 'warning' | 'ok' | 'exceeded';
 export interface ConstraintProgress {
   current: number;
   min?: number;
-  max?: number;
   status: ConstraintStatus;
   needed?: number; // How many more needed to meet minimum
 }
 
 export interface RosterProgress {
   wicketKeepers: ConstraintProgress;
-  batsmen: ConstraintProgress;
   allRounders: ConstraintProgress;
   bowlers: ConstraintProgress;
   international: ConstraintProgress;
-  wkBatCombined: ConstraintProgress;
+  batWkCombined: ConstraintProgress;
   bwlArCombined: ConstraintProgress;
   total: { current: number; target: number };
 }
 
 // Helper functions for combined limits
-export function getMinWkBat(config: LeagueConfig): number {
-  return config.minWks + config.minBatsmen;
+export function getMinBatWk(config: LeagueConfig): number {
+  return config.minBatWk;
 }
 
-export function getMaxWkBat(config: LeagueConfig): number {
-  return config.activeSize - config.minBowlers - config.minAllRounders;
-}
-
-// Additional helper for BWL+AR if needed (it was used in the file but I don't see it defined either)
 export function getMinBwlAr(config: LeagueConfig): number {
   return config.minBowlers + config.minAllRounders;
 }
 
 /**
  * Calculate roster progress for draft UI
- * Shows current counts vs required minimums/maximums with status indicators
  */
 export function getRosterProgress(players: Player[], config: LeagueConfig): RosterProgress {
   const counts = countRosterPlayers(players);
@@ -454,7 +474,6 @@ export function getRosterProgress(players: Player[], config: LeagueConfig): Rost
   const wkBatCurrent = counts.wicketKeepers + counts.batsmen;
   const bwlArCurrent = counts.bowlers + counts.allRounders;
 
-  // Helper to determine status
   const getStatus = (current: number, min?: number, max?: number): ConstraintStatus => {
     if (max !== undefined && current > max) return 'exceeded';
     if (min !== undefined && current < min) return 'warning';
@@ -465,16 +484,8 @@ export function getRosterProgress(players: Player[], config: LeagueConfig): Rost
   return {
     wicketKeepers: {
       current: counts.wicketKeepers,
-      min: config.minWks,
-      status: getStatus(counts.wicketKeepers, config.minWks),
-      needed: Math.max(0, config.minWks - counts.wicketKeepers),
-    },
-    batsmen: {
-      current: counts.batsmen,
-      min: config.minBatsmen,
-      max: config.maxBatsmen,
-      status: getStatus(counts.batsmen, config.minBatsmen, config.maxBatsmen),
-      needed: Math.max(0, config.minBatsmen - counts.batsmen),
+      status: getStatus(counts.wicketKeepers, config.requireWk ? 1 : 0),
+      needed: Math.max(0, (config.requireWk ? 1 : 0) - counts.wicketKeepers),
     },
     allRounders: {
       current: counts.allRounders,
@@ -490,15 +501,13 @@ export function getRosterProgress(players: Player[], config: LeagueConfig): Rost
     },
     international: {
       current: counts.international,
-      max: config.maxInternational,
-      status: getStatus(counts.international, undefined, config.maxInternational),
+      status: getStatus(counts.international, undefined, 4),
     },
-    wkBatCombined: {
+    batWkCombined: {
       current: wkBatCurrent,
-      min: getMinWkBat(config),
-      max: getMaxWkBat(config),
-      status: getStatus(wkBatCurrent, getMinWkBat(config), getMaxWkBat(config)),
-      needed: Math.max(0, getMinWkBat(config) - wkBatCurrent),
+      min: config.minBatWk,
+      status: getStatus(wkBatCurrent, config.minBatWk),
+      needed: Math.max(0, config.minBatWk - wkBatCurrent),
     },
     bwlArCombined: {
       current: bwlArCurrent,
@@ -521,7 +530,6 @@ export interface PlayerRecommendation {
 
 /**
  * Determine if a player should be recommended during draft
- * Returns recommendation status with reason and priority
  */
 export function getPlayerRecommendation(
   currentPicks: Player[],
@@ -532,42 +540,29 @@ export function getPlayerRecommendation(
   const role = playerToEvaluate.role;
   const isInternational = playerToEvaluate.isInternational;
 
-  // Check if adding this player would exceed limits
-  if (isInternational && progress.international.current >= config.maxInternational) {
-    return { isRecommended: false, priority: -1 }; // Would exceed international limit
+  const STRICT_MAX_INTL = 4;
+  if (isInternational && progress.international.current >= STRICT_MAX_INTL) {
+    return { isRecommended: false, priority: -1 };
   }
 
-  // Priority scoring - higher priority for more urgent needs
   let priority = 0;
   let reason: string | undefined;
 
-  // Check role-specific needs
   switch (role) {
     case 'Wicket Keeper':
       if (progress.wicketKeepers.needed && progress.wicketKeepers.needed > 0) {
         priority = 100 + progress.wicketKeepers.needed * 10;
-        reason = `Need ${progress.wicketKeepers.needed} more WK`;
-      } else if (progress.wkBatCombined.needed && progress.wkBatCombined.needed > 0) {
-        priority = 50 + progress.wkBatCombined.needed * 5;
-        reason = `Need ${progress.wkBatCombined.needed} more WK/BAT`;
-      } else if (progress.wkBatCombined.current >= (progress.wkBatCombined.max || 6)) {
-        return { isRecommended: false, priority: -1 }; // Would exceed WK+BAT max
+        reason = `Need 1 Wicket Keeper`;
+      } else if (progress.batWkCombined.needed && progress.batWkCombined.needed > 0) {
+        priority = 50 + progress.batWkCombined.needed * 5;
+        reason = `Need ${progress.batWkCombined.needed} more BAT / WK`;
       }
       break;
 
     case 'Batsman':
-      if (progress.batsmen.current >= (progress.batsmen.max || config.maxBatsmen)) {
-        return { isRecommended: false, priority: -1 }; // Would exceed batsmen max
-      }
-      if (progress.wkBatCombined.current >= (progress.wkBatCombined.max || 6)) {
-        return { isRecommended: false, priority: -1 }; // Would exceed WK+BAT max
-      }
-      if (progress.batsmen.needed && progress.batsmen.needed > 0) {
-        priority = 80 + progress.batsmen.needed * 10;
-        reason = `Need ${progress.batsmen.needed} more BAT`;
-      } else if (progress.wkBatCombined.needed && progress.wkBatCombined.needed > 0) {
-        priority = 40 + progress.wkBatCombined.needed * 5;
-        reason = `Need ${progress.wkBatCombined.needed} more WK/BAT`;
+      if (progress.batWkCombined.needed && progress.batWkCombined.needed > 0) {
+        priority = 80 + progress.batWkCombined.needed * 10;
+        reason = `Need ${progress.batWkCombined.needed} more BAT / WK`;
       }
       break;
 
@@ -575,9 +570,6 @@ export function getPlayerRecommendation(
       if (progress.allRounders.needed && progress.allRounders.needed > 0) {
         priority = 90 + progress.allRounders.needed * 10;
         reason = `Need ${progress.allRounders.needed} more AR`;
-      } else if (progress.bwlArCombined.needed && progress.bwlArCombined.needed > 0) {
-        priority = 45 + progress.bwlArCombined.needed * 5;
-        reason = `Need ${progress.bwlArCombined.needed} more BWL/AR`;
       }
       break;
 
@@ -585,14 +577,10 @@ export function getPlayerRecommendation(
       if (progress.bowlers.needed && progress.bowlers.needed > 0) {
         priority = 85 + progress.bowlers.needed * 10;
         reason = `Need ${progress.bowlers.needed} more BOWL`;
-      } else if (progress.bwlArCombined.needed && progress.bwlArCombined.needed > 0) {
-        priority = 45 + progress.bwlArCombined.needed * 5;
-        reason = `Need ${progress.bwlArCombined.needed} more BWL/AR`;
       }
       break;
   }
 
-  // Only recommend if there's a reason (unfilled requirement)
   if (priority > 0 && reason) {
     return { isRecommended: true, reason, priority };
   }

@@ -21,6 +21,7 @@ export const useDraft = () => {
   const setDraftPicks = useGameStore(state => state.setDraftPicks);
   const setDraftOrder = useGameStore(state => state.setDraftOrder);
   const setDraftState = useGameStore(state => state.setDraftState);
+  const finalizeRosters = useGameStore(state => state.finalizeRosters);
 
   const [loading, setLoading] = useState(true);
 
@@ -62,14 +63,13 @@ export const useDraft = () => {
             .from('draft_state')
             .insert({
               league_id: leagueId,
-              is_finalized: false,
-              is_active: false
+              status: 'pre_draft' as "pre_draft" | "active" | "paused" | "completed"
             })
             .select('*')
             .single();
 
           if (!createError && newState) {
-            setDraftState(mapDbDraftState({ ...newState, league_id: leagueId }));
+            setDraftState(mapDbDraftState({ ...newState, league_id: leagueId } as DbDraftState));
           } else if (createError) {
             console.error('[useDraft] ❌ Error creating draft state:', createError);
           }
@@ -95,7 +95,7 @@ export const useDraft = () => {
 
   // Get pick for a specific round and position
   const getPick = useCallback((round: number, position: number) => {
-    return draftPicks.find(p => p.round === round && p.pickPosition === position) || null;
+    return draftPicks.find(p => p.round === round && p.pickNumber === position) || null;
   }, [draftPicks]);
 
   // Get player for a pick
@@ -134,306 +134,38 @@ export const useDraft = () => {
     }
   }, [draftOrder, setDraftOrder]);
 
-  // Finalize draft - clear all rosters first, then insert into junction table with optimal Active 11
-  const finalizeDraft = useCallback(async () => {
-    if (!leagueId) {
-      toast.error('No league selected');
-      return false;
-    }
-
-    try {
-      // Group picks by manager
-      const picksByManager = new Map<string, string[]>();
-
-      for (const pick of draftPicks) {
-        if (pick.managerId && pick.playerId) {
-          const existing = picksByManager.get(pick.managerId) || [];
-          existing.push(pick.playerId);
-          picksByManager.set(pick.managerId, existing);
-        }
-      }
-
-      if (picksByManager.size === 0) {
-        toast.error('No picks have been made yet');
-        return false;
-      }
-
-      // First, clear ALL roster entries for this league from junction table
-      const { error: clearError } = await supabase
-        .from('manager_roster' as 'managers')
-        .delete()
-        .eq('league_id', leagueId);
-
-      if (clearError) {
-        console.error('Failed to clear rosters:', clearError);
-        toast.error('Failed to clear existing rosters');
-        return false;
-      }
-
-      // Insert roster entries for each manager using optimal Active 11 building
-      for (const [managerId, playerIds] of picksByManager) {
-        // Get the actual player objects
-        const draftedPlayers: Player[] = playerIds
-          .map(id => players.find(p => p.id === id))
-          .filter((p): p is Player => p !== undefined);
-
-        // Build optimal Active 11 based on positional requirements
-        const { active, bench } = buildOptimalActive11(draftedPlayers);
-
-        // Prepare roster entries for ALL weeks (1-7)
-        const totalWeeks = 7;
-        const rosterEntries = [];
-
-        // Top 2 drafted players become captain and vice-captain
-        const captainId = playerIds[0] || null;
-        const viceCaptainId = playerIds[1] || null;
-
-        for (let week = 1; week <= totalWeeks; week++) {
-          rosterEntries.push(
-            ...active.map((p, idx) => ({
-              manager_id: managerId,
-              player_id: p.id,
-              league_id: leagueId,
-              slot_type: 'active' as const,
-              position: idx,
-              week,
-              is_captain: p.id === captainId,
-              is_vice_captain: p.id === viceCaptainId,
-            })),
-            ...bench.map((p, idx) => ({
-              manager_id: managerId,
-              player_id: p.id,
-              league_id: leagueId,
-              slot_type: 'bench' as const,
-              position: idx,
-              week,
-              is_captain: false,
-              is_vice_captain: false,
-            })),
-          );
-        }
-
-        if (rosterEntries.length > 0) {
-          const { error } = await supabase
-            .from('manager_roster')
-            .insert(rosterEntries);
-
-          if (error) {
-            console.error('Failed to insert manager roster:', error);
-            toast.error('Failed to update rosters');
-            return false;
-          }
-        }
-      }
-
-      // Log draft finalization transaction
-      await supabase.from('transactions').insert({
-        type: 'trade',
-        description: `Draft finalized - All rosters cleared, ${picksByManager.size} team rosters updated with optimized Active 11`,
-        manager_id: null,
-        week: null,
-        league_id: leagueId,
-      });
-
-      // --- Schedule Generation ---
-      // Clear existing schedule for this league to avoid duplicates
-      const { error: clearScheduleError } = await supabase
-        .from('league_matchups' as 'transactions') // Using actual DB table name
-        .delete()
-        .eq('league_id', leagueId);
-
-      if (clearScheduleError) {
-        console.error('Failed to clear existing schedule:', clearScheduleError);
-      }
-
-      // Generate new schedule
-      const managerIds = Array.from(picksByManager.keys());
-
-      // Dynamic import to avoid circular dependencies if any, or just for code splitting
-      const { generateSchedule } = await import('@/lib/scheduler');
-      const matchups = generateSchedule(managerIds);
-
-      if (matchups.length > 0) {
-        const scheduleRows = matchups.map(m => ({
-          league_id: leagueId,
-          week: m.round,
-          manager1_id: m.home,
-          manager2_id: m.away, // Can be null for bye
-        }));
-
-        const { error: scheduleError } = await supabase
-          .from('league_matchups')
-          .insert(scheduleRows);
-
-        if (scheduleError) {
-          console.error('Failed to save schedule:', scheduleError);
-          toast.error('Draft finalized, but failed to generate schedule.');
-        } else {
-          console.log(`[useDraft] ✅ Generated ${matchups.length} matchups for 5 weeks.`);
-        }
-      }
-
-      // Update draft state
-      if (draftState) {
-        await supabase
-          .from('draft_state')
-          .update({ is_finalized: true, finalized_at: new Date().toISOString() })
-          .eq('league_id', leagueId);
-      }
-
-      // Set current_week to 0 (pre-season) so managers can rearrange before Week 1
-      await supabase
-        .from('leagues' as const)
-        .update({ current_week: 0 } as Record<string, unknown>)
-        .eq('id', leagueId);
-
-      toast.success(`Draft finalized! All rosters cleared and ${picksByManager.size} teams updated with optimized Active 11.`);
-
-      // Refresh all data to ensure UI is in sync immediately
-      await useGameStore.getState().fetchAllData(leagueId);
-
-      return true;
-    } catch (error) {
-      console.error('Failed to finalize draft:', error);
-      toast.error('Failed to finalize draft');
-      return false;
-    }
-  }, [draftPicks, draftState, players, leagueId]);
 
   // Make a draft pick
   const makePick = useCallback(async (round: number, position: number, playerId: string, isAutoDraft = false) => {
+    if (!leagueId || !draftState || draftState.status !== 'active') return;
+
     const orderItem = draftOrder.find(o => o.position === position);
+    const expectedManagerId = orderItem?.managerId || null;
 
-    // Allow empty manager (null) for empty slots
-    const managerId = orderItem?.managerId || null;
+    // Use the RPC for make pick
+    const currentManagerId = useGameStore.getState().currentManagerId;
 
-    if (!managerId && !isAutoDraft) {
-      console.log('[useDraft] ⚠️ Picking for empty slot (no manager) - allowed as it might be admin override');
+    // Only allow picks for the current manager, unless it's an auto-draft triggered by the system
+    if (!isAutoDraft && currentManagerId !== expectedManagerId && expectedManagerId !== null) {
+      toast.error('It is not your turn to pick!');
+      return;
     }
 
-    const existingPick = getPick(round, position);
+    const actuallyUsedManagerId = expectedManagerId || currentManagerId;
 
-    if (existingPick) {
-      // Optimistic update for existing pick
-      const oldPlayerId = existingPick.playerId;
-      // Get FRESH state for optimistic update to avoid race conditions
-      const currentPicks = useGameStore.getState().draftPicks;
+    console.log(`[useDraft] 🎯 Calling execute_draft_pick for ${playerId}`);
+    const { error } = await supabase.rpc('execute_draft_pick', {
+      p_league_id: leagueId,
+      p_manager_id: actuallyUsedManagerId,
+      p_player_id: playerId,
+      p_is_auto_draft: isAutoDraft
+    });
 
-      const optimisticPicks = currentPicks.map(p =>
-        p.id === existingPick.id ? { ...p, playerId, managerId, isAutoDraft } : p
-      );
-
-      console.log(`[useDraft] ⚡️ Optimistically updating existing pick ${existingPick.id}`);
-      setDraftPicks(optimisticPicks);
-
-      const { error } = await supabase
-        .from('draft_picks')
-        .update({ player_id: playerId, manager_id: managerId, is_auto_draft: isAutoDraft })
-        .eq('id', existingPick.id);
-
-      if (error) {
-        // Revert on error - get fresh state again
-        const freshPicks = useGameStore.getState().draftPicks;
-        setDraftPicks(freshPicks.map(p =>
-          p.id === existingPick.id ? { ...p, playerId: oldPlayerId } : p
-        ));
-        toast.error('Failed to update pick');
-        console.error(error);
-      }
-    } else {
-      // Optimistic insert - create temporary ID
-      const tempId = `temp-${round}-${position}`;
-      const newPick: DraftPick = {
-        id: tempId,
-        leagueId: leagueId!,
-        round,
-        pickPosition: position,
-        managerId,
-        playerId,
-        isAutoDraft,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      // Get latest state
-      const initialPicks = useGameStore.getState().draftPicks;
-      console.log(`[useDraft] ⚡️ Optimistically adding new pick ${tempId}`);
-      setDraftPicks([...initialPicks, newPick]);
-
-      const { data, error } = await supabase
-        .from('draft_picks')
-        .insert({
-          league_id: leagueId!,
-          round,
-          pick_position: position,
-          manager_id: managerId,
-          player_id: playerId,
-          is_auto_draft: isAutoDraft,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        // Revert on error
-        const picksAfterError = useGameStore.getState().draftPicks;
-        setDraftPicks(picksAfterError.filter(p => p.id !== tempId));
-
-        if (error.code === '23505') {
-          console.warn(`[useDraft] ⚠️ Pick already exists in DB for ${round}.${position}. Realtime should fix it.`);
-        } else {
-          toast.error('Failed to make pick');
-          console.error(error);
-        }
-      } else if (data) {
-        // Replace temp pick with real one
-        // CRITICAL: Get latest state again because Realtime might have fired
-        const latestPicks = useGameStore.getState().draftPicks;
-
-        const realPick = mapDbDraftPick(data as unknown as DbDraftPick);
-        const alreadyHasReal = latestPicks.find(p => p.id === realPick.id);
-
-        if (alreadyHasReal) {
-          // Realtime beat us to it. Just remove the temp pick.
-          console.log(`[useDraft] 🔄 Realtime arrived first. Removing temp pick ${tempId}`);
-          setDraftPicks(latestPicks.filter(p => p.id !== tempId));
-        } else {
-          // Replace temp with real
-          console.log(`[useDraft] ✅ Converting temp pick ${tempId} to real pick ${realPick.id}`);
-          setDraftPicks(latestPicks.map(p =>
-            p.id === tempId ? realPick : p
-          ));
-        }
-      }
+    if (error) {
+      toast.error('Failed to make pick: ' + error.message);
+      console.error(error);
     }
-
-    // After a successful pick (optimistic or real), update the timer for the next pick
-    if (draftState?.isActive) {
-      const config = useGameStore.getState().config;
-      const totalPicks = config.managerCount * (config.activeSize + config.benchSize);
-      // We use the store's draftPicks length + 1 (if new) to check if finished
-      const currentPicks = useGameStore.getState().draftPicks;
-      // Note: currentPicks already has the new pick included via opportunistic update
-
-      if (currentPicks.length >= totalPicks) {
-        // Draft finished!
-        finalizeDraft();
-      } else {
-        // Update timer for next pick
-        const newStartAt = new Date().toISOString();
-
-        // Optimistic update for UI responsiveness
-        setDraftState({
-          ...draftState,
-          currentPickStartAt: new Date(newStartAt)
-        });
-
-        await supabase
-          .from('draft_state')
-          .update({ current_pick_start_at: newStartAt })
-          .eq('id', draftState.id);
-      }
-    }
-  }, [draftOrder, getPick, draftState, finalizeDraft, leagueId, setDraftPicks, setDraftState]);
+  }, [leagueId, draftState, draftOrder]);
 
   // Clear a pick
   const clearPick = useCallback(async (round: number, position: number) => {
@@ -465,14 +197,16 @@ export const useDraft = () => {
         .eq('league_id', leagueId);
 
       // Reset draft state
+      const nowIso = new Date().toISOString();
       await supabase
         .from('draft_state')
         .update({
-          is_finalized: false,
-          finalized_at: null,
-          is_active: false,
-          current_pick_start_at: null,
-          paused_at: null
+          status: 'pre_draft',
+          current_round: 1,
+          current_position: 1,
+          last_pick_at: nowIso,
+          paused_at: null,
+          total_paused_duration_ms: 0
         })
         .eq('league_id', leagueId);
 
@@ -482,11 +216,12 @@ export const useDraft = () => {
       if (draftState) {
         setDraftState({
           ...draftState,
-          isFinalized: false,
-          finalizedAt: null,
-          isActive: false,
-          currentPickStartAt: null,
-          pausedAt: null
+          status: 'pre_draft',
+          currentRound: 1,
+          currentPosition: 1,
+          lastPickAt: new Date(nowIso),
+          pausedAt: null,
+          totalPausedDurationMs: 0
         });
       }
 
@@ -600,24 +335,24 @@ export const useDraft = () => {
     }
 
     const startAt = new Date().toISOString();
-    console.log('[useDraft] 📝 Updating draft_state to active...', { id: draftState.id });
+    console.log('[useDraft] 📝 Updating draft_state to active...', { leagueId: draftState.leagueId });
 
     // Optimistic update
     setDraftState({
       ...draftState,
-      isActive: true,
-      currentPickStartAt: new Date(startAt),
+      status: 'active',
+      lastPickAt: new Date(startAt),
       pausedAt: null
     });
 
     const { error } = await supabase
       .from('draft_state')
       .update({
-        is_active: true,
-        current_pick_start_at: startAt,
+        status: 'active',
+        last_pick_at: startAt,
         paused_at: null
       })
-      .eq('id', draftState.id);
+      .eq('league_id', leagueId);
 
     if (error) {
       toast.error('Failed to start draft');
@@ -625,8 +360,8 @@ export const useDraft = () => {
       // Revert
       setDraftState({
         ...draftState,
-        isActive: false,
-        currentPickStartAt: draftState.currentPickStartAt // restore
+        status: draftState.status,
+        lastPickAt: draftState.lastPickAt
       });
     } else {
       console.log('[useDraft] ✅ Draft state successfully updated to active');
@@ -636,24 +371,24 @@ export const useDraft = () => {
 
   // Pause draft
   const pauseDraft = useCallback(async () => {
-    if (!draftState || !draftState.isActive) return;
+    if (!draftState || draftState.status !== 'active') return;
 
     const pausedAt = new Date().toISOString();
 
     // Optimistic update
     setDraftState({
       ...draftState,
-      isActive: false,
+      status: 'paused',
       pausedAt: new Date(pausedAt)
     });
 
     const { error } = await supabase
       .from('draft_state')
       .update({
-        is_active: false,
+        status: 'paused',
         paused_at: pausedAt
       })
-      .eq('id', draftState.id);
+      .eq('league_id', leagueId);
 
     if (error) {
       toast.error('Failed to pause draft');
@@ -661,7 +396,7 @@ export const useDraft = () => {
       // Revert
       setDraftState({
         ...draftState,
-        isActive: true,
+        status: 'active',
         pausedAt: null
       });
     }
@@ -669,33 +404,31 @@ export const useDraft = () => {
 
   // Resume draft
   const resumeDraft = useCallback(async () => {
-    if (!draftState || draftState.isActive) return;
+    if (!draftState || draftState.status !== 'paused') return;
 
-    // Calculate new start at by adding the duration of the pause
-    let newStartAt = new Date();
-    if (draftState.currentPickStartAt && draftState.pausedAt) {
-      const pauseDuration = Date.now() - draftState.pausedAt.getTime();
-      newStartAt = new Date(draftState.currentPickStartAt.getTime() + pauseDuration);
+    // Add pause duration to total
+    let additionalPauseMs = 0;
+    if (draftState.pausedAt) {
+      additionalPauseMs = Date.now() - draftState.pausedAt.getTime();
     }
-
-    const startAtIso = newStartAt.toISOString();
+    const newTotalPausedMs = draftState.totalPausedDurationMs + additionalPauseMs;
 
     // Optimistic update
     setDraftState({
       ...draftState,
-      isActive: true,
-      currentPickStartAt: newStartAt,
-      pausedAt: null
+      status: 'active',
+      pausedAt: null,
+      totalPausedDurationMs: newTotalPausedMs
     });
 
     const { error } = await supabase
       .from('draft_state')
       .update({
-        is_active: true,
-        current_pick_start_at: startAtIso,
-        paused_at: null
+        status: 'active',
+        paused_at: null,
+        total_paused_duration_ms: newTotalPausedMs
       })
-      .eq('id', draftState.id);
+      .eq('league_id', leagueId);
 
     if (error) {
       toast.error('Failed to resume draft');
@@ -703,8 +436,9 @@ export const useDraft = () => {
       // Revert
       setDraftState({
         ...draftState,
-        isActive: false,
-        pausedAt: draftState.pausedAt
+        status: 'paused',
+        pausedAt: draftState.pausedAt,
+        totalPausedDurationMs: draftState.totalPausedDurationMs
       });
     }
   }, [draftState, setDraftState]);
@@ -716,9 +450,9 @@ export const useDraft = () => {
     const { error } = await supabase
       .from('draft_state')
       .update({
-        current_pick_start_at: new Date().toISOString()
+        last_pick_at: new Date().toISOString()
       })
-      .eq('id', draftState.id);
+      .eq('league_id', draftState.leagueId);
 
     if (error) {
       toast.error('Failed to reset clock');
@@ -748,106 +482,47 @@ export const useDraft = () => {
 
   // Get remaining time for current pick (in ms)
   const getRemainingTime = useCallback(() => {
-    const pickData = getCurrentPickData();
-    let timerDuration = 30000; // default 30s
+    if (!draftState || !draftState.lastPickAt) return 0;
 
-    if (pickData?.isAutoDraftEnabled) {
-      timerDuration = 10000;
-    }
-
-    if (!draftState || !draftState.currentPickStartAt) return timerDuration;
+    const timerDurationMs = (draftState.clockDurationSeconds || 60) * 1000;
 
     const now = draftState.pausedAt?.getTime() || Date.now();
-    const elapsed = now - draftState.currentPickStartAt.getTime();
-    return Math.max(0, timerDuration - elapsed);
-  }, [draftState, getCurrentPickData]);
-
-  // Execute an auto-pick
-  const executeAutoPick = useCallback(async (round: number, position: number) => {
-    const slotKey = `${round}-${position}`;
-
-    // Concurrency Lock: Prevent multiple calls for the same slot
-    if (processingPicksRef.current.has(slotKey)) {
-      console.warn(`[useDraft] 🛡️ Pick for ${slotKey} is already in flight. Skipping.`);
-      return;
-    }
-
-    // Secondary check: pick already exists in state
-    const currentPicks = useGameStore.getState().draftPicks;
-    if (currentPicks.some(p => p.round === round && p.pickPosition === position)) {
-      console.warn(`[useDraft] ⚠️ Pick for ${slotKey} already exists in store. Skipping.`);
-      return;
-    }
-
-    console.log(`[useDraft] 🤖 Executing auto-pick for ${slotKey}`);
-    processingPicksRef.current.add(slotKey);
-
-    try {
-      const draftedIds = getDraftedPlayerIds();
-      const available = players.filter(p => !draftedIds.includes(p.id));
-
-      if (available.length === 0) {
-        console.warn('[useDraft] 🤖 Auto-pick failed: No players available');
-        return;
-      }
-
-      const sorted = sortPlayersByPriority(available);
-      const bestPlayer = sorted[0];
-
-      console.log(`[useDraft] 🤖 Auto-picking ${bestPlayer.name} for ${slotKey}`);
-      await makePick(round, position, bestPlayer.id, true);
-    } catch (e) {
-      console.error(`[useDraft] ❌ Auto-pick error for ${slotKey}:`, e);
-    } finally {
-      // Only clear after a small delay to ensure Realtime/State catch up
-      setTimeout(() => {
-        processingPicksRef.current.delete(slotKey);
-      }, 1000);
-    }
-  }, [getDraftedPlayerIds, players, makePick]);
+    const elapsed = now - draftState.lastPickAt.getTime();
+    return Math.max(0, timerDurationMs - elapsed);
+  }, [draftState]);
 
   // Timer side-effect for auto-drafting and empty team handling
   useEffect(() => {
-    if (!draftState?.isActive || draftState?.isFinalized) return;
-    if (draftState?.pausedAt) return;
+    if (draftState?.status !== 'active') return;
 
-    // Calculate current position details once
-    const pickData = getCurrentPickData();
-    if (!pickData) return;
+    const tick = async () => {
+      const pickData = getCurrentPickData();
+      if (!pickData) return;
 
-    const { round, position, orderNode, isAutoDraftEnabled } = pickData;
+      const { orderNode } = pickData;
+      const hasManager = !!orderNode?.managerId;
+      const manager = hasManager ? managers.find(m => m.id === orderNode!.managerId) : null;
+      const shouldImmediatePick = !hasManager || (manager && !manager.userId);
 
-    // Check if the current position has a manager assigned
-    const hasManager = !!orderNode?.managerId;
-
-    // Check if manager is a bot (empty team with no user_id)
-    const manager = hasManager ? managers.find(m => m.id === orderNode!.managerId) : null;
-
-    const isAssignedToUser = !!manager?.userId;
-
-    const shouldImmediatePick = !hasManager || (manager && !manager.userId);
-
-    console.log(`[useDraft] ⏱️ Tick: ${round}.${position} | Manager: ${manager?.teamName || 'None'} | User: ${isAssignedToUser ? 'Yes' : 'No'} | AutoDraft: ${isAutoDraftEnabled} | Immediate: ${shouldImmediatePick}`);
-
-    if (shouldImmediatePick) {
-      console.log(`[useDraft] 👻 No human manager for ${round}.${position}. Executing immediate auto-pick.`);
-      const timeout = setTimeout(() => {
-        executeAutoPick(round, position);
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
-
-    const timer = setInterval(() => {
-      const remaining = getRemainingTime();
-
-      if (remaining <= 0) {
-        console.log(`[useDraft] ⏰ Time up for ${round}.${position}. Triggering auto-pick.`);
-        executeAutoPick(round, position);
+      // If immediate or time is up, trigger the check RPC
+      if (shouldImmediatePick || getRemainingTime() <= 0) {
+        if (!processingPicksRef.current.has('checking')) {
+          processingPicksRef.current.add('checking');
+          try {
+            await supabase.rpc('check_auto_draft', { p_league_id: leagueId! });
+          } catch (e) { console.error(e) }
+          finally {
+            setTimeout(() => processingPicksRef.current.delete('checking'), 2000);
+          }
+        }
       }
-    }, 1000);
+    };
 
+    tick();
+
+    const timer = setInterval(tick, 2000);
     return () => clearInterval(timer);
-  }, [draftState, getRemainingTime, managers, executeAutoPick, getCurrentPickData]);
+  }, [draftState, getRemainingTime, managers, getCurrentPickData, leagueId]);
 
   // Auto-complete all remaining picks
   const autoCompleteAllPicks = useCallback(async () => {
@@ -897,10 +572,46 @@ export const useDraft = () => {
 
       toast.loading(`Auto-drafting ${emptyPicks.length} picks...`, { id: 'auto-draft-all' });
 
-      // Get already drafted player IDs
-      const draftedIds = getDraftedPlayerIds();
+      // 1. Check if we need to randomize order (if any positions lack managers)
+      const missingManagers = draftOrder.some(o => !o.managerId);
+      let effectiveDraftOrder = [...draftOrder];
 
-      // Sort all available players by priority once
+      if (missingManagers) {
+        console.log('[useDraft] 🎲 Some positions missing managers, randomizing first...');
+        const allManagerIds = managers.map(m => m.id);
+        const shuffledIds = [...allManagerIds].sort(() => Math.random() - 0.5);
+
+        const randomizationUpdates = Array.from({ length: managers.length }).map((_, index) => {
+          const position = index + 1;
+          return {
+            league_id: leagueId,
+            position,
+            manager_id: shuffledIds[index]
+          };
+        });
+
+        const { error: randError } = await supabase
+          .from('draft_order')
+          .upsert(randomizationUpdates, { onConflict: 'league_id, position' });
+
+        if (randError) {
+          console.error('[useDraft] ❌ Randomization failed during auto-complete:', randError);
+          toast.error('Failed to randomize order', { id: 'auto-draft-all' });
+          return false;
+        }
+
+        // Update effective order for local pick generation
+        effectiveDraftOrder = randomizationUpdates.map(u => ({
+          id: `temp-${u.position}`,
+          leagueId: u.league_id,
+          position: u.position,
+          managerId: u.manager_id,
+          autoDraftEnabled: false
+        }));
+      }
+
+      // 2. Prepare picks
+      const draftedIds = getDraftedPlayerIds();
       const availablePlayers = players.filter(p => !draftedIds.includes(p.id));
       const sortedPlayers = sortPlayersByPriority(availablePlayers);
 
@@ -911,14 +622,14 @@ export const useDraft = () => {
 
       // Prepare all picks data for batch insert
       const picksToInsert = emptyPicks.map((emptyPick, index) => {
-        const orderItem = draftOrder.find(o => o.position === emptyPick.position);
+        const orderItem = effectiveDraftOrder.find(o => o.position === emptyPick.position);
         const managerId = orderItem?.managerId || null;
         const player = sortedPlayers[index]; // Use index to get unique player
 
         return {
           league_id: leagueId,
           round: emptyPick.round,
-          pick_position: emptyPick.position,
+          pick_number: emptyPick.position,
           manager_id: managerId,
           player_id: player.id,
           is_auto_draft: true,
@@ -944,24 +655,35 @@ export const useDraft = () => {
           id: pick.id,
           leagueId: pick.league_id,
           round: pick.round,
-          pickPosition: pick.pick_position,
+          pickNumber: pick.pick_number,
           managerId: pick.manager_id,
           playerId: pick.player_id,
           isAutoDraft: pick.is_auto_draft,
           createdAt: new Date(pick.created_at),
-          updatedAt: new Date(pick.updated_at),
         }))];
         setDraftPicks(newPicks);
       }
 
-      toast.success(`Successfully auto-drafted ${emptyPicks.length} picks!`, { id: 'auto-draft-all' });
+      // IMPORTANT: After auto-completing all picks, trigger client-side roster finalization
+      console.log(`[useDraft] 🏁 Auto-draft complete, finalizing rosters for ${leagueId}`);
+      const { success, error: finalizeError } = await finalizeRosters(leagueId);
+
+      if (!success) {
+        console.error('[useDraft] Roster finalization error:', finalizeError);
+        toast.error('Draft complete, but roster optimization failed. Please refresh.');
+        return false;
+      } else {
+        toast.success('Draft complete! Rosters have been optimized.');
+      }
+
+      toast.success(`Successfully auto-drafted ${emptyPicks.length} picks and finalized draft!`, { id: 'auto-draft-all' });
       return true;
     } catch (error) {
       console.error('[useDraft] Auto-complete error:', error);
       toast.error('Failed to auto-complete draft', { id: 'auto-draft-all' });
       return false;
     }
-  }, [leagueId, getPick, getDraftedPlayerIds, players, draftOrder, setDraftPicks]);
+  }, [leagueId, getPick, getDraftedPlayerIds, players, draftOrder, setDraftPicks, finalizeRosters]);
 
 
   return {
@@ -976,7 +698,6 @@ export const useDraft = () => {
     assignManagerToPosition,
     makePick,
     clearPick,
-    finalizeDraft,
     resetDraft,
     randomizeDraftOrder,
     toggleAutoDraft,
@@ -985,7 +706,6 @@ export const useDraft = () => {
     resumeDraft,
     resetClock,
     getRemainingTime,
-    executeAutoPick,
     autoCompleteAllPicks,
   };
 };

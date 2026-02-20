@@ -99,6 +99,7 @@ export interface GameState {
   updateCurrentWeek: (week: number) => Promise<{ success: boolean; error?: string }>;
   setCaptain: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
   setViceCaptain: (managerId: string, playerId: string) => Promise<RosterMoveResult>;
+  finalizeRosters: (leagueId: string) => Promise<{ success: boolean; error?: string }>;
 
   // Data fetching
   fetchAllData: (leagueId: string) => Promise<void>;

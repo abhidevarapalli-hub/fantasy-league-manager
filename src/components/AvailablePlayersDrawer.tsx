@@ -396,7 +396,7 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
                         key={player.id}
                         onClick={() => onSelectPlayer ? onSelectPlayer(player.id) : setDetailPlayer(player)}
                         className={cn(
-                          "cursor-pointer transition-transform hover:scale-[1.02]",
+                          "cursor-pointer transition-all",
                           onSelectPlayer && "hover:ring-2 hover:ring-primary rounded-lg"
                         )}
                       >
