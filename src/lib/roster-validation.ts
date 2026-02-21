@@ -396,12 +396,19 @@ export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig 
     if (tryAdd(bw)) batWkCount++;
   }
 
-  // 5. Fill ANY REMAINING ACTIVE SLOTS with remaining players (regardless of role)
-  // until active roster is full OR we run out of valid players (intl cap check still applies)
+  // 5. Fill FLEX SLOTS with remaining players
+  // Flex slots = total active size - sum of mandatory minimums
+  const totalMandatoryMin = config.minBatWk + config.minAllRounders + config.minBowlers;
+  const flexSlotCapacity = Math.max(0, config.activeSize - totalMandatoryMin);
+
+  // Count how many "extra" players we've already added that weren't strictly mandatory
+  // Wait, the way we added them above, everyone added was mandatory.
+  // So we have exactly flexSlotCapacity slots to fill.
+  let flexFilled = 0;
   const remainingPotentialActive = sortedAllPlayers.filter(p => !assignedIds.has(p.id));
   for (const p of remainingPotentialActive) {
-    if (active.length >= config.activeSize) break;
-    tryAdd(p);
+    if (flexFilled >= flexSlotCapacity) break;
+    if (tryAdd(p)) flexFilled++;
   }
 
   // 6. Everything else goes to bench

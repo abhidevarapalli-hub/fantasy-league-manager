@@ -195,24 +195,42 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_draft_state public.draft_state%ROWTYPE;
-  v_time_passed INTERVAL;
+  v_current_manager_id UUID;
+  v_current_user_id UUID;
+  v_threshold_seconds INTEGER;
+  v_elapsed_seconds FLOAT;
   v_auto_player UUID;
-  v_current_manager UUID;
 BEGIN
-  -- Non-blocking check first
+  -- 1. Get current draft state
   SELECT * INTO v_draft_state FROM public.draft_state WHERE league_id = p_league_id;
   
   IF v_draft_state.status != 'active' THEN
     RETURN jsonb_build_object('success', false, 'reason', 'not active');
   END IF;
 
-  v_time_passed := NOW() - v_draft_state.last_pick_at;
+  -- 2. Find who is on the clock
+  SELECT do.manager_id, m.user_id 
+  INTO v_current_manager_id, v_current_user_id
+  FROM public.draft_order do
+  LEFT JOIN public.managers m ON m.id = do.manager_id
+  WHERE do.league_id = p_league_id 
+    AND do.position = v_draft_state.current_position;
+
+  -- 3. Determine threshold
+  -- Logic: If no manager assigned OR manager has no user_id (CPU), use 3s.
+  -- Otherwise use the regular clock duration.
+  IF v_current_manager_id IS NULL OR v_current_user_id IS NULL THEN
+    v_threshold_seconds := 3;
+  ELSE
+    v_threshold_seconds := v_draft_state.clock_duration_seconds;
+  END IF;
+
+  -- 4. Calculate elapsed time (accounting for paused duration)
+  v_elapsed_seconds := EXTRACT(EPOCH FROM (NOW() - v_draft_state.last_pick_at)) - (v_draft_state.total_paused_duration_ms / 1000.0);
   
-  -- If time has exceeded clock duration + 1 sec buffer
-  IF EXTRACT(EPOCH FROM v_time_passed) > (v_draft_state.clock_duration_seconds + 1) THEN
-     -- Time expired! Lock and auto-pick.
-     
-     -- Find best available player (naive heuristic: highest id for now or first available)
+  -- 5. Trigger auto-pick if time expired
+  IF v_elapsed_seconds > v_threshold_seconds THEN
+     -- Find best available player
      SELECT p.id INTO v_auto_player
      FROM public.league_players p
      WHERE p.league_id = p_league_id 
@@ -220,10 +238,11 @@ BEGIN
      LIMIT 1;
 
      IF v_auto_player IS NOT NULL THEN
-       RETURN public.execute_draft_pick(p_league_id, NULL, v_auto_player, true);
+       -- Use execute_draft_pick to handle state updates & roster insertion
+       RETURN public.execute_draft_pick(p_league_id, v_current_manager_id, v_auto_player, true);
      END IF;
   END IF;
 
-  RETURN jsonb_build_object('success', false, 'reason', 'time not expired');
+  RETURN jsonb_build_object('success', false, 'reason', 'time not expired', 'elapsed', v_elapsed_seconds, 'threshold', v_threshold_seconds);
 END;
 $$;

@@ -629,8 +629,8 @@ export const useDraft = () => {
 
       // Prepare all picks data for batch insert
       const picksToInsert = emptyPicks.map((emptyPick, index) => {
-        const orderItem = effectiveDraftOrder.find(o => o.position === emptyPick.position);
-        const managerId = orderItem?.managerId || null;
+        // Find the manager assigned to this position in the effective order
+        const managerId = effectiveDraftOrder.find(o => o.position === emptyPick.position)?.managerId || null;
         const player = sortedPlayers[index]; // Use index to get unique player
 
         return {
