@@ -32,6 +32,7 @@ jobs:
   deploy:
     name: Deploy to Production
     needs: validate
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -52,3 +53,9 @@ jobs:
         run: |
           echo "Migrations deployed successfully to production"
           echo "Project: ${{ secrets.SUPABASE_PROJECT_REF }}"
+      - name: Deployment summary
+        run: |
+          echo "## Migration Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
