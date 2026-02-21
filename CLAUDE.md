@@ -122,6 +122,7 @@ Requires `VITE_RAPIDAPI_KEY` in `.env.local`. The flag `VITE_USE_LIVE_API=true` 
 - `npm run dev:full:live` — Start Supabase + Vite with live API
 - `npm run supabase:reset` — Drop and recreate local DB (re-applies migrations + seed)
 - `npm run supabase:status` — Show local Supabase URLs and keys
+- `npm run supabase:migration -- <name>` — Create a new migration with a timestamp-safe filename (always use this instead of creating migration files manually)
 - `npm run supabase:stop` — Stop local Docker containers
 - `npm run supabase:functions` — Serve edge functions locally
 - Supabase Studio: http://127.0.0.1:54323
