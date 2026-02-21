@@ -343,6 +343,9 @@ export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig 
   const STRICT_MAX_INTL = 4;
   let internationalCount = 0;
 
+  // Sort all players by a priority (e.g. name or ID) to ensure deterministic results
+  const sortedAllPlayers = [...allPlayers].sort((a, b) => a.id.localeCompare(b.id));
+
   // Track players already assigned to active
   const assignedIds = new Set<string>();
 
@@ -352,6 +355,7 @@ export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig 
 
   const tryAdd = (player: Player): boolean => {
     if (assignedIds.has(player.id)) return false;
+    if (active.length >= config.activeSize) return false;
     if (!canAddIntl(player)) return false;
 
     active.push(player);
@@ -362,14 +366,14 @@ export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig 
 
   // 1. Fill Mandatory WK (if required)
   if (config.requireWk) {
-    const wks = allPlayers.filter(p => p.role === 'Wicket Keeper' && !assignedIds.has(p.id));
+    const wks = sortedAllPlayers.filter(p => p.role === 'Wicket Keeper' && !assignedIds.has(p.id));
     for (const wk of wks) {
-      if (tryAdd(wk)) break; // Just need one
+      if (tryAdd(wk)) break; // Just need one for mandatory check
     }
   }
 
   // 2. Fill Mandatory Bowlers
-  const bowlers = allPlayers.filter(p => p.role === 'Bowler' && !assignedIds.has(p.id));
+  const bowlers = sortedAllPlayers.filter(p => p.role === 'Bowler' && !assignedIds.has(p.id));
   let bowlersAdded = active.filter(p => p.role === 'Bowler').length;
   for (const b of bowlers) {
     if (bowlersAdded >= config.minBowlers) break;
@@ -377,7 +381,7 @@ export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig 
   }
 
   // 3. Fill Mandatory All Rounders
-  const allRounders = allPlayers.filter(p => p.role === 'All Rounder' && !assignedIds.has(p.id));
+  const allRounders = sortedAllPlayers.filter(p => p.role === 'All Rounder' && !assignedIds.has(p.id));
   let arAdded = active.filter(p => p.role === 'All Rounder').length;
   for (const ar of allRounders) {
     if (arAdded >= config.minAllRounders) break;
@@ -385,44 +389,23 @@ export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig 
   }
 
   // 4. Fill Mandatory Batsmen/WKs
-  const batWks = allPlayers.filter(p => (p.role === 'Batsman' || p.role === 'Wicket Keeper') && !assignedIds.has(p.id));
+  const batWks = sortedAllPlayers.filter(p => (p.role === 'Batsman' || p.role === 'Wicket Keeper') && !assignedIds.has(p.id));
   let batWkCount = active.filter(p => p.role === 'Batsman' || p.role === 'Wicket Keeper').length;
   for (const bw of batWks) {
     if (batWkCount >= config.minBatWk) break;
     if (tryAdd(bw)) batWkCount++;
   }
 
-  // 5. Fill Flex Slots
-  // Total mandatory slots are defined by config
-  const totalMandatoryNeeded = config.minBatWk + config.minAllRounders + config.minBowlers;
-  // If requireWk is true, it's already part of minBatWk technically, 
-  // but let's be careful. In this app, Wicket Keeper IS a role that counts towards minBatWk.
-
-  const totalSlots = config.activeSize;
-  const flexSlotsAvailable = totalSlots - totalMandatoryNeeded;
-
-  if (flexSlotsAvailable > 0) {
-    const remainingPlayers = allPlayers.filter(p => !assignedIds.has(p.id));
-    let flexFilled = 0;
-    for (const p of remainingPlayers) {
-      if (flexFilled >= flexSlotsAvailable) break;
-      // Note: we don't use tryAdd here because we want to cap at flexSlotsAvailable
-      // but tryAdd checks active.length < config.activeSize, which might be bigger 
-      // if we have vacant mandatory slots. 
-      // Actually, if we have vacant mandatory slots, we SHOULD NOT fill them with 
-      // players of other roles yet. We only fill the "Flex" portion of the roster.
-
-      if (canAddIntl(p)) {
-        active.push(p);
-        assignedIds.add(p.id);
-        if (p.isInternational) internationalCount++;
-        flexFilled++;
-      }
-    }
+  // 5. Fill ANY REMAINING ACTIVE SLOTS with remaining players (regardless of role)
+  // until active roster is full OR we run out of valid players (intl cap check still applies)
+  const remainingPotentialActive = sortedAllPlayers.filter(p => !assignedIds.has(p.id));
+  for (const p of remainingPotentialActive) {
+    if (active.length >= config.activeSize) break;
+    tryAdd(p);
   }
 
-  // Everything else goes to bench
-  for (const p of allPlayers) {
+  // 6. Everything else goes to bench
+  for (const p of sortedAllPlayers) {
     if (!assignedIds.has(p.id)) {
       bench.push(p);
     }

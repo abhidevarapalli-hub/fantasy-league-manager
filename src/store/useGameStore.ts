@@ -863,6 +863,7 @@ export const useGameStore = create<GameState>()(
 
       finalizeRosters: async (leagueId) => {
         const { config, currentWeek, players } = get();
+        console.log(`[useGameStore] 🏁 Starting roster finalization for league: ${leagueId}`);
 
         try {
           // 1. Fetch current rosters for all managers in this league
@@ -871,7 +872,10 @@ export const useGameStore = create<GameState>()(
             .select("*")
             .eq("league_id", leagueId);
 
-          if (fetchError) return { success: false, error: fetchError.message };
+          if (fetchError) {
+            console.error("[useGameStore] ❌ Error fetching roster entries:", fetchError);
+            return { success: false, error: fetchError.message };
+          }
 
           // 2. Fetch all managers
           const { data: managersData, error: managersError } = await supabase
@@ -879,12 +883,16 @@ export const useGameStore = create<GameState>()(
             .select("*")
             .eq("league_id", leagueId);
 
-          if (managersError) return { success: false, error: managersError.message };
+          if (managersError) {
+            console.error("[useGameStore] ❌ Error fetching managers:", managersError);
+            return { success: false, error: managersError.message };
+          }
 
-          // 3. Process each manager separately
-          for (const manager of managersData) {
+          console.log(`[useGameStore] 👤 Processing ${managersData.length} managers...`);
+
+          // 3. Process all managers in parallel
+          const processingPromises = managersData.map(async (manager) => {
             // Get all unique players this manager has across all weeks
-            // Use week 1 if draft is pre-draft or ongoing, otherwise use currentWeek
             const baselineWeek = Math.max(1, currentWeek);
             const playerIds = Array.from(new Set(
               (allRosterEntries as Tables<'manager_roster'>[])
@@ -896,21 +904,16 @@ export const useGameStore = create<GameState>()(
               .map(id => players.find(p => p.id === id))
               .filter(Boolean) as Player[];
 
-            if (managerPlayers.length === 0) continue;
+            if (managerPlayers.length === 0) {
+              console.log(`[useGameStore] ⏩ Skipping manager ${manager.team_name} (no players)`);
+              return;
+            }
 
             const { active, bench } = buildOptimalActive11(managerPlayers, config);
+            console.log(`[useGameStore] ⚙️ Optimized ${manager.team_name}: ${active.length} active, ${bench.length} bench`);
 
-            // Prepare list of player IDs for active and bench
-            const activeIds = new Set(active.map(p => p.id));
-            const benchIds = new Set(bench.map(p => p.id));
-
-            // To be simple, we update all weeks 1-7
-            // This ensures future weeks are also correct if they were pre-populated
             const upsertData = [];
             for (let week = 1; week <= 7; week++) {
-              // Note: We only update if the player is still with this manager in that specific week
-              // but for a fresh draft finalize, everything is consistent.
-
               active.forEach((p, idx) => {
                 upsertData.push({
                   league_id: leagueId,
@@ -919,8 +922,6 @@ export const useGameStore = create<GameState>()(
                   slot_type: 'active',
                   position: idx,
                   week: week,
-                  // Preserve captaincy if possible or reset? Let's reset for now to be safe, 
-                  // or better, if they are already captain keep them. 
                 });
               });
 
@@ -937,24 +938,28 @@ export const useGameStore = create<GameState>()(
             }
 
             if (upsertData.length > 0) {
-              // Batch upsert for this manager
               const { error: upsertError } = await supabase
                 .from("manager_roster")
                 .upsert(upsertData, { onConflict: 'player_id,league_id,week' });
 
               if (upsertError) {
-                console.error(`Error finalizing roster for manager ${manager.id}:`, upsertError);
+                console.error(`[useGameStore] ❌ Error finalizing roster for manager ${manager.team_name}:`, upsertError);
               }
             }
-          }
+          });
+
+          await Promise.all(processingPromises);
 
           // Refresh store data for the currently selected week
           const { selectedRosterWeek: rw, currentLeagueId: rl } = get();
-          if (rl) await get().fetchRosterForWeek(rl, rw);
+          if (rl) {
+            console.log(`[useGameStore] 🔄 Refreshing rosters for week ${rw}...`);
+            await get().fetchRosterForWeek(rl, rw);
+          }
 
           return { success: true };
         } catch (e) {
-          console.error('Exception in finalizeRosters:', e);
+          console.error('[useGameStore] ❌ Exception in finalizeRosters:', e);
           return { success: false, error: e instanceof Error ? e.message : String(e) };
         }
       },
@@ -1213,9 +1218,31 @@ export const useGameStore = create<GameState>()(
               set({ draftOrder: get().draftOrder.filter(o => o.id !== payload.old.id) });
             }
           })
-          .on("postgres_changes", { event: "*", schema: "public", table: "draft_state", filter }, (payload) => {
+          .on("postgres_changes", { event: "*", schema: "public", table: "draft_state", filter }, async (payload) => {
             if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-              set({ draftState: mapDbDraftState(payload.new) });
+              const newState = mapDbDraftState(payload.new);
+              const oldStatus = get().draftState?.status;
+
+              set({ draftState: newState });
+
+              // If draft just finished, trigger global finalization
+              if (newState.status === 'completed' && oldStatus !== 'completed') {
+                console.log(`[useGameStore] 🏁 Draft COMPLETED for league ${leagueId}. Finalizing rosters...`);
+                toast.success("Draft completed! Optimizing rosters...");
+
+                try {
+                  const { success, error } = await get().finalizeRosters(leagueId);
+                  if (success) {
+                    console.log("[useGameStore] ✅ Rosters optimized successfully after draft.");
+                    // After optimization, do one last full fetch to ensure sync
+                    await get().fetchAllData(leagueId);
+                  } else {
+                    console.error("[useGameStore] ❌ Roster optimization failed:", error);
+                  }
+                } catch (e) {
+                  console.error("[useGameStore] ❌ Exception during draft finalization:", e);
+                }
+              }
             }
           })
           .subscribe((status, err) => {

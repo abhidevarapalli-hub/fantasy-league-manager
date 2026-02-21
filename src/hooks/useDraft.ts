@@ -95,8 +95,13 @@ export const useDraft = () => {
 
   // Get pick for a specific round and position
   const getPick = useCallback((round: number, position: number) => {
-    return draftPicks.find(p => p.round === round && p.pickNumber === position) || null;
-  }, [draftPicks]);
+    const managerCount = managers.length;
+    if (managerCount === 0) return null;
+
+    // In database, pick_number is global: ((round-1) * managerCount) + position
+    const globalPickNumber = ((round - 1) * managerCount) + position;
+    return draftPicks.find(p => p.round === round && p.pickNumber === globalPickNumber) || null;
+  }, [draftPicks, managers.length]);
 
   // Get player for a pick
   const getPlayerForPick = useCallback((pick: DraftPick | null) => {
@@ -171,6 +176,8 @@ export const useDraft = () => {
   const clearPick = useCallback(async (round: number, position: number) => {
     const existingPick = getPick(round, position);
     if (!existingPick) return;
+
+    console.log(`[useDraft] 🗑️ Clearing pick: Round ${round}, Pos ${position}`);
 
     const { error } = await supabase
       .from('draft_picks')
@@ -487,7 +494,7 @@ export const useDraft = () => {
     const timerDurationMs = (draftState.clockDurationSeconds || 60) * 1000;
 
     const now = draftState.pausedAt?.getTime() || Date.now();
-    const elapsed = now - draftState.lastPickAt.getTime();
+    const elapsed = (now - draftState.lastPickAt.getTime()) - (draftState.totalPausedDurationMs || 0);
     return Math.max(0, timerDurationMs - elapsed);
   }, [draftState]);
 
@@ -648,8 +655,9 @@ export const useDraft = () => {
         return false;
       }
 
-      // Manually refresh draft picks to update UI immediately
+      // Manually refresh draft picks locally to update UI immediately
       if (data) {
+        console.log(`[useDraft] 🔄 Refreshing local picks after batch insert...`);
         const freshPicks = useGameStore.getState().draftPicks;
         const newPicks = [...freshPicks, ...data.map(pick => ({
           id: pick.id,
@@ -664,19 +672,29 @@ export const useDraft = () => {
         setDraftPicks(newPicks);
       }
 
-      // IMPORTANT: After auto-completing all picks, trigger client-side roster finalization
-      console.log(`[useDraft] 🏁 Auto-draft complete, finalizing rosters for ${leagueId}`);
+      // 3. Sync database rosters and state using RPC
+      console.log(`[useDraft] 🔗 Syncing league rosters and state via RPC...`);
+      const { error: syncError } = await supabase.rpc('sync_league_rosters', {
+        p_league_id: leagueId
+      });
+
+      if (syncError) {
+        console.error('[useDraft] ❌ Error syncing league rosters:', syncError);
+        toast.error('Failed to sync rosters. Please refresh.', { id: 'auto-draft-all' });
+        return false;
+      }
+
+      // IMPORTANT: After database is synced, trigger client-side roster optimization
+      console.log(`[useDraft] 🏁 Sync complete, optimizing rosters for ${leagueId}`);
       const { success, error: finalizeError } = await finalizeRosters(leagueId);
 
       if (!success) {
-        console.error('[useDraft] Roster finalization error:', finalizeError);
-        toast.error('Draft complete, but roster optimization failed. Please refresh.');
+        console.error('[useDraft] Roster optimization error:', finalizeError);
+        toast.error('Draft complete, but roster optimization failed. Please refresh.', { id: 'auto-draft-all' });
         return false;
-      } else {
-        toast.success('Draft complete! Rosters have been optimized.');
       }
 
-      toast.success(`Successfully auto-drafted ${emptyPicks.length} picks and finalized draft!`, { id: 'auto-draft-all' });
+      toast.success(`Successfully finalized draft for all teams!`, { id: 'auto-draft-all' });
       return true;
     } catch (error) {
       console.error('[useDraft] Auto-complete error:', error);

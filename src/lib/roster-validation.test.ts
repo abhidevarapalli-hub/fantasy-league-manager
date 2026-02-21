@@ -47,8 +47,8 @@ describe('buildOptimalActive11', () => {
         expect(bench).toHaveLength(1);
         expect(active.filter(p => p.role === 'Wicket Keeper')).toHaveLength(1);
         expect(active.filter(p => p.role === 'Batsman')).toHaveLength(4);
-        expect(active.filter(p => p.role === 'All Rounder')).toHaveLength(2);
-        expect(active.filter(p => p.role === 'Bowler')).toHaveLength(4); // 3 mandatory + 1 flex
+        expect(active.filter(p => p.role === 'All Rounder')).toHaveLength(3); // 2 mandatory + 1 flex (id: 5, 6, 12)
+        expect(active.filter(p => p.role === 'Bowler')).toHaveLength(3); // 3 mandatory (id: 7, 8, 9), flex was filled by AR (id: 11 goes to bench)
     });
 
     it('leaves vacant spots if requirements are not met', () => {

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Player } from '@/lib/supabase-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RosterGrid } from '@/components/RosterGrid';
 import { buildOptimalActive11 } from '@/lib/roster-validation';
 import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
@@ -55,12 +56,21 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
   const managers = useGameStore(state => state.managers);
   const draftPicks = useGameStore(state => state.draftPicks);
   const config = useGameStore(state => state.config);
+  const currentManagerId = useGameStore(state => state.currentManagerId);
 
+  const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
   const [drawerHeight, setDrawerHeight] = useState(60); // percentage of vh
   const [isDragging, setIsDragging] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Initialize selectedManagerId to currentManagerId
+  useEffect(() => {
+    if (isExpanded && !selectedManagerId && managers.length > 0) {
+      setSelectedManagerId(currentManagerId || managers[0].id);
+    }
+  }, [isExpanded, managers, currentManagerId, selectedManagerId]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -187,6 +197,12 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
       };
     });
   }, [managers, draftPicks, players, config]);
+
+  const selectedManager = useMemo(() =>
+    displayManagers.find(m => m.id === selectedManagerId) ||
+    (displayManagers.length > 0 ? displayManagers[0] : null),
+    [displayManagers, selectedManagerId]
+  );
 
   return (
     <>
@@ -414,39 +430,63 @@ export const AvailablePlayersDrawer = ({ draftedPlayerIds, onSelectPlayer }: Ava
               </div>
             </TabsContent>
 
-            <TabsContent value="rosters" className="flex-1 overflow-y-auto w-full data-[state=active]:flex flex-col mt-0 pb-[env(safe-area-inset-bottom)] p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
-                {displayManagers.map(manager => (
-                  <div key={manager.id} className="min-h-[400px] space-y-2 flex flex-col bg-card/30 rounded-xl border border-border/50 p-2">
-                    <div className="flex justify-between items-center py-1 border-b px-1">
-                      <h3 className="font-bold text-sm truncate max-w-[70%]">
-                        {manager.teamName}
-                        {(manager as unknown as ManagerWithDebug)._debugInfo && (
+            <TabsContent value="rosters" className="flex-1 overflow-hidden w-full data-[state=active]:flex flex-col mt-0 pb-[env(safe-area-inset-bottom)]">
+              {/* Team Selector Row */}
+              <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between flex-shrink-0">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Viewing Team</span>
+                <Select
+                  value={selectedManagerId || undefined}
+                  onValueChange={setSelectedManagerId}
+                >
+                  <SelectTrigger className="w-[200px] h-8 text-xs">
+                    <SelectValue placeholder="Select Team" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[70]">
+                    {displayManagers.map(m => (
+                      <SelectItem key={m.id} value={m.id} className="text-xs">
+                        {m.teamName} {m.id === currentManagerId ? '(You)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Single Team Roster View */}
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                {selectedManager ? (
+                  <div className="max-w-md mx-auto space-y-4">
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <h3 className="font-bold text-base">
+                        {selectedManager.teamName}
+                        {(selectedManager as unknown as ManagerWithDebug)._debugInfo && (
                           <span className="text-[10px] ml-2 text-yellow-500 font-mono">
-                            P:{(manager as unknown as ManagerWithDebug)._debugInfo.picks}/
-                            R:{(manager as unknown as ManagerWithDebug)._debugInfo.resolved}
-                            Activ:{(manager as unknown as ManagerWithDebug)._debugInfo.active}/
-                            ActCfg:{(manager as unknown as ManagerWithDebug)._debugInfo.cfgActive}
-                            Bnch:{(manager as unknown as ManagerWithDebug)._debugInfo.bench}/
-                            BnchCfg:{(manager as unknown as ManagerWithDebug)._debugInfo.cfgBench}
+                            P:{(selectedManager as unknown as ManagerWithDebug)._debugInfo.picks}/
+                            R:{(selectedManager as unknown as ManagerWithDebug)._debugInfo.resolved}
+                            Activ:{(selectedManager as unknown as ManagerWithDebug)._debugInfo.active}/
+                            ActCfg:{(selectedManager as unknown as ManagerWithDebug)._debugInfo.cfgActive}
+                            Bnch:{(selectedManager as unknown as ManagerWithDebug)._debugInfo.bench}/
+                            BnchCfg:{(selectedManager as unknown as ManagerWithDebug)._debugInfo.cfgBench}
                           </span>
                         )}
                       </h3>
-                      <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full whitespace-nowrap">
-                        {(manager.activeRoster?.length || 0) + (manager.bench?.length || 0)} / {config.activeSize + config.benchSize}
+                      <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">
+                        {(selectedManager.activeRoster?.length || 0) + (selectedManager.bench?.length || 0)} / {config.activeSize + config.benchSize} Players
                       </span>
                     </div>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
-                      <RosterGrid
-                        manager={manager}
-                        config={config}
-                        players={players}
-                        compact={false}
-                        onPlayerClick={setDetailPlayer}
-                      />
-                    </div>
+
+                    <RosterGrid
+                      manager={selectedManager}
+                      config={config}
+                      players={players}
+                      compact={false}
+                      onPlayerClick={setDetailPlayer}
+                    />
                   </div>
-                ))}
+                ) : (
+                  <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                    No team selected
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>

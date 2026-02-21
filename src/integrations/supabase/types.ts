@@ -459,74 +459,6 @@ export type Database = {
           },
         ]
       }
-      league_matchups: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_finalized: boolean
-          league_id: string
-          manager1_id: string
-          manager1_score: number | null
-          manager2_id: string | null
-          manager2_score: number | null
-          week: number
-          winner_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_finalized?: boolean
-          league_id: string
-          manager1_id: string
-          manager1_score?: number | null
-          manager2_id?: string | null
-          manager2_score?: number | null
-          week: number
-          winner_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_finalized?: boolean
-          league_id?: string
-          manager1_id?: string
-          manager1_score?: number | null
-          manager2_id?: string | null
-          manager2_score?: number | null
-          week?: number
-          winner_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_schedules_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_manager1_id_fkey"
-            columns: ["manager1_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_manager2_id_fkey"
-            columns: ["manager2_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "league_schedules_winner_id_fkey"
-            columns: ["winner_id"]
-            isOneToOne: false
-            referencedRelation: "managers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       league_player_match_scores: {
         Row: {
           batting_points: number
@@ -686,7 +618,7 @@ export type Database = {
           },
         ]
       }
-      league_schedules: {
+      league_matchups: {
         Row: {
           created_at: string | null
           id: string
@@ -725,28 +657,28 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "league_schedules_league_id_fkey"
+            foreignKeyName: "league_matchups_league_id_fkey"
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "leagues"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "league_schedules_manager1_id_fkey"
+            foreignKeyName: "league_matchups_manager1_id_fkey"
             columns: ["manager1_id"]
             isOneToOne: false
             referencedRelation: "managers"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "league_schedules_manager2_id_fkey"
+            foreignKeyName: "league_matchups_manager2_id_fkey"
             columns: ["manager2_id"]
             isOneToOne: false
             referencedRelation: "managers"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "league_schedules_winner_id_fkey"
+            foreignKeyName: "league_matchups_winner_id_fkey"
             columns: ["winner_id"]
             isOneToOne: false
             referencedRelation: "managers"
@@ -763,22 +695,22 @@ export type Database = {
           league_manager_id: string | null
           league_manager_username: string | null
           manager_count: number
-          max_all_rounders: number
-          max_bat_wk: number
+          max_all_rounders: number | null
           max_batsmen: number
-          max_bowlers: number
+          max_bowlers: number | null
           max_from_team: number | null
           max_international: number
+          max_wks: number | null
           min_all_rounders: number
-          min_bat_wk: number
           min_batsmen: number
           min_bowlers: number
           min_wks: number
           name: string
-          require_wk: boolean
           tournament_id: number | null
           tournament_name: string | null
           updated_at: string
+          min_bat_wk: number | null
+          require_wk: boolean | null
         }
         Insert: {
           active_size?: number
@@ -788,22 +720,22 @@ export type Database = {
           league_manager_id?: string | null
           league_manager_username?: string | null
           manager_count?: number
-          max_all_rounders?: number
-          max_bat_wk?: number
+          max_all_rounders?: number | null
           max_batsmen?: number
-          max_bowlers?: number
+          max_bowlers?: number | null
           max_from_team?: number | null
           max_international?: number
+          max_wks?: number | null
           min_all_rounders?: number
-          min_bat_wk?: number
           min_batsmen?: number
           min_bowlers?: number
           min_wks?: number
           name: string
-          require_wk?: boolean
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
+          min_bat_wk?: number | null
+          require_wk?: boolean | null
         }
         Update: {
           active_size?: number
@@ -813,22 +745,22 @@ export type Database = {
           league_manager_id?: string | null
           league_manager_username?: string | null
           manager_count?: number
-          max_all_rounders?: number
-          max_bat_wk?: number
+          max_all_rounders?: number | null
           max_batsmen?: number
-          max_bowlers?: number
+          max_bowlers?: number | null
           max_from_team?: number | null
           max_international?: number
+          max_wks?: number | null
           min_all_rounders?: number
-          min_bat_wk?: number
           min_batsmen?: number
           min_bowlers?: number
           min_wks?: number
           name?: string
-          require_wk?: boolean
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
+          min_bat_wk?: number | null
+          require_wk?: boolean | null
         }
         Relationships: []
       }
@@ -926,38 +858,38 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          is_captain: boolean
-          is_vice_captain: boolean
           league_id: string
           manager_id: string
           player_id: string
           position: number
           slot_type: string
           week: number
+          is_captain: boolean
+          is_vice_captain: boolean
         }
         Insert: {
           created_at?: string | null
           id?: string
-          is_captain?: boolean
-          is_vice_captain?: boolean
           league_id: string
           manager_id: string
           player_id: string
           position?: number
           slot_type: string
           week?: number
+          is_captain?: boolean
+          is_vice_captain?: boolean
         }
         Update: {
           created_at?: string | null
           id?: string
-          is_captain?: boolean
-          is_vice_captain?: boolean
           league_id?: string
           manager_id?: string
           player_id?: string
           position?: number
           slot_type?: string
           week?: number
+          is_captain?: boolean
+          is_vice_captain?: boolean
         }
         Relationships: [
           {
@@ -1955,6 +1887,12 @@ export type Database = {
           p_league_id: string
           p_manager_id: string
           p_player_id: string
+        }
+        Returns: Json
+      }
+      sync_league_rosters: {
+        Args: {
+          p_league_id: string
         }
         Returns: Json
       }
