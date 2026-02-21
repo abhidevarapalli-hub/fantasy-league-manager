@@ -1,6 +1,4 @@
 export { ScoreInput } from './ScoreInput';
-export { StatsImport } from './StatsImport';
-export { PlayerMapping } from './PlayerMapping';
 export { AddNewPlayer } from './AddNewPlayer';
 export { RemovePlayer } from './RemovePlayer';
 export { RosterManagement } from './RosterManagement';

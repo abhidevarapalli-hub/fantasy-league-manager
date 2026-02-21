@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useGameStore } from '@/store/useGameStore';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, Loader2, ChevronRight, Trash2, UserCircle, LogOut, Users } from 'lucide-react';
+import { PlusCircle, Loader2, ChevronRight, Trash2, UserCircle, LogOut, Users, Shield } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 
 import { toast } from 'sonner';
@@ -28,6 +28,7 @@ const Leagues = () => {
     const userProfile = useAuthStore(state => state.userProfile);
     const signOut = useAuthStore(state => state.signOut);
     const isLoading = useAuthStore(state => state.isLoading);
+    const isPlatformAdmin = useAuthStore(state => state.userProfile?.is_platform_admin || false);
     const isLeaguesInitialized = useGameStore(state => state.isLeaguesInitialized);
     const setIsLeaguesInitialized = useGameStore(state => state.setIsLeaguesInitialized);
 
@@ -196,10 +197,18 @@ const Leagues = () => {
                         <p className="font-bold text-foreground">@{userProfile?.username || 'user'}</p>
                     </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2">
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                </Button>
+                <div className="flex items-center gap-2">
+                    {isPlatformAdmin && (
+                        <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-muted-foreground hover:text-primary hover:bg-primary/5 gap-2">
+                            <Shield className="w-4 h-4" />
+                            Admin
+                        </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2">
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                    </Button>
+                </div>
             </div>
 
             <div className="max-w-4xl w-full space-y-12 p-6 py-12">

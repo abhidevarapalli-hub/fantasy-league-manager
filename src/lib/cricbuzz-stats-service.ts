@@ -6,6 +6,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { calculateFantasyPoints, type PlayerStats } from './fantasy-points-calculator';
 import type { ScoringRules } from './scoring-types';
+import { mergeScoringRules } from './scoring-types';
 
 // Types for Cricbuzz API responses
 export interface CricbuzzBatsman {
@@ -679,6 +680,289 @@ export function extractManOfMatch(
     return scorecardResponse.playersOfTheMatch[0];
   }
   return null;
+}
+
+/**
+ * Save global match stats (no league context).
+ * Writes raw cricket stats to match_player_stats only.
+ * Used by the platform admin to import stats once per match, shared across all leagues.
+ */
+export async function saveGlobalMatchStats(
+  matchId: string,
+  stats: ParsedPlayerStats[],
+  isLive: boolean = false
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // We need player_ids — look them up from master_players via cricbuzz_id
+    const cricbuzzIds = stats.map(s => s.cricbuzzPlayerId.toString());
+    const { data: masterPlayers } = await supabase
+      .from('master_players')
+      .select('id, cricbuzz_id')
+      .in('cricbuzz_id', cricbuzzIds);
+
+    const cricbuzzToMasterId = new Map<string, string>();
+    if (masterPlayers) {
+      for (const mp of masterPlayers) {
+        if (mp.cricbuzz_id) {
+          cricbuzzToMasterId.set(mp.cricbuzz_id, mp.id);
+        }
+      }
+    }
+
+    const globalRecords = stats.map(s => ({
+      match_id: matchId,
+      player_id: cricbuzzToMasterId.get(s.cricbuzzPlayerId.toString()) || null,
+      cricbuzz_player_id: s.cricbuzzPlayerId.toString(),
+      runs: s.runs,
+      balls_faced: s.ballsFaced,
+      fours: s.fours,
+      sixes: s.sixes,
+      strike_rate: s.ballsFaced > 0 ? (s.runs / s.ballsFaced) * 100 : null,
+      is_out: s.isOut,
+      dismissal_type: s.dismissalType,
+      overs: s.overs,
+      maidens: s.maidens,
+      runs_conceded: s.runsConceded,
+      wickets: s.wickets,
+      economy: s.overs > 0 ? s.runsConceded / s.overs : null,
+      dots: s.dots,
+      lbw_bowled_count: s.lbwBowledCount,
+      catches: s.catches,
+      stumpings: s.stumpings,
+      run_outs: s.runOuts,
+      is_in_playing_11: s.isInPlaying11,
+      is_impact_player: false,
+      is_man_of_match: false,
+      team_won: s.teamWon,
+      is_live: isLive,
+      live_updated_at: isLive ? new Date().toISOString() : null,
+      finalized_at: isLive ? null : new Date().toISOString(),
+    }));
+
+    const { error: globalError } = await supabase
+      .from('match_player_stats')
+      .upsert(globalRecords, {
+        onConflict: 'match_id,cricbuzz_player_id',
+        ignoreDuplicates: false,
+      });
+
+    if (globalError) {
+      console.error('Error saving global match stats:', globalError);
+      return { success: false, error: globalError.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error in saveGlobalMatchStats:', err);
+    return { success: false, error: 'Unknown error occurred' };
+  }
+}
+
+/**
+ * Calculate fantasy points for a single league using raw stats from match_player_stats.
+ * Reads raw stats, fetches league scoring rules + player ownership, calculates points,
+ * and upserts into league_player_match_scores.
+ */
+export async function calculateAndSaveLeaguePoints(
+  matchId: string,
+  leagueId: string
+): Promise<{ success: boolean; error?: string; playersScored?: number }> {
+  try {
+    // 1. Fetch raw stats from match_player_stats
+    const { data: rawStats, error: rawError } = await supabase
+      .from('match_player_stats')
+      .select('*')
+      .eq('match_id', matchId);
+
+    if (rawError || !rawStats || rawStats.length === 0) {
+      return { success: false, error: rawError?.message || 'No raw stats found for this match' };
+    }
+
+    // 2. Fetch league scoring rules from scoring_rules table
+    const { data: scoringRulesData } = await supabase
+      .from('scoring_rules')
+      .select('rules')
+      .eq('league_id', leagueId)
+      .maybeSingle();
+
+    const scoringRules = mergeScoringRules(scoringRulesData?.rules as Partial<ScoringRules> | null);
+
+    // 3. Fetch league players (to map cricbuzz_id -> league player)
+    const { data: leaguePlayers } = await supabase
+      .from('league_players')
+      .select('id, name, cricbuzz_id')
+      .eq('league_id', leagueId);
+
+    const cricbuzzToLeaguePlayer = new Map<string, { playerId: string; playerName: string }>();
+    if (leaguePlayers) {
+      for (const lp of leaguePlayers) {
+        if (lp.cricbuzz_id) {
+          cricbuzzToLeaguePlayer.set(String(lp.cricbuzz_id), {
+            playerId: lp.id!,
+            playerName: lp.name!,
+          });
+        }
+      }
+    }
+
+    // 4. Fetch managers + roster for ownership info
+    const [managersRes, rosterRes] = await Promise.all([
+      supabase.from('managers').select('id, name, team_name').eq('league_id', leagueId),
+      supabase.from('manager_roster').select('manager_id, player_id, slot_type').eq('league_id', leagueId),
+    ]);
+
+    const managerMap = new Map<string, { name: string; teamName: string }>();
+    if (managersRes.data) {
+      for (const m of managersRes.data) {
+        managerMap.set(m.id, { name: m.name, teamName: m.team_name });
+      }
+    }
+
+    const playerToManager = new Map<string, { managerId: string; isActive: boolean }>();
+    if (rosterRes.data) {
+      for (const entry of rosterRes.data) {
+        playerToManager.set(entry.player_id, {
+          managerId: entry.manager_id,
+          isActive: entry.slot_type === 'active',
+        });
+      }
+    }
+
+    // 5. Calculate points for each player that exists in the league
+    const leagueRecords: Array<{
+      league_id: string;
+      match_id: string;
+      player_id: string;
+      match_player_stats_id: string;
+      manager_id: string | null;
+      was_in_active_roster: boolean;
+      week: number | null;
+      total_points: number;
+      is_live: boolean;
+      finalized_at: string | null;
+    }> = [];
+
+    for (const raw of rawStats) {
+      const leaguePlayer = cricbuzzToLeaguePlayer.get(raw.cricbuzz_player_id);
+      if (!leaguePlayer) continue; // Player not in this league
+
+      const ownership = playerToManager.get(leaguePlayer.playerId);
+
+      const playerStats: PlayerStats = {
+        runs: raw.runs || 0,
+        ballsFaced: raw.balls_faced || 0,
+        fours: raw.fours || 0,
+        sixes: raw.sixes || 0,
+        isOut: raw.is_out || false,
+        overs: raw.overs || 0,
+        maidens: raw.maidens || 0,
+        runsConceded: raw.runs_conceded || 0,
+        wickets: raw.wickets || 0,
+        dots: raw.dots || 0,
+        wides: 0,
+        noBalls: 0,
+        lbwBowledCount: raw.lbw_bowled_count || 0,
+        catches: raw.catches || 0,
+        stumpings: raw.stumpings || 0,
+        runOuts: raw.run_outs || 0,
+        isInPlaying11: raw.is_in_playing_11 || false,
+        isImpactPlayer: raw.is_impact_player || false,
+        isManOfMatch: raw.is_man_of_match || false,
+        teamWon: raw.team_won || false,
+      };
+
+      const pointsBreakdown = calculateFantasyPoints(playerStats, scoringRules);
+
+      // Get week from league_matches if exists
+      const { data: leagueMatch } = await supabase
+        .from('league_matches')
+        .select('week')
+        .eq('league_id', leagueId)
+        .eq('match_id', matchId)
+        .maybeSingle();
+
+      leagueRecords.push({
+        league_id: leagueId,
+        match_id: matchId,
+        player_id: leaguePlayer.playerId,
+        match_player_stats_id: raw.id,
+        manager_id: ownership?.managerId || null,
+        was_in_active_roster: ownership?.isActive ?? false,
+        week: leagueMatch?.week || null,
+        total_points: pointsBreakdown.total,
+        is_live: raw.is_live || false,
+        finalized_at: raw.finalized_at || null,
+      });
+    }
+
+    if (leagueRecords.length === 0) {
+      return { success: true, playersScored: 0 };
+    }
+
+    // 6. Upsert league scores
+    const { error: upsertError } = await supabase
+      .from('league_player_match_scores')
+      .upsert(leagueRecords, {
+        onConflict: 'league_id,match_id,player_id',
+        ignoreDuplicates: false,
+      });
+
+    if (upsertError) {
+      console.error('Error upserting league scores:', upsertError);
+      return { success: false, error: upsertError.message };
+    }
+
+    // 7. Mark stats as imported in league_matches
+    await supabase
+      .from('league_matches')
+      .update({
+        stats_imported: true,
+        stats_imported_at: new Date().toISOString(),
+      })
+      .eq('league_id', leagueId)
+      .eq('match_id', matchId);
+
+    return { success: true, playersScored: leagueRecords.length };
+  } catch (err) {
+    console.error('Error in calculateAndSaveLeaguePoints:', err);
+    return { success: false, error: 'Unknown error occurred' };
+  }
+}
+
+/**
+ * Auto-calculate fantasy points for all leagues linked to a given match.
+ * Called after platform admin saves global stats.
+ */
+export async function autoCalculateForAllLeagues(
+  matchId: string
+): Promise<{ success: boolean; leaguesProcessed: number; errors: string[] }> {
+  const errors: string[] = [];
+
+  // Find all leagues linked to this match
+  const { data: leagueLinks, error: linkError } = await supabase
+    .from('league_matches')
+    .select('league_id')
+    .eq('match_id', matchId);
+
+  if (linkError || !leagueLinks || leagueLinks.length === 0) {
+    return { success: true, leaguesProcessed: 0, errors: [] };
+  }
+
+  let processed = 0;
+  for (const link of leagueLinks) {
+    const result = await calculateAndSaveLeaguePoints(matchId, link.league_id);
+    if (result.success) {
+      processed++;
+    } else {
+      errors.push(`League ${link.league_id}: ${result.error}`);
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    leaguesProcessed: processed,
+    errors,
+  };
 }
 
 /**

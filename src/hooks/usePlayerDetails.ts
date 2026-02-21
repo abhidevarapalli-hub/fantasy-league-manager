@@ -461,52 +461,96 @@ export function usePlayerMatchStats(
     queryFn: async () => {
       if (!playerId || !leagueId) throw new Error('Player ID and League ID required');
 
-      const { data, error } = await supabase
+      // Helper to build the stats map from rows
+      function buildStatsMap(
+        rows: Array<{
+          cricbuzz_match_id?: number | null;
+          match?: { cricbuzz_match_id: number } | null;
+          created_at: string;
+          runs?: number | null;
+          balls_faced?: number | null;
+          fours?: number | null;
+          sixes?: number | null;
+          strike_rate?: number | string | null;
+          is_out?: boolean | null;
+          overs?: number | string | null;
+          maidens?: number | null;
+          runs_conceded?: number | null;
+          wickets?: number | null;
+          economy?: number | string | null;
+          catches?: number | null;
+          stumpings?: number | null;
+          run_outs?: number | null;
+          fantasy_points?: number | string | null;
+        }>
+      ) {
+        const statsMap = new Map<number, PlayerMatchPerformance>();
+        for (const row of rows) {
+          // Use direct column first, fall back to embedded join
+          const cricbuzzMatchId = row.cricbuzz_match_id ?? row.match?.cricbuzz_match_id;
+          if (!cricbuzzMatchId) continue;
+
+          statsMap.set(cricbuzzMatchId, {
+            matchId: cricbuzzMatchId,
+            matchDate: new Date(row.created_at),
+            opponent: '',
+            opponentShort: '',
+            runs: row.runs ?? undefined,
+            ballsFaced: row.balls_faced ?? undefined,
+            fours: row.fours ?? undefined,
+            sixes: row.sixes ?? undefined,
+            strikeRate: row.strike_rate != null ? Number(row.strike_rate) : undefined,
+            isNotOut: row.is_out === false,
+            overs: row.overs != null ? Number(row.overs) : undefined,
+            maidens: row.maidens ?? undefined,
+            runsConceded: row.runs_conceded ?? undefined,
+            wickets: row.wickets ?? undefined,
+            economy: row.economy != null ? Number(row.economy) : undefined,
+            catches: row.catches ?? undefined,
+            stumpings: row.stumpings ?? undefined,
+            runOuts: row.run_outs ?? undefined,
+            fantasyPoints: row.fantasy_points != null ? Number(row.fantasy_points) : undefined,
+          });
+        }
+        return statsMap;
+      }
+
+      // 1. Fetch league-specific stats from the compat view
+      //    (cricbuzz_match_id is included directly in the view)
+      const { data: leagueData, error: leagueError } = await supabase
         .from('player_match_stats_compat')
+        .select('*')
+        .eq('player_id', playerId)
+        .eq('league_id', leagueId);
+
+      if (leagueError) {
+        console.warn('[usePlayerMatchStats] Compat view error:', leagueError.message);
+      }
+
+      // 2. Also fetch raw match_player_stats (league-independent)
+      //    so matches not yet linked to league_player_match_scores still appear
+      const { data: rawData, error: rawError } = await supabase
+        .from('match_player_stats')
         .select(`
           *,
           match:cricket_matches (
             cricbuzz_match_id
           )
         `)
-        .eq('player_id', playerId)
-        .eq('league_id', leagueId);
+        .eq('player_id', playerId);
 
-      if (error) {
-        console.error('[usePlayerMatchStats] Error:', error);
-        return new Map<number, PlayerMatchPerformance>();
+      if (rawError) {
+        console.warn('[usePlayerMatchStats] Raw stats error:', rawError.message);
       }
 
-      // Build a map from cricbuzz_match_id to stats
-      const statsMap = new Map<number, PlayerMatchPerformance>();
-      for (const row of data || []) {
-        const cricbuzzMatchId = row.match?.cricbuzz_match_id;
-        if (!cricbuzzMatchId) continue;
+      // 3. Build maps from both sources and merge.
+      //    Raw stats form the base; league stats override with fantasy points etc.
+      const rawMap = buildStatsMap(rawData || []);
+      const leagueMap = buildStatsMap(leagueData || []);
+      const mergedMap = new Map<number, PlayerMatchPerformance>([...rawMap, ...leagueMap]);
 
-        statsMap.set(cricbuzzMatchId, {
-          matchId: cricbuzzMatchId,
-          matchDate: new Date(row.created_at),
-          opponent: '',
-          opponentShort: '',
-          runs: row.runs ?? undefined,
-          ballsFaced: row.balls_faced ?? undefined,
-          fours: row.fours ?? undefined,
-          sixes: row.sixes ?? undefined,
-          strikeRate: row.strike_rate != null ? Number(row.strike_rate) : undefined,
-          isNotOut: row.is_out === false,
-          overs: row.overs != null ? Number(row.overs) : undefined,
-          maidens: row.maidens ?? undefined,
-          runsConceded: row.runs_conceded ?? undefined,
-          wickets: row.wickets ?? undefined,
-          economy: row.economy != null ? Number(row.economy) : undefined,
-          catches: row.catches ?? undefined,
-          stumpings: row.stumpings ?? undefined,
-          runOuts: row.run_outs ?? undefined,
-          fantasyPoints: row.fantasy_points != null ? Number(row.fantasy_points) : undefined,
-        });
-      }
-
-      return statsMap;
+      console.log(`[usePlayerMatchStats] Player ${playerId}, league ${leagueId}: ${leagueMap.size} league rows, ${rawMap.size} raw rows, ${mergedMap.size} merged`);
+      return mergedMap;
     },
     enabled: !!playerId && !!leagueId,
     staleTime: 5 * 60 * 1000,
