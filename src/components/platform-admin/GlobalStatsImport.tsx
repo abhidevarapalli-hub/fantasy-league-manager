@@ -290,6 +290,34 @@ export const GlobalStatsImport = () => {
     }
   };
 
+  // Link a newly-inserted match to every league that uses its tournament
+  const linkMatchToLeagues = async (matchId: string, seriesId: number, matchWeek?: number | null) => {
+    if (!seriesId) return;
+
+    const { data: leagues, error } = await supabase
+      .from('leagues')
+      .select('id')
+      .eq('tournament_id', seriesId);
+
+    if (error || !leagues || leagues.length === 0) return;
+
+    const rows = leagues.map(l => ({
+      league_id: l.id,
+      match_id: matchId,
+      week: matchWeek ?? null,
+    }));
+
+    const { error: linkError } = await supabase
+      .from('league_matches')
+      .upsert(rows, { onConflict: 'league_id,match_id', ignoreDuplicates: true });
+
+    if (linkError) {
+      console.warn('[linkMatchToLeagues] Failed to link match to leagues:', linkError.message);
+    } else {
+      console.log(`[linkMatchToLeagues] Linked match ${matchId} to ${leagues.length} league(s)`);
+    }
+  };
+
   // Sync matches from series to cricket_matches (global, no league link)
   const syncMatchesCore = async (
     completedOnly: boolean,
@@ -333,7 +361,7 @@ export const GlobalStatsImport = () => {
         continue;
       }
 
-      // Insert new cricket_match (global, no league link)
+      // Insert new cricket_match and auto-link to leagues for this tournament
       const { data: newMatch, error: insertError } = await supabase
         .from('cricket_matches')
         .insert({
@@ -356,6 +384,7 @@ export const GlobalStatsImport = () => {
           p_match_id: newMatch.id,
           p_match_state: matchState,
         });
+        await linkMatchToLeagues(newMatch.id, match.seriesId);
         addedCount++;
       }
     }
