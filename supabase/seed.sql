@@ -1088,7 +1088,7 @@ WHERE league_id = '10000000-0000-0000-0000-000000000002'
 -- Week 1 is finalized with scores; weeks 2-3 are pending (future)
 -- Weeks correspond to actual IPL match weeks
 
-INSERT INTO league_schedules (league_id, week, manager1_id, manager2_id, manager1_score, manager2_score, winner_id, is_finalized) VALUES
+INSERT INTO league_matchups (league_id, week, manager1_id, manager2_id, manager1_score, manager2_score, winner_id, is_finalized) VALUES
   -- Week 1 (completed)
   ('10000000-0000-0000-0000-000000000002', 1, '20000000-0000-0000-0000-000000000005', '20000000-0000-0000-0000-000000000006', 485.5, 412.0, '20000000-0000-0000-0000-000000000005', true),
   ('10000000-0000-0000-0000-000000000002', 1, '20000000-0000-0000-0000-000000000007', '20000000-0000-0000-0000-000000000008', 398.0, 356.5, '20000000-0000-0000-0000-000000000007', true),

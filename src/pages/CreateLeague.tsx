@@ -177,12 +177,15 @@ const CreateLeague = () => {
                 throw new Error('League creation returned no data');
             }
 
-            // 1b. Insert scoring rules (non-fatal if it fails)
+            // 1b. Upsert scoring rules (trigger auto-inserts defaults; we overwrite with user's choices)
             try {
                 const sanitizedRules = sanitizeScoringRules(scoringRules);
                 const { error: scoringError } = await supabase
                     .from('scoring_rules')
-                    .insert({ league_id: league.id, rules: sanitizedRules as unknown as Json });
+                    .upsert(
+                        { league_id: league.id, rules: sanitizedRules as unknown as Json },
+                        { onConflict: 'league_id' }
+                    );
 
                 if (scoringError) {
                     console.warn('[CreateLeague] ⚠️ Failed to save scoring rules:', scoringError);
@@ -353,6 +356,38 @@ const CreateLeague = () => {
             if (scheduleError) {
                 console.error("[CreateLeague] ⚠️  Error creating schedule:", scheduleError);
             }
+
+            // 5b. Link all tournament matches to this league via league_matches
+            console.log(`[CreateLeague] 🔗 Step 5b: Linking tournament matches to league...`);
+            const step5bStart = performance.now();
+
+            const { data: tournamentMatches, error: matchFetchError } = await supabase
+                .from('cricket_matches')
+                .select('id, match_week')
+                .eq('series_id', selectedTournament.id);
+
+            if (matchFetchError) {
+                console.warn('[CreateLeague] ⚠️ Failed to fetch tournament matches:', matchFetchError);
+            } else if (tournamentMatches && tournamentMatches.length > 0) {
+                const leagueMatchRows = tournamentMatches.map(m => ({
+                    league_id: league.id,
+                    match_id: m.id,
+                    week: m.match_week,
+                }));
+
+                const { error: linkError } = await supabase
+                    .from('league_matches')
+                    .insert(leagueMatchRows);
+
+                if (linkError) {
+                    console.warn('[CreateLeague] ⚠️ Failed to link matches:', linkError);
+                } else {
+                    console.log(`[CreateLeague] ✅ Linked ${leagueMatchRows.length} matches to league`);
+                }
+            }
+
+            const step5bDuration = performance.now() - step5bStart;
+            console.log(`[CreateLeague] ✅ Step 5b completed in ${step5bDuration.toFixed(2)}ms`);
 
             // 6. Seed players from tournament
             console.log(`[CreateLeague] 🏏 Step 6: Seeding players from ${selectedTournament.shortName}...`);
