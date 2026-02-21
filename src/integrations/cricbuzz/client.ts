@@ -44,8 +44,13 @@ export class CricbuzzApiError extends Error {
   }
 }
 
-// Check if API is configured — requires both live mode and a valid API key
+// Check if API is configured
+// In production: always enabled (API calls go through the Supabase Edge Function proxy)
+// In development: requires VITE_USE_LIVE_API=true and a valid RapidAPI key
 export function isApiConfigured(): boolean {
+  if (!import.meta.env.DEV) {
+    return true;
+  }
   const liveApiEnabled = import.meta.env.VITE_USE_LIVE_API === 'true';
   return liveApiEnabled && Boolean(RAPIDAPI_KEY && RAPIDAPI_KEY !== 'your_rapidapi_key_here');
 }
