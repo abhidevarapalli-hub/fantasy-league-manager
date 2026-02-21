@@ -461,9 +461,10 @@ export function usePlayerMatchStats(
     queryFn: async () => {
       if (!playerId || !leagueId) throw new Error('Player ID and League ID required');
 
-      // Helper to build the stats map from rows that have a cricbuzz_match_id join
+      // Helper to build the stats map from rows
       function buildStatsMap(
         rows: Array<{
+          cricbuzz_match_id?: number | null;
           match?: { cricbuzz_match_id: number } | null;
           created_at: string;
           runs?: number | null;
@@ -485,7 +486,8 @@ export function usePlayerMatchStats(
       ) {
         const statsMap = new Map<number, PlayerMatchPerformance>();
         for (const row of rows) {
-          const cricbuzzMatchId = row.match?.cricbuzz_match_id;
+          // Use direct column first, fall back to embedded join
+          const cricbuzzMatchId = row.cricbuzz_match_id ?? row.match?.cricbuzz_match_id;
           if (!cricbuzzMatchId) continue;
 
           statsMap.set(cricbuzzMatchId, {
@@ -513,28 +515,20 @@ export function usePlayerMatchStats(
         return statsMap;
       }
 
-      // 1. Try league-specific stats from the compat view
-      const { data, error } = await supabase
+      // 1. Fetch league-specific stats from the compat view
+      //    (cricbuzz_match_id is included directly in the view)
+      const { data: leagueData, error: leagueError } = await supabase
         .from('player_match_stats_compat')
-        .select(`
-          *,
-          match:cricket_matches (
-            cricbuzz_match_id
-          )
-        `)
+        .select('*')
         .eq('player_id', playerId)
         .eq('league_id', leagueId);
 
-      if (!error && data && data.length > 0) {
-        console.log(`[usePlayerMatchStats] Using league stats (${data.length} rows) for player ${playerId} in league ${leagueId}`);
-        return buildStatsMap(data);
+      if (leagueError) {
+        console.warn('[usePlayerMatchStats] Compat view error:', leagueError.message);
       }
 
-      if (error) {
-        console.warn('[usePlayerMatchStats] Compat view error, falling back to raw stats:', error.message);
-      }
-
-      // 2. Fallback: query match_player_stats directly (league-independent)
+      // 2. Also fetch raw match_player_stats (league-independent)
+      //    so matches not yet linked to league_player_match_scores still appear
       const { data: rawData, error: rawError } = await supabase
         .from('match_player_stats')
         .select(`
@@ -546,12 +540,17 @@ export function usePlayerMatchStats(
         .eq('player_id', playerId);
 
       if (rawError) {
-        console.error('[usePlayerMatchStats] Raw stats error:', rawError);
-        return new Map<number, PlayerMatchPerformance>();
+        console.warn('[usePlayerMatchStats] Raw stats error:', rawError.message);
       }
 
-      console.log(`[usePlayerMatchStats] Using raw player stats (${rawData?.length ?? 0} rows) for player ${playerId} — league ${leagueId} had no imported stats`);
-      return buildStatsMap(rawData || []);
+      // 3. Build maps from both sources and merge.
+      //    Raw stats form the base; league stats override with fantasy points etc.
+      const rawMap = buildStatsMap(rawData || []);
+      const leagueMap = buildStatsMap(leagueData || []);
+      const mergedMap = new Map<number, PlayerMatchPerformance>([...rawMap, ...leagueMap]);
+
+      console.log(`[usePlayerMatchStats] Player ${playerId}, league ${leagueId}: ${leagueMap.size} league rows, ${rawMap.size} raw rows, ${mergedMap.size} merged`);
+      return mergedMap;
     },
     enabled: !!playerId && !!leagueId,
     staleTime: 5 * 60 * 1000,
