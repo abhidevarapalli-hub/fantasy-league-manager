@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, User, Plane, Timer, Pause, Play, RefreshCw, Shuffle, Bot, CheckCircle, AlertCircle, Flag, Zap } from 'lucide-react';
 import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { useGameStore } from '@/store/useGameStore';
+import { supabase } from '@/integrations/supabase/client';
 import { useDraft } from '@/hooks/useDraft';
 import type { Manager, Player } from '@/lib/supabase-types';
 import type { DraftState } from '@/lib/draft-types';
@@ -35,9 +36,11 @@ interface DraftCellProps {
   onClearPick: () => void;
   readOnly?: boolean;
   isActive?: boolean;
+  isMyCol?: boolean;
+  isMyTurn?: boolean;
 }
 
-const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, onClearPick, readOnly, isActive }: DraftCellProps) => {
+const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, onClearPick, readOnly, isActive, isMyCol, isMyTurn }: DraftCellProps) => {
   const isEmpty = !player;
 
   const handleClearClick = (e: React.MouseEvent) => {
@@ -58,7 +61,8 @@ const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, 
         manager && !readOnly ? "cursor-pointer hover:opacity-80" : "cursor-default",
         !manager && "opacity-50",
         isEmpty && manager && !readOnly && "border-dashed",
-        isActive && !player && "border-primary ring-2 ring-primary ring-inset animate-pulse"
+        isActive && !player && "border-primary ring-2 ring-primary ring-inset animate-pulse",
+        isMyCol && !player && !isActive && "bg-primary/5 border-primary/20"
       )}
       style={player && colors ? {
         backgroundColor: colors.raw,
@@ -133,10 +137,18 @@ const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, 
         </div>
       ) : (
         <div className="flex items-center justify-center h-full pt-2">
-          {isActive ? (
-            <div className="flex flex-col items-center gap-1">
-              <Timer className="w-6 h-6 text-primary animate-bounce" />
-              <span className="text-[8px] font-bold text-primary uppercase">Active</span>
+          {isActive && isMyTurn ? (
+            <div className="flex flex-col items-center gap-1 group-hover:scale-110 transition-transform duration-300">
+              <Zap className="w-8 h-8 text-primary animate-pulse fill-primary/20" />
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-black text-primary uppercase tracking-tighter">Click to</span>
+                <span className="text-[12px] font-black text-primary uppercase tracking-tighter leading-none">Pick Player</span>
+              </div>
+            </div>
+          ) : isActive ? (
+            <div className="flex flex-col items-center gap-1 opacity-50">
+              <Timer className="w-6 h-6 text-primary" />
+              <span className="text-[8px] font-bold text-primary uppercase">On Clock</span>
             </div>
           ) : (
             <User className="w-6 h-6 opacity-30" />
@@ -211,6 +223,7 @@ interface DraftLMControlsProps {
   onAutoDraftAll: () => void;
   allPositionsFilled: boolean;
   hasRemainingPicks: boolean;
+  isOrderRandomized: boolean;
 }
 
 const DraftLMControls = ({
@@ -222,7 +235,8 @@ const DraftLMControls = ({
   onResetClock,
   onAutoDraftAll,
   allPositionsFilled,
-  hasRemainingPicks
+  hasRemainingPicks,
+  isOrderRandomized
 }: DraftLMControlsProps) => {
   if (draftState?.isFinalized) return null;
 
@@ -259,7 +273,8 @@ const DraftLMControls = ({
                   variant="default"
                   size="sm"
                   onClick={onAutoDraftAll}
-                  className="gap-1.5 bg-purple-600 hover:bg-purple-700"
+                  disabled={!isOrderRandomized}
+                  className="gap-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
                 >
                   <Zap className="w-3.5 h-3.5" />
                   Auto-Draft All
@@ -331,6 +346,16 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
   const managers = useGameStore(state => state.managers);
   const players = useGameStore(state => state.players);
   const config = useGameStore(state => state.config);
+  const leagueOwnerId = useGameStore(state => state.leagueOwnerId);
+  const currentManagerId = useGameStore(state => state.currentManagerId);
+
+  // Determine if current user is the League Manager
+  const isLeagueManager = useMemo(() => {
+    // Check if the current manager is the league owner
+    const myManager = managers.find(m => m.id === currentManagerId);
+    return myManager?.userId === leagueOwnerId;
+  }, [leagueOwnerId, currentManagerId, managers]);
+
   const {
     draftPicks,
     draftOrder,
@@ -363,13 +388,31 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
 
   const handleCellClick = (round: number, position: number) => {
     if (isEffectivelyReadOnly) return;
+
+    // Permission check: only LM can click any cell. Non-LM can ONLY click the active cell that belongs to them.
+    const isActiveCell = round === currentRound && position === currentPosition;
+    const isMyTurn = getManagerAtPosition(position)?.id === currentManagerId;
+
+    if (!isLeagueManager && (!isActiveCell || !isMyTurn)) {
+      return;
+    }
+
     setSelectedCell({ round, position });
     setDialogOpen(true);
   };
 
   const handlePickConfirm = async (playerId: string) => {
     if (!selectedCell || isEffectivelyReadOnly) return;
-    await makePick(selectedCell.round, selectedCell.position, playerId);
+    setIsSubmitting(true);
+    try {
+      await makePick(selectedCell.round, selectedCell.position, playerId);
+      setDialogOpen(false);
+      setSelectedCell(null);
+    } catch (error) {
+      console.error('[DraftBoard] Pick confirmation error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
@@ -434,12 +477,20 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     <div className="space-y-4 pb-28">
       {/* Top Floating Bar for Timer */}
       {draftState?.isActive && !draftState?.isFinalized && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
           <DraftTimer
             getRemainingTime={getRemainingTime}
             isActive={draftState.isActive}
             isPaused={!!draftState.pausedAt}
           />
+          {draftState.isActive && !draftState.pausedAt && getManagerAtPosition(currentPosition)?.id === useGameStore.getState().currentManagerId && (
+            <div className="bg-primary px-6 py-1.5 rounded-full shadow-lg border-2 border-primary-foreground/20 animate-in fade-in zoom-in duration-300">
+              <span className="text-primary-foreground font-black text-xs tracking-tighter uppercase flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                It's Your Turn! Pick Now
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -467,6 +518,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
             onAutoDraftAll={handleAutoDraftAll}
             allPositionsFilled={allPositionsFilled}
             hasRemainingPicks={getDraftedPlayerIds().length < (config.activeSize + config.benchSize) * config.managerCount}
+            isOrderRandomized={draftOrder.some(o => o.managerId !== null)}
           />
         </div>
       )}
@@ -487,10 +539,24 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                 m => !assignedManagerIds.includes(m.id) || m.id === manager?.id
               );
 
+              const isCurrentTurn = draftState?.isActive && !draftState.isFinalized && position === currentPosition;
+
               return (
-                <div key={position} className="flex flex-col items-center gap-1">
+                <div key={position} className="flex flex-col items-center gap-1 relative">
+                  {isCurrentTurn && (
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                      <Badge variant="default" className="bg-primary text-[10px] h-4 px-1 py-0 animate-bounce">
+                        ON CLOCK
+                      </Badge>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground font-medium">#{position}</span>
+                    <span className={cn(
+                      "text-xs font-medium transition-colors",
+                      isCurrentTurn ? "text-primary font-bold" : "text-muted-foreground"
+                    )}>
+                      #{position}
+                    </span>
                     {manager && !isEffectivelyReadOnly && (
                       <button
                         onClick={() => manager && toggleAutoDraft(manager.id, !orderItem?.autoDraftEnabled)}
@@ -505,8 +571,16 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                     )}
                   </div>
                   {isEffectivelyReadOnly ? (
-                    <div className="h-8 text-xs bg-muted border border-border rounded-md w-full flex items-center justify-center px-1">
-                      <span className="truncate text-[10px]">{manager?.teamName || 'Empty'}</span>
+                    <div className={cn(
+                      "h-8 text-xs border rounded-md w-full flex items-center justify-center px-1 transition-all",
+                      isCurrentTurn ? "bg-primary/10 border-primary ring-1 ring-primary" : "bg-muted border-border"
+                    )}>
+                      <span className={cn(
+                        "truncate text-[10px]",
+                        isCurrentTurn && "font-bold text-primary"
+                      )}>
+                        {manager?.teamName || 'Empty'}
+                      </span>
                     </div>
                   ) : (
                     <Select
@@ -514,7 +588,10 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                       onValueChange={(value) => assignManagerToPosition(position, value)}
                       disabled={draftState?.isActive}
                     >
-                      <SelectTrigger className="h-8 text-xs bg-muted border-border w-full">
+                      <SelectTrigger className={cn(
+                        "h-8 text-xs w-full transition-all",
+                        isCurrentTurn ? "bg-primary/10 border-primary ring-1 ring-primary text-primary font-bold" : "bg-muted border-border"
+                      )}>
                         <SelectValue placeholder="Select..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -552,6 +629,9 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                   round === currentRound &&
                   position === currentPosition;
 
+                const isMyCol = manager?.id === currentManagerId;
+                const isMyTurn = isActivePick && isMyCol;
+
                 return (
                   <DraftCell
                     key={`${round}-${position}`}
@@ -564,6 +644,8 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                     onClearPick={() => !isEffectivelyReadOnly && clearPick(round, position)}
                     readOnly={isEffectivelyReadOnly}
                     isActive={isActivePick}
+                    isMyCol={isMyCol}
+                    isMyTurn={isMyTurn}
                   />
                 );
               });
@@ -608,8 +690,13 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
         />
       )}
 
-      {/* Available Players Drawer - always visible */}
-      <AvailablePlayersDrawer draftedPlayerIds={getDraftedPlayerIds()} />
+      {!isEffectivelyReadOnly && (
+        <AvailablePlayersDrawer
+          draftedPlayerIds={getDraftedPlayerIds()}
+          canPick={isLeagueManager || (currentRound === currentRound && getManagerAtPosition(currentPosition)?.id === currentManagerId)}
+          onDraftPlayer={(playerId) => makePick(currentRound, currentPosition, playerId)}
+        />
+      )}
     </div>
   );
 };
