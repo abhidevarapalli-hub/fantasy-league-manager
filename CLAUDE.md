@@ -61,6 +61,8 @@ Key characteristics:
 - Use the playwright MCP when asked to verify changes in the browser
 - Look for servers before starting a new server, kill old ones if a new one needs to start
 - Consider database schema changes with future scalability in mind
+- When a migration renames or drops a table/column, update `supabase/seed.sql` in the same commit — CI runs `supabase db reset` which applies migrations then seed, so a stale seed will fail the build
+- Always create migrations with `npm run supabase:migration -- <name>` to avoid timestamp collisions
 
 ## Local Development Setup
 
