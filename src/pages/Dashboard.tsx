@@ -111,7 +111,7 @@ const Dashboard = () => {
       <div className="px-4 py-6 space-y-8">
 
         {/* Invite Card if needed */}
-        {isLeagueManager && hasAvailableSlots && (
+        {isLeagueManager && hasAvailableSlots && (!draftState || draftState.status === 'pre_draft') && (
           <Card className="border-2 border-primary/20 bg-primary/5">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">

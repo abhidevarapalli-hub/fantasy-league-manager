@@ -20,6 +20,7 @@ const JoinLeague = () => {
     const [leagueName, setLeagueName] = useState('');
     const [isAlreadyMember, setIsAlreadyMember] = useState(false);
     const [isFull, setIsFull] = useState(false);
+    const [isDraftFinished, setIsDraftFinished] = useState(false);
 
     useEffect(() => {
         const checkLeagueStatus = async () => {
@@ -59,6 +60,18 @@ const JoinLeague = () => {
                 if (existingManager) {
                     setIsAlreadyMember(true);
                     navigate(`/${leagueId}`);
+                    return;
+                }
+
+                // Check draft state
+                const { data: draftState } = await supabase
+                    .from('draft_state')
+                    .select('status')
+                    .eq('league_id', leagueId)
+                    .maybeSingle();
+
+                if (draftState?.status && draftState.status !== 'pre_draft') {
+                    setIsDraftFinished(true);
                     return;
                 }
 
@@ -163,6 +176,41 @@ const JoinLeague = () => {
 
     if (isAlreadyMember) {
         return null; // Will redirect via useEffect
+    }
+
+    if (isDraftFinished) {
+        return (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
+                <div className="max-w-md w-full">
+                    <Card className="border-2 border-destructive/20 shadow-xl">
+                        <CardHeader className="bg-destructive/5 border-b border-destructive/10 text-center">
+                            <div className="w-16 h-16 bg-destructive/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-destructive/30">
+                                <AlertCircle className="w-8 h-8 text-destructive" />
+                            </div>
+                            <CardTitle className="text-2xl">Draft Started or Completed</CardTitle>
+                            <CardDescription className="text-base">
+                                {leagueName} has already started or finished drafting.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6 text-center">
+                            <p className="text-muted-foreground">
+                                You cannot join this league because the draft has already commenced. Please join before the draft begins next time.
+                            </p>
+                        </CardContent>
+                        <CardFooter className="bg-muted/50 border-t p-6">
+                            <Button
+                                onClick={() => navigate('/leagues')}
+                                className="w-full h-12 text-lg font-bold"
+                                variant="default"
+                            >
+                                <ArrowLeft className="w-5 h-5 mr-2" />
+                                Back to Leagues
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </div>
+            </div>
+        );
     }
 
     if (isFull) {
