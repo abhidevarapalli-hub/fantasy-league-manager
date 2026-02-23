@@ -7,6 +7,8 @@ SELECT
   lpms.match_id,
   mps.cricbuzz_player_id,
   lpms.player_id,
+  -- Match identifier for frontend keying
+  cm.cricbuzz_match_id,
   -- Batting
   mps.runs,
   mps.balls_faced,
@@ -46,7 +48,8 @@ SELECT
   lpms.finalized_at,
   mps.created_at
 FROM league_player_match_scores lpms
-JOIN match_player_stats mps ON mps.id = lpms.match_player_stats_id;
+JOIN match_player_stats mps ON mps.id = lpms.match_player_stats_id
+JOIN cricket_matches cm ON cm.id = lpms.match_id;
 
 -- Grant read access to authenticated users (matches RLS on underlying tables)
 GRANT SELECT ON public.player_match_stats_compat TO authenticated;

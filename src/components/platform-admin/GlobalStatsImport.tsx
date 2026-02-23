@@ -141,6 +141,63 @@ export const GlobalStatsImport = () => {
     }
   }, []);
 
+  // Refresh team metadata for matches with TBC names via individual match endpoint.
+  // Calls the edge function proxy directly to avoid the isApiConfigured() guard
+  // which blocks in dev mode without VITE_USE_LIVE_API=true.
+  // Note: /mcenter/v1/{id} returns lowercase keys (teamname, teamsname, teamid).
+  const refreshTbcMatches = useCallback(async (matchList: GlobalMatch[]) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const isTbcName = (n: string) => !n || n.toLowerCase() === 'tbc';
+    const tbcMatches = matchList.filter(
+      m => isTbcName(m.team1Name) || isTbcName(m.team2Name)
+    );
+    if (tbcMatches.length === 0) return 0;
+
+    let updatedCount = 0;
+    for (const match of tbcMatches) {
+      try {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/cricbuzz-proxy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: `/mcenter/v1/${match.cricbuzzMatchId}` }),
+        });
+        if (!resp.ok) {
+          console.error(`[refreshTBC] Cricbuzz proxy error for match ${match.cricbuzzMatchId}:`, resp.status);
+          continue;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = await resp.json();
+        const t1 = data.team1 ?? data.matchInfo?.team1;
+        const t2 = data.team2 ?? data.matchInfo?.team2;
+        const team1Name: string | undefined = t1?.teamName ?? t1?.teamname;
+        const team2Name: string | undefined = t2?.teamName ?? t2?.teamname;
+        const isTbc = (n?: string) => !n || n.toLowerCase() === 'tbc';
+        if (!isTbc(team1Name) && !isTbc(team2Name)) {
+          const { error: updateError } = await supabase
+            .from('cricket_matches')
+            .update({
+              team1_name: team1Name!,
+              team2_name: team2Name!,
+              team1_id: t1?.teamId ?? t1?.teamid,
+              team2_id: t2?.teamId ?? t2?.teamid,
+              team1_short: t1?.teamSName ?? t1?.teamsname,
+              team2_short: t2?.teamSName ?? t2?.teamsname,
+              match_description: data.matchDesc ?? data.matchdesc ?? match.matchDescription,
+            })
+            .eq('id', match.id);
+          if (updateError) {
+            console.error(`[refreshTBC] DB update failed for match ${match.cricbuzzMatchId}:`, updateError);
+          } else {
+            updatedCount++;
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to refresh match ${match.cricbuzzMatchId}:`, err);
+      }
+    }
+    return updatedCount;
+  }, []);
+
   useEffect(() => {
     fetchGlobalMatches();
   }, [fetchGlobalMatches]);
@@ -330,7 +387,7 @@ export const GlobalStatsImport = () => {
 
     const matchesToSync = completedOnly
       ? matchesList.filter(m => m.state === 'Complete')
-      : matchesList.filter(m => m.state === 'Complete' || m.state === 'In Progress');
+      : matchesList.filter(m => m.state === 'Complete' || m.state === 'In Progress' || m.state === 'Upcoming');
 
     for (const match of matchesToSync) {
       const matchState = mapMatchState(match.state);
@@ -343,12 +400,19 @@ export const GlobalStatsImport = () => {
         .maybeSingle();
 
       if (existingMatch) {
-        // Update result and state
+        // Update result, state, and team metadata (teams may change from TBC to real names)
         await supabase
           .from('cricket_matches')
           .update({
             result: match.status || null,
             state: matchState,
+            team1_name: match.team1.teamName,
+            team2_name: match.team2.teamName,
+            team1_id: match.team1.teamId,
+            team2_id: match.team2.teamId,
+            team1_short: match.team1.teamSName,
+            team2_short: match.team2.teamSName,
+            match_description: match.matchDesc,
           })
           .eq('id', existingMatch.id);
 
@@ -370,6 +434,10 @@ export const GlobalStatsImport = () => {
           match_description: match.matchDesc,
           team1_name: match.team1.teamName,
           team2_name: match.team2.teamName,
+          team1_id: match.team1.teamId,
+          team2_id: match.team2.teamId,
+          team1_short: match.team1.teamSName,
+          team2_short: match.team2.teamSName,
           match_date: new Date(parseInt(match.startDate)).toISOString(),
           venue: `${match.venueInfo.ground}, ${match.venueInfo.city}`,
           result: match.status || null,
@@ -769,7 +837,7 @@ export const GlobalStatsImport = () => {
                       ) : (
                         <Download className="w-4 h-4 mr-2" />
                       )}
-                      Sync Completed + Live
+                      Sync All
                     </Button>
                     <Button
                       size="sm"
@@ -829,7 +897,13 @@ export const GlobalStatsImport = () => {
         <CardHeader className="py-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">All Matches</CardTitle>
-            <Button size="sm" variant="outline" onClick={fetchGlobalMatches}>
+            <Button size="sm" variant="outline" onClick={async () => {
+              const updated = await refreshTbcMatches(matches);
+              if (updated > 0) {
+                toast.success(`Updated team names for ${updated} match${updated !== 1 ? 'es' : ''}`);
+              }
+              await fetchGlobalMatches();
+            }}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
