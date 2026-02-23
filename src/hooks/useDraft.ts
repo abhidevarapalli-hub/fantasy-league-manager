@@ -375,7 +375,7 @@ export const useDraft = () => {
       console.log('[useDraft] ✅ Draft state successfully updated to active');
       toast.success('Draft started!');
     }
-  }, [draftState, draftOrder, managers, setDraftState]);
+  }, [draftState, draftOrder, managers, setDraftState, leagueId]);
 
   // Pause draft
   const pauseDraft = useCallback(async () => {
@@ -408,7 +408,7 @@ export const useDraft = () => {
         pausedAt: null
       });
     }
-  }, [draftState, setDraftState]);
+  }, [draftState, setDraftState, leagueId]);
 
   // Resume draft
   const resumeDraft = useCallback(async () => {
@@ -449,7 +449,7 @@ export const useDraft = () => {
         totalPausedDurationMs: draftState.totalPausedDurationMs
       });
     }
-  }, [draftState, setDraftState]);
+  }, [draftState, setDraftState, leagueId]);
 
   // Reset clock for current pick
   const resetClock = useCallback(async () => {
@@ -713,7 +713,7 @@ export const useDraft = () => {
       toast.error('Failed to auto-complete draft', { id: 'auto-draft-all' });
       return false;
     }
-  }, [leagueId, getPick, getDraftedPlayerIds, players, draftOrder, setDraftPicks, finalizeRosters]);
+  }, [leagueId, getPick, getDraftedPlayerIds, players, draftOrder, setDraftPicks, finalizeRosters, managers]);
 
 
   return {

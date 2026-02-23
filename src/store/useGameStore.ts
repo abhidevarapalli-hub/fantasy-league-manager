@@ -869,7 +869,7 @@ export const useGameStore = create<GameState>()(
       },
 
       finalizeRosters: async (leagueId) => {
-        const { config, currentWeek, players } = get();
+        const { config, currentWeek, players, draftPicks } = get();
         console.log(`[useGameStore] 🏁 Starting roster finalization for league: ${leagueId}`);
 
         try {
@@ -919,8 +919,20 @@ export const useGameStore = create<GameState>()(
             const { active, bench } = buildOptimalActive11(managerPlayers, config);
             console.log(`[useGameStore] ⚙️ Optimized ${manager.team_name}: ${active.length} active, ${bench.length} bench`);
 
+            const firstRoundPick = draftPicks.find(dp => dp.managerId === manager.id && dp.round === 1)?.playerId;
+            const secondRoundPick = draftPicks.find(dp => dp.managerId === manager.id && dp.round === 2)?.playerId;
+
             const upsertData = [];
             for (let week = 1; week <= 7; week++) {
+              // Find existing captain/VC for this manager and week from the initially fetched DB state
+              const weekCaptainId = (allRosterEntries as Tables<'manager_roster'>[])
+                .find(e => e.manager_id === manager.id && e.week === week && e.is_captain)?.player_id;
+              const weekViceCaptainId = (allRosterEntries as Tables<'manager_roster'>[])
+                .find(e => e.manager_id === manager.id && e.week === week && e.is_vice_captain)?.player_id;
+
+              const actualCaptainId = weekCaptainId || firstRoundPick;
+              const actualViceCaptainId = weekViceCaptainId || secondRoundPick;
+
               active.forEach((p, idx) => {
                 upsertData.push({
                   league_id: leagueId,
@@ -929,6 +941,8 @@ export const useGameStore = create<GameState>()(
                   slot_type: 'active',
                   position: idx,
                   week: week,
+                  is_captain: p.id === actualCaptainId,
+                  is_vice_captain: p.id === actualViceCaptainId,
                 });
               });
 
@@ -939,7 +953,9 @@ export const useGameStore = create<GameState>()(
                   player_id: p.id,
                   slot_type: 'bench',
                   position: idx,
-                  week: week
+                  week: week,
+                  is_captain: false, // Bench players cannot be captain
+                  is_vice_captain: false,
                 });
               });
             }

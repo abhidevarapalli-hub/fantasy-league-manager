@@ -214,27 +214,25 @@ const TeamView = () => {
   return (
     <AppLayout
       title={
-        <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-3">
+        <div className="flex items-baseline gap-2 sm:gap-3 truncate">
           <span className="truncate">{manager.teamName}</span>
-          <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">{manager.name}</span>
+          <span className="text-sm text-muted-foreground font-medium flex-shrink-0">{manager.name}</span>
         </div>
       }
       subtitle={
-        <div className="flex flex-col gap-1.5 mt-0.5">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1">
-            <div className="flex items-center gap-2 bg-muted/50 px-2 py-1.5 rounded-md border border-border/50 shadow-sm">
-              <span className="text-sm font-bold text-foreground tabular-nums">{manager.wins}W - {manager.losses}L</span>
-              <span className="text-[10px] text-muted-foreground font-bold tracking-tighter uppercase whitespace-nowrap">Record</span>
-            </div>
-            <div className="flex items-center gap-2 bg-primary/5 px-2 py-1.5 rounded-md border border-primary/20 shadow-sm">
-              <span className="text-sm font-bold text-primary tabular-nums">{manager.points.toFixed(1)}</span>
-              <span className="text-[10px] text-primary/70 font-bold tracking-tighter uppercase whitespace-nowrap">Points</span>
-            </div>
-            <div className="flex items-center gap-2 bg-amber-500/5 px-2 py-1.5 rounded-md border border-amber-500/20 shadow-sm">
-              <Trophy className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-sm font-bold text-amber-500 tabular-nums">#{standingsPosition}</span>
-              <span className="text-[10px] text-amber-500/70 font-bold tracking-tighter uppercase whitespace-nowrap">Rank</span>
-            </div>
+        <div className="flex items-center gap-2 mt-0.5 overflow-x-auto hide-scrollbar pb-1 -mb-1">
+          <div className="flex items-center gap-2 bg-muted/50 px-2 py-1.5 rounded-md border border-border/50 shadow-sm whitespace-nowrap flex-shrink-0">
+            <span className="text-sm font-bold text-foreground tabular-nums">{manager.wins}W - {manager.losses}L</span>
+            <span className="text-[10px] text-muted-foreground font-bold tracking-tighter uppercase">Record</span>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 bg-primary/5 px-2 py-1.5 rounded-md border border-primary/20 shadow-sm whitespace-nowrap flex-shrink-0">
+            <span className="text-sm font-bold text-primary tabular-nums">{manager.points.toFixed(1)}</span>
+            <span className="text-[10px] text-primary/70 font-bold tracking-tighter uppercase">Points</span>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 bg-amber-500/5 px-2 py-1.5 rounded-md border border-amber-500/20 shadow-sm whitespace-nowrap flex-shrink-0">
+            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-sm font-bold text-amber-500 tabular-nums">#{standingsPosition}</span>
+            <span className="text-[10px] text-amber-500/70 font-bold tracking-tighter uppercase">Rank</span>
           </div>
         </div>
       }

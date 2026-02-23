@@ -328,7 +328,7 @@ const HeadToHeadSection = ({
     onPlayerClick: (playerId: string) => void;
     useSlots?: boolean;
 }) => {
-    let rows: { home: PlayerWithMatches | null, away: PlayerWithMatches | null, label: string }[] = [];
+    const rows: { home: PlayerWithMatches | null, away: PlayerWithMatches | null, label: string }[] = [];
 
     if (useSlots) {
         const homeSlots = assignToSlots(homePlayers);

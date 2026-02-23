@@ -261,7 +261,7 @@ export const useRealtimeGame = (leagueId?: string) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [leagueId]);
+  }, [leagueId, fetchAllData]);
 
   const getFreeAgents = useCallback(() => {
     const rosteredIds = new Set(managers.flatMap((m) => [...m.activeRoster, ...m.bench]));

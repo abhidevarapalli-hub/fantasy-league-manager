@@ -59,12 +59,12 @@ export const UserMenu = () => {
           .eq('user_id', user.id);
 
         if (!error && data) {
-          const mapped: UserTeam[] = data.map((m: any) => ({
+          const mapped: UserTeam[] = data.map((m: { id: string; team_name: string; is_league_manager: boolean; league_id: string; leagues: { name: string } | { name: string }[] | null }) => ({
             teamId: m.id,
             teamName: m.team_name,
             isLeagueManager: m.is_league_manager,
             leagueId: m.league_id,
-            leagueName: m.leagues?.name || 'Unknown League'
+            leagueName: (Array.isArray(m.leagues) ? m.leagues[0]?.name : m.leagues?.name) || 'Unknown League'
           }));
           setUserTeams(mapped);
         }

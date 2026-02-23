@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, X, PanelRightOpen, Filter, Zap, Bot } from 'lucide-react';
+import { Search, X, PanelRightOpen, Filter, Zap, Bot, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlayerCard } from '@/components/PlayerCard';
@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RosterGrid } from '@/components/RosterGrid';
 import { DraftTimer, DraftTimerProps } from '@/components/DraftTimer';
-import { buildOptimalActive11 } from '@/lib/roster-validation';
+import { buildOptimalActive11, validateActiveRoster } from '@/lib/roster-validation';
 import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
 import { getTeamPillStyles } from '@/lib/team-colors';
 import {
@@ -189,7 +189,7 @@ export const AvailablePlayersDrawer = ({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="available" className="flex-1 flex flex-col overflow-hidden data-[state=active]:flex h-full mt-0">
+            <TabsContent value="available" className="flex-1 flex-col overflow-hidden data-[state=active]:flex h-full mt-0">
               {/* Filters Section */}
               <div className="px-6 py-2 space-y-4 flex-shrink-0 mt-4">
                 {/* Search */}
@@ -349,17 +349,41 @@ export const AvailablePlayersDrawer = ({
 
               {/* Single Team Roster View */}
               <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar pb-20">
-                {selectedManager ? (
-                  <div className="space-y-6">
-                    <RosterGrid
-                      manager={selectedManager}
-                      config={config}
-                      players={players}
-                      compact={false}
-                      onPlayerClick={setDetailPlayer}
-                    />
-                  </div>
-                ) : (
+                {selectedManager ? (() => {
+                  const activePlayers = selectedManager.activeRoster
+                    .map(id => players.find(p => p.id === id))
+                    .filter((p): p is Player => p !== undefined);
+                  const validation = validateActiveRoster(activePlayers, config);
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Validation Errors */}
+                      {!validation.isValid && validation.errors.length > 0 && (
+                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-sm font-medium text-destructive mb-1">Roster Requirements Not Met</p>
+                              <ul className="text-xs text-destructive/80 space-y-0.5">
+                                {validation.errors.map((error, i) => (
+                                  <li key={i}>• {error}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <RosterGrid
+                        manager={selectedManager}
+                        config={config}
+                        players={players}
+                        compact={false}
+                        onPlayerClick={setDetailPlayer}
+                      />
+                    </div>
+                  );
+                })() : (
                   <div className="flex items-center justify-center py-20 text-muted-foreground text-sm italic">
                     <p>Select a team to view their roster</p>
                   </div>

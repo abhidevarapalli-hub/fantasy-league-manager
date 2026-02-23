@@ -166,7 +166,6 @@ const Dashboard = () => {
                   {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
                     <SelectItem key={week} value={week.toString()}>
                       Week {week}
-                      {week === currentWeek && " (Current)"}
                     </SelectItem>
                   ))}
                 </SelectContent>

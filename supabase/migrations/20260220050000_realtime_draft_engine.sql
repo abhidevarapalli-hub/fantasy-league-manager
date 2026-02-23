@@ -195,8 +195,8 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_draft_state public.draft_state%ROWTYPE;
-  v_current_manager_id UUID;
-  v_current_user_id UUID;
+  v_current_manager_id TEXT;
+  v_current_user_id TEXT;
   v_threshold_seconds INTEGER;
   v_elapsed_seconds FLOAT;
   v_auto_player UUID;
@@ -209,12 +209,12 @@ BEGIN
   END IF;
 
   -- 2. Find who is on the clock
-  SELECT do.manager_id, m.user_id 
+  SELECT d_ord.manager_id, m.user_id 
   INTO v_current_manager_id, v_current_user_id
-  FROM public.draft_order do
-  LEFT JOIN public.managers m ON m.id = do.manager_id
-  WHERE do.league_id = p_league_id 
-    AND do.position = v_draft_state.current_position;
+  FROM public.draft_order d_ord
+  LEFT JOIN public.managers m ON m.id = d_ord.manager_id
+  WHERE d_ord.league_id = p_league_id 
+    AND d_ord.position = v_draft_state.current_position;
 
   -- 3. Determine threshold
   -- Logic: If no manager assigned OR manager has no user_id (CPU), use 3s.

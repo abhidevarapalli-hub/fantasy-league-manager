@@ -158,8 +158,8 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_draft_state public.draft_state%ROWTYPE;
-  v_current_manager_id UUID;
-  v_current_user_id UUID;
+  v_current_manager_id TEXT;
+  v_current_user_id TEXT;
   v_threshold_seconds INTEGER;
   v_elapsed_seconds FLOAT;
   v_auto_player UUID;
@@ -173,12 +173,12 @@ BEGIN
   END IF;
 
   -- 2. Find who is on the clock and their auto-draft status
-  SELECT do.manager_id, m.user_id, do.auto_draft_enabled
+  SELECT d_ord.manager_id, m.user_id, d_ord.auto_draft_enabled
   INTO v_current_manager_id, v_current_user_id, v_auto_draft_enabled
-  FROM public.draft_order do
-  LEFT JOIN public.managers m ON m.id = do.manager_id
-  WHERE do.league_id = p_league_id 
-    AND do.position = v_draft_state.current_position;
+  FROM public.draft_order d_ord
+  LEFT JOIN public.managers m ON m.id = d_ord.manager_id
+  WHERE d_ord.league_id = p_league_id 
+    AND d_ord.position = v_draft_state.current_position;
 
   -- 3. Determine threshold
   -- If CPU (no user) or explicit auto-draft enabled, trigger quickly (e.g. 1-2s delay)

@@ -275,33 +275,6 @@ export function PlayerDetailDialog({
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-0" />
                         <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/40 to-transparent pointer-events-none z-0" />
 
-                        {/* Top Bar for Mobile (Tags) */}
-                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-30 md:hidden">
-                            <div className="flex flex-col gap-1.5">
-                                <Badge
-                                    className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-black/50 backdrop-blur-md border border-white/20 text-white"
-                                    variant="secondary"
-                                >
-                                    {player.role}
-                                </Badge>
-                                {owningManager ? (
-                                    <Badge
-                                        className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-indigo-500/80 backdrop-blur-md border border-indigo-300/30 text-white"
-                                        variant="secondary"
-                                    >
-                                        {owningManager.teamName}
-                                    </Badge>
-                                ) : (
-                                    <Badge
-                                        className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-emerald-500/80 backdrop-blur-md border border-emerald-300/30 text-white"
-                                        variant="secondary"
-                                    >
-                                        Free Agent
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-
                         {/* Player Image - Floating Cutout Style */}
                         <div className="relative w-full md:w-64 h-[180px] md:h-[260px] flex-shrink-0 flex items-end justify-center z-10 mx-auto md:mx-0 -mb-4 md:mb-0">
                             <img
@@ -315,31 +288,6 @@ export function PlayerDetailDialog({
 
                         {/* Info and Metadata Grid */}
                         <div className="flex-1 w-full p-5 md:p-8 flex flex-col justify-end md:justify-center relative z-20 md:bg-gradient-to-l from-black/40 via-black/10 to-transparent">
-                            {/* Desktop Tags (Hidden on Mobile) */}
-                            <div className="hidden md:flex flex-wrap items-center gap-2 mb-3">
-                                <Badge
-                                    className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-black/40 backdrop-blur-sm border border-white/10 text-white"
-                                    variant="secondary"
-                                >
-                                    {player.role}
-                                </Badge>
-                                {owningManager ? (
-                                    <Badge
-                                        className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-indigo-600/80 backdrop-blur-sm border border-indigo-400/30 text-white"
-                                        variant="secondary"
-                                    >
-                                        {owningManager.teamName}
-                                    </Badge>
-                                ) : (
-                                    <Badge
-                                        className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-emerald-600/80 backdrop-blur-sm border border-emerald-400/30 text-white"
-                                        variant="secondary"
-                                    >
-                                        Free Agent
-                                    </Badge>
-                                )}
-                            </div>
-
                             <div className="mb-4 text-center md:text-left">
                                 <DialogTitle className={cn(
                                     "text-3xl md:text-4xl lg:text-5xl font-black tracking-tight leading-none drop-shadow-md mb-2 flex flex-col uppercase",
@@ -356,20 +304,51 @@ export function PlayerDetailDialog({
                                     )}
                                 </DialogTitle>
 
-                                <div className={cn(
-                                    "text-xs md:text-sm font-bold uppercase tracking-[0.2em] opacity-90 flex items-center justify-center md:justify-start gap-2 bg-black/20 inline-flex px-3 py-1 rounded-full backdrop-blur-md border border-white/10",
-                                    teamColors.text
-                                )}>
-                                    <span>{player.team}</span>
-                                    {player.isInternational && (
-                                        <>
-                                            <span className="w-1 h-1 rounded-full bg-current opacity-50" />
-                                            <span className="flex items-center gap-1">
-                                                <Plane className="w-3.5 h-3.5" />
-                                                INTL
-                                            </span>
-                                        </>
-                                    )}
+                                <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3 mt-3">
+                                    {/* Team & International Badge */}
+                                    <div className={cn(
+                                        "text-[10px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] opacity-90 flex items-center justify-center gap-1.5 md:gap-2 bg-black/30 md:bg-black/20 px-3 py-1.5 md:px-3 md:py-1 rounded-full backdrop-blur-md border border-white/10",
+                                        teamColors.text
+                                    )}>
+                                        <span>{player.team}</span>
+                                        {player.isInternational && (
+                                            <>
+                                                <span className="w-1 h-1 rounded-full bg-current opacity-50" />
+                                                <span className="flex items-center gap-1">
+                                                    <Plane className="w-3 md:w-3.5 h-3 md:h-3.5" />
+                                                    INTL
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Status Badges Group */}
+                                    <div className="flex items-center gap-2">
+                                        {/* Role Badge */}
+                                        <Badge
+                                            className="text-[9px] md:text-[10px] px-2 py-1 md:py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-black/50 backdrop-blur-md border border-white/20 text-white"
+                                            variant="secondary"
+                                        >
+                                            {player.role}
+                                        </Badge>
+
+                                        {/* Ownership Badge */}
+                                        {owningManager ? (
+                                            <Badge
+                                                className="text-[9px] md:text-[10px] px-2 py-1 md:py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-indigo-500/80 backdrop-blur-md border border-indigo-300/30 text-white"
+                                                variant="secondary"
+                                            >
+                                                {owningManager.teamName}
+                                            </Badge>
+                                        ) : (
+                                            <Badge
+                                                className="text-[9px] md:text-[10px] px-2 py-1 md:py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-emerald-500/80 backdrop-blur-md border border-emerald-300/30 text-white"
+                                                variant="secondary"
+                                            >
+                                                Free Agent
+                                            </Badge>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 

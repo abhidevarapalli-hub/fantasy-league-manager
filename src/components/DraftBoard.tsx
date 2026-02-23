@@ -533,34 +533,39 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                     )}>
                       #{position}
                     </span>
-                    {manager && (
-                      <div className="flex items-center gap-1 min-h-[12px]">
-                        {isLeagueManager && !isEffectivelyReadOnly ? (
-                          <button
-                            onClick={() => toggleAutoDraft(manager.id, !orderItem?.autoDraftEnabled)}
-                            className={cn(
-                              "flex items-center gap-1 h-5 px-1.5 rounded-full transition-all duration-200 border",
-                              orderItem?.autoDraftEnabled
-                                ? "bg-primary/10 border-primary/30 text-primary scale-105 shadow-sm"
-                                : "bg-muted/50 border-transparent text-muted-foreground/30 hover:text-muted-foreground/80 hover:bg-muted"
-                            )}
-                            title={orderItem?.autoDraftEnabled ? "Auto-drafting enabled" : "Enable auto-drafting"}
-                          >
-                            <Bot className={cn("w-3.5 h-3.5", orderItem?.autoDraftEnabled && "animate-pulse")} />
-                            {orderItem?.autoDraftEnabled && (
-                              <span className="text-[9px] font-bold tracking-tighter">AUTO</span>
-                            )}
-                          </button>
-                        ) : (
-                          orderItem?.autoDraftEnabled && (
-                            <div className="flex items-center gap-1 bg-primary/10 border border-primary/20 rounded-full px-1.5 h-5 text-primary">
-                              <Bot className="w-3.5 h-3.5 animate-pulse" />
-                              <span className="text-[9px] font-bold tracking-tighter">AUTO</span>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    )}
+                    {manager && (() => {
+                      const isCpu = !manager.userId;
+                      const isAuto = orderItem?.autoDraftEnabled || isCpu;
+
+                      return (
+                        <div className="flex items-center gap-1 min-h-[12px]">
+                          {isLeagueManager && !isEffectivelyReadOnly && !isCpu ? (
+                            <button
+                              onClick={() => toggleAutoDraft(manager.id, !orderItem?.autoDraftEnabled)}
+                              className={cn(
+                                "flex items-center gap-1 h-5 px-1.5 rounded-full transition-all duration-200 border",
+                                isAuto
+                                  ? "bg-primary/10 border-primary/30 text-primary scale-105 shadow-sm"
+                                  : "bg-muted/50 border-transparent text-muted-foreground/30 hover:text-muted-foreground/80 hover:bg-muted"
+                              )}
+                              title={isAuto ? "Auto-drafting enabled" : "Enable auto-drafting"}
+                            >
+                              <Bot className={cn("w-3.5 h-3.5", isAuto && "animate-pulse")} />
+                              {isAuto && (
+                                <span className="text-[9px] font-bold tracking-tighter">AUTO</span>
+                              )}
+                            </button>
+                          ) : (
+                            isAuto && (
+                              <div className="flex items-center gap-1 bg-primary/10 border border-primary/20 rounded-full px-1.5 h-5 text-primary">
+                                <Bot className="w-3.5 h-3.5 animate-pulse" />
+                                <span className="text-[9px] font-bold tracking-tighter">AUTO</span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   {isEffectivelyReadOnly ? (
                     <div className={cn(
