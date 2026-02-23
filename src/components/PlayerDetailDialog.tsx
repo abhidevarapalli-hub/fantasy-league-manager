@@ -238,72 +238,116 @@ export function PlayerDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90vh] z-[100]">
-                <div className="relative flex flex-col w-full h-full max-h-[90vh] bg-[#0f1014] rounded-xl overflow-hidden border border-border/50 shadow-2xl">
-                    {/* Header Background Gradient */}
-                    <div className={cn("absolute inset-x-0 top-0 h-48 bg-gradient-to-b opacity-20 pointer-events-none", teamColors.bg)} />
+            <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90vh] z-[100] flex flex-col md:flex-row rounded-2xl">
+                <div className="relative flex flex-col w-full h-full max-h-[90vh] bg-background md:bg-[#0f1014] rounded-2xl overflow-hidden border border-border/50 shadow-2xl">
 
                     <DialogDescription className="sr-only">Player details and statistics for {player.name}</DialogDescription>
 
                     {/* Header Section */}
                     <div
                         className={cn(
-                            "relative flex flex-row items-stretch h-[200px] md:h-[260px] transition-colors duration-500 overflow-hidden flex-shrink-0",
+                            "relative flex flex-col md:flex-row items-end md:items-stretch transition-colors duration-500 overflow-hidden flex-shrink-0 pt-12 md:pt-0 border-b border-border/10",
                             teamColors.bg === 'bg-muted' ? "bg-muted/30" : ""
                         )}
                         style={teamColors.bg !== 'bg-muted' ? {
                             backgroundColor: teamColors.raw,
                         } : {}}
                     >
-                        {/* Player Image - Full Space */}
-                        <div className="relative w-48 md:w-64 flex-shrink-0 flex items-end justify-center overflow-hidden bg-black/10 border-r border-white/5">
-                            {/* Shaded background for depth */}
-                            <div className="absolute inset-0 bg-black/10 z-10" />
-                            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/40 to-transparent z-20" />
+                        {/* Background subtle gradient for depth */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-0" />
+                        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/40 to-transparent pointer-events-none z-0" />
 
+                        {/* Top Bar for Mobile (Tags) */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-30 md:hidden">
+                            <div className="flex flex-col gap-1.5">
+                                <Badge
+                                    className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-black/50 backdrop-blur-md border border-white/20 text-white"
+                                    variant="secondary"
+                                >
+                                    {player.role}
+                                </Badge>
+                                {owningManager ? (
+                                    <Badge
+                                        className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-indigo-500/80 backdrop-blur-md border border-indigo-300/30 text-white"
+                                        variant="secondary"
+                                    >
+                                        {owningManager.teamName}
+                                    </Badge>
+                                ) : (
+                                    <Badge
+                                        className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-emerald-500/80 backdrop-blur-md border border-emerald-300/30 text-white"
+                                        variant="secondary"
+                                    >
+                                        Free Agent
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Player Image - Floating Cutout Style */}
+                        <div className="relative w-full md:w-64 h-[180px] md:h-[260px] flex-shrink-0 flex items-end justify-center z-10 mx-auto md:mx-0 -mb-4 md:mb-0">
                             <img
                                 src={getPlayerAvatarUrl(imageId, 'det')}
                                 alt={player.name}
-                                className="relative z-30 h-full w-full object-cover object-top drop-shadow-[0_8px_16px_rgba(0,0,0,0.4)]"
+                                className="relative z-30 h-[120%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]"
                             />
+                            {/* Bottom fade to blend image with content below on mobile */}
+                            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background to-transparent z-40 md:hidden" />
                         </div>
 
                         {/* Info and Metadata Grid */}
-                        <div className="flex-1 p-5 md:p-8 flex flex-col justify-center relative bg-gradient-to-l from-black/40 via-black/10 to-transparent">
-                            <div className="mb-4">
-                                <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
-                                    <DialogTitle className={cn("text-2xl md:text-3xl md:text-4xl font-semibold drop-shadow-sm", teamColors.text)}>
-                                        {player.name}
-                                    </DialogTitle>
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                        <Badge
-                                            className={cn(
-                                                "text-[10px] px-2 py-0.5 font-medium shadow-md pointer-events-none whitespace-nowrap bg-zinc-900/60 backdrop-blur-md border border-white/10 text-white",
-                                            )}
-                                            variant="secondary"
-                                        >
-                                            {player.role}
-                                        </Badge>
-                                        {owningManager && (
-                                            <Badge
-                                                className={cn(
-                                                    "uppercase text-[9px] md:text-[10px] px-2 py-0.5 tracking-wider font-semibold shadow-lg pointer-events-none whitespace-nowrap bg-indigo-600 backdrop-blur-md border border-indigo-400/50 text-white",
-                                                )}
-                                                variant="secondary"
-                                            >
-                                                {owningManager.teamName}
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </div>
+                        <div className="flex-1 w-full p-5 md:p-8 flex flex-col justify-end md:justify-center relative z-20 md:bg-gradient-to-l from-black/40 via-black/10 to-transparent">
+                            {/* Desktop Tags (Hidden on Mobile) */}
+                            <div className="hidden md:flex flex-wrap items-center gap-2 mb-3">
+                                <Badge
+                                    className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-black/40 backdrop-blur-sm border border-white/10 text-white"
+                                    variant="secondary"
+                                >
+                                    {player.role}
+                                </Badge>
+                                {owningManager ? (
+                                    <Badge
+                                        className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-indigo-600/80 backdrop-blur-sm border border-indigo-400/30 text-white"
+                                        variant="secondary"
+                                    >
+                                        {owningManager.teamName}
+                                    </Badge>
+                                ) : (
+                                    <Badge
+                                        className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-emerald-600/80 backdrop-blur-sm border border-emerald-400/30 text-white"
+                                        variant="secondary"
+                                    >
+                                        Free Agent
+                                    </Badge>
+                                )}
+                            </div>
 
-                                <div className={cn("text-xs md:text-sm font-bold uppercase tracking-[0.2em] opacity-80 flex items-center gap-2", teamColors.text)}>
+                            <div className="mb-4 text-center md:text-left">
+                                <DialogTitle className={cn(
+                                    "text-3xl md:text-4xl lg:text-5xl font-black tracking-tight leading-none drop-shadow-md mb-2 flex flex-col uppercase",
+                                    teamColors.text
+                                )}>
+                                    {/* Split name if there's a space for dramatic visual effect on desktop */}
+                                    {player.name.includes(' ') ? (
+                                        <>
+                                            <span className="text-xl md:text-2xl lg:text-3xl opacity-90">{player.name.substring(0, player.name.lastIndexOf(' '))}</span>
+                                            <span>{player.name.substring(player.name.lastIndexOf(' ') + 1)}</span>
+                                        </>
+                                    ) : (
+                                        <span>{player.name}</span>
+                                    )}
+                                </DialogTitle>
+
+                                <div className={cn(
+                                    "text-xs md:text-sm font-bold uppercase tracking-[0.2em] opacity-90 flex items-center justify-center md:justify-start gap-2 bg-black/20 inline-flex px-3 py-1 rounded-full backdrop-blur-md border border-white/10",
+                                    teamColors.text
+                                )}>
                                     <span>{player.team}</span>
                                     {player.isInternational && (
                                         <>
-                                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40" />
-                                            <span className="flex items-center gap-1.5">
-                                                <Plane className="w-4 h-4" />
+                                            <span className="w-1 h-1 rounded-full bg-current opacity-50" />
+                                            <span className="flex items-center gap-1">
+                                                <Plane className="w-3.5 h-3.5" />
                                                 INTL
                                             </span>
                                         </>
@@ -312,29 +356,29 @@ export function PlayerDetailDialog({
                             </div>
 
                             {/* Metadata Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 border-t border-white/10 pt-4">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Born</span>
-                                    <span className="text-xs md:text-sm font-semibold text-white truncate">
-                                        {player.dateOfBirth || extendedData?.dob || 'N/A'}
+                            <div className="grid grid-cols-4 gap-2 md:gap-6 border-t border-white/10 pt-4 mt-2">
+                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
+                                    <span className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5 md:mb-1">Born</span>
+                                    <span className="text-xs md:text-sm font-bold text-white tracking-tight">
+                                        {player.dateOfBirth || extendedData?.dob || '-'}
                                     </span>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Batting</span>
-                                    <span className="text-xs md:text-sm font-semibold text-white">
-                                        {player.battingStyle || extendedData?.battingStyle || 'N/A'}
+                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
+                                    <span className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5 md:mb-1">Batting</span>
+                                    <span className="text-xs md:text-sm font-bold text-white tracking-tight">
+                                        {player.battingStyle || extendedData?.battingStyle || '-'}
                                     </span>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Bowling</span>
-                                    <span className="text-xs md:text-sm font-semibold text-white">
-                                        {player.bowlingStyle || extendedData?.bowlingStyle || 'N/A'}
+                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
+                                    <span className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5 md:mb-1">Bowling</span>
+                                    <span className="text-xs md:text-sm font-bold text-white tracking-tight truncate w-full">
+                                        {player.bowlingStyle || extendedData?.bowlingStyle || '-'}
                                     </span>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] md:text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1">Height</span>
-                                    <span className="text-xs md:text-sm font-semibold text-white">
-                                        {player.height || extendedData?.height || 'N/A'}
+                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
+                                    <span className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5 md:mb-1">Height</span>
+                                    <span className="text-xs md:text-sm font-bold text-white tracking-tight">
+                                        {player.height || extendedData?.height || '-'}
                                     </span>
                                 </div>
                             </div>
@@ -342,16 +386,31 @@ export function PlayerDetailDialog({
                     </div>
 
                     {/* Content Section */}
-                    <div className="bg-card flex-1 flex flex-col min-h-0">
-                        <ScrollArea className="flex-1 w-full">
+                    <div className="bg-background flex-1 flex flex-col min-h-0 relative z-30">
+                        {/* Pseudo Tabs */}
+                        <div className="flex items-center px-4 md:px-6 pt-4 border-b border-border/40">
+                            <div className="px-4 pb-3 border-b-2 border-primary font-bold text-xs md:text-sm tracking-wide text-foreground uppercase cursor-pointer">
+                                Game Log
+                            </div>
+                            <div className="px-4 pb-3 text-muted-foreground font-semibold text-xs md:text-sm tracking-wide uppercase hover:text-foreground transition-colors cursor-pointer">
+                                Summary
+                            </div>
+                        </div>
+
+                        <ScrollArea className="flex-1 w-full bg-background/50">
                             <div className="p-0">
-                                <div className="min-w-[700px] md:min-w-full">
+                                <div className="min-w-[700px] md:min-w-full pb-4">
+                                    {/* Year/Filter header */}
+                                    <div className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/10">
+                                        2025 Regular Season
+                                    </div>
+
                                     {/* Unified Grid Table */}
                                     <div className="grid text-xs text-center border-b border-border/50">
                                         {/* Header Row 1 - Groups */}
-                                        <div className="flex bg-muted/30 font-semibold text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
-                                            <div className="w-[180px] h-8 flex items-center px-4 border-r border-border/50 text-left">MATCH</div>
-                                            <div className="w-[80px] h-8 flex items-center justify-center border-r border-border/50 bg-muted/50 text-foreground">FANTASY</div>
+                                        <div className="flex bg-muted/30 font-bold text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
+                                            <div className="w-[180px] h-8 flex items-center px-4 border-r border-border/50 text-left bg-background/95 backdrop-blur-sm">MATCH</div>
+                                            <div className="w-[80px] h-8 flex items-center justify-center border-r border-border/50 bg-indigo-500/10 text-indigo-400">FANTASY</div>
 
                                             {sections.map(section => (
                                                 <div
@@ -365,13 +424,13 @@ export function PlayerDetailDialog({
                                         </div>
 
                                         {/* Header Row 2 - Columns */}
-                                        <div className="flex bg-muted/10 font-bold border-t border-border/50 sticky top-[28px] z-10 shadow-sm">
+                                        <div className="flex bg-background/95 backdrop-blur-sm font-bold border-b border-border/50 sticky top-[32px] z-10 shadow-sm text-[10px] md:text-xs">
                                             {/* Match Columns */}
-                                            <div className="w-[30px] py-2 border-r border-border/50">WK</div>
-                                            <div className="w-[150px] py-2 border-r border-border/50 text-left px-3">OPP</div>
+                                            <div className="w-[30px] py-2 border-r border-border/50 text-muted-foreground">WK</div>
+                                            <div className="w-[150px] py-2 border-r border-border/50 text-left px-3 text-muted-foreground">OPP</div>
 
                                             {/* Fantasy Columns */}
-                                            <div className="w-[80px] py-2 border-r border-border/50 bg-muted/30">FPTS</div>
+                                            <div className="w-[80px] py-2 border-r border-border/50 bg-indigo-500/5 text-foreground">FPTS</div>
 
                                             {/* Dynamic Columns */}
                                             {sections.map(section => (
@@ -379,7 +438,7 @@ export function PlayerDetailDialog({
                                                     {section.cols.map(col => (
                                                         <div
                                                             key={col.label}
-                                                            className={cn(col.w, "py-2 border-r border-border/50 last:border-r-0")}
+                                                            className={cn(col.w, "py-2 border-r border-border/50 last:border-r-0 text-foreground")}
                                                         >
                                                             {col.label}
                                                         </div>
@@ -505,15 +564,15 @@ export function PlayerDetailDialog({
 
                         {/* Action Bar */}
                         {(onAdd || onDrop || onTrade || (canDraft && onDraft)) && (
-                            <div className="p-4 border-t border-border/50 bg-muted/20 flex gap-3 flex-shrink-0 z-20">
+                            <div className="p-4 md:p-6 bg-background/95 backdrop-blur-xl border-t border-border/20 flex flex-col sm:flex-row gap-3 flex-shrink-0 z-40 sticky bottom-0 shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
                                 {/* Draft Case */}
                                 {canDraft && onDraft && (
                                     <Button
                                         onClick={onDraft}
-                                        className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        className="flex-1 gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-emerald-500/20 w-full"
                                     >
-                                        <Plus className="w-4 h-4" />
-                                        Draft Player
+                                        <Plus className="w-5 h-5" />
+                                        DRAFT PLAYER
                                     </Button>
                                 )}
 
@@ -521,10 +580,10 @@ export function PlayerDetailDialog({
                                 {!owningManager && onAdd && !canDraft && (
                                     <Button
                                         onClick={onAdd}
-                                        className="flex-1 gap-2 bg-primary hover:bg-primary/90"
+                                        className="flex-1 gap-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-indigo-500/20 w-full"
                                     >
-                                        <Plus className="w-4 h-4" />
-                                        Add Player
+                                        <Plus className="w-5 h-5" />
+                                        ADD PLAYER
                                     </Button>
                                 )}
 
@@ -533,10 +592,10 @@ export function PlayerDetailDialog({
                                     <Button
                                         onClick={onDrop}
                                         variant="destructive"
-                                        className="flex-1 gap-2"
+                                        className="flex-1 gap-2 font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-red-500/20 w-full"
                                     >
-                                        <Minus className="w-4 h-4" />
-                                        Drop Player
+                                        <Minus className="w-5 h-5" />
+                                        DROP PLAYER
                                     </Button>
                                 )}
 
@@ -544,11 +603,10 @@ export function PlayerDetailDialog({
                                 {owningManager && managerProfile && owningManager.id !== managerProfile.id && onTrade && (
                                     <Button
                                         onClick={onTrade}
-                                        variant="secondary"
-                                        className="flex-1 gap-2"
+                                        className="flex-1 gap-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg w-full"
                                     >
-                                        <ArrowLeftRight className="w-4 h-4" />
-                                        Trade Player
+                                        <ArrowLeftRight className="w-5 h-5" />
+                                        TRADE PLAYER
                                     </Button>
                                 )}
                             </div>
