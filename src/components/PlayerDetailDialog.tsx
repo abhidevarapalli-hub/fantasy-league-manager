@@ -238,15 +238,30 @@ export function PlayerDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90vh] z-[100] flex flex-col md:flex-row rounded-2xl">
+            <DialogContent
+                className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90vh] z-[100] flex flex-col md:flex-row rounded-2xl"
+                onInteractOutside={(e) => {
+                    // Only prevent default if we're dealing with something specific, otherwise allow the interact outside to close it
+                    if (onOpenChange) onOpenChange(false);
+                }}
+            >
                 <div className="relative flex flex-col w-full h-full max-h-[90vh] bg-background md:bg-[#0f1014] rounded-2xl overflow-hidden border border-border/50 shadow-2xl">
+
+                    {/* Visual Close Button for Mobile Accessibility */}
+                    <button
+                        onClick={() => onOpenChange && onOpenChange(false)}
+                        className="md:hidden absolute top-4 right-4 z-50 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md text-white rounded-full transition-colors border border-white/20 shadow-xl"
+                        aria-label="Close dialog"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                    </button>
 
                     <DialogDescription className="sr-only">Player details and statistics for {player.name}</DialogDescription>
 
                     {/* Header Section */}
                     <div
                         className={cn(
-                            "relative flex flex-col md:flex-row items-end md:items-stretch transition-colors duration-500 overflow-hidden flex-shrink-0 pt-12 md:pt-0 border-b border-border/10",
+                            "relative flex flex-col md:flex-row items-end md:items-stretch transition-colors duration-500 overflow-hidden flex-shrink-0 pt-14 md:pt-0 border-b border-border/10",
                             teamColors.bg === 'bg-muted' ? "bg-muted/30" : ""
                         )}
                         style={teamColors.bg !== 'bg-muted' ? {

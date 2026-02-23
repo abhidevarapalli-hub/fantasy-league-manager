@@ -497,7 +497,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     <div className="space-y-4 pb-28">
       {/* Top Floating Bar for Timer */}
       {draftState?.isActive && !draftState?.isFinalized && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] flex flex-col items-center gap-2">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2">
           <DraftTimer
             getRemainingTime={getRemainingTime}
             isActive={draftState.isActive}
