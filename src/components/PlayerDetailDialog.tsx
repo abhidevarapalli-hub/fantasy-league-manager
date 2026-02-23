@@ -423,14 +423,14 @@ export function PlayerDetailDialog({
                                     {/* Unified Grid Table */}
                                     <div className="grid text-xs text-center border-b border-border/50">
                                         {/* Header Row 1 - Groups */}
-                                        <div className="flex bg-muted/30 font-bold text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
-                                            <div className="w-[180px] h-8 flex items-center px-4 border-r border-border/50 text-left bg-background/95 backdrop-blur-sm">MATCH</div>
-                                            <div className="w-[80px] h-8 flex items-center justify-center border-r border-border/50 bg-indigo-500/10 text-indigo-400">FANTASY</div>
+                                        <div className="flex w-max bg-muted/30 font-bold text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
+                                            <div className="w-[180px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-background/95 backdrop-blur-sm">MATCH</div>
+                                            <div className="w-[80px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-indigo-500/10 text-indigo-400">FANTASY</div>
 
                                             {sections.map(section => (
                                                 <div
                                                     key={section.id}
-                                                    className={cn("h-8 flex items-center justify-center border-r border-border/50 last:border-r-0", section.color)}
+                                                    className={cn("flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 last:border-r-0", section.color)}
                                                     style={{ width: `${section.width}px` }}
                                                 >
                                                     {section.label}
@@ -439,13 +439,13 @@ export function PlayerDetailDialog({
                                         </div>
 
                                         {/* Header Row 2 - Columns */}
-                                        <div className="flex bg-background/95 backdrop-blur-sm font-bold border-b border-border/50 sticky top-[32px] z-10 shadow-sm text-[10px] md:text-xs">
+                                        <div className="flex w-max bg-background/95 backdrop-blur-sm font-bold border-b border-border/50 sticky top-[32px] z-10 shadow-sm text-[10px] md:text-xs">
                                             {/* Match Columns */}
-                                            <div className="w-[30px] py-2 border-r border-border/50 text-muted-foreground">WK</div>
-                                            <div className="w-[150px] py-2 border-r border-border/50 text-left px-3 text-muted-foreground">OPP</div>
+                                            <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 text-muted-foreground flex items-center justify-center">WK</div>
+                                            <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 text-muted-foreground flex items-center">OPP</div>
 
                                             {/* Fantasy Columns */}
-                                            <div className="w-[80px] py-2 border-r border-border/50 bg-indigo-500/5 text-foreground">FPTS</div>
+                                            <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 bg-indigo-500/5 text-foreground flex items-center justify-center">FPTS</div>
 
                                             {/* Dynamic Columns */}
                                             {sections.map(section => (
@@ -453,7 +453,8 @@ export function PlayerDetailDialog({
                                                     {section.cols.map(col => (
                                                         <div
                                                             key={col.label}
-                                                            className={cn(col.w, "py-2 border-r border-border/50 last:border-r-0 text-foreground")}
+                                                            className="flex-shrink-0 py-2 border-r border-border/50 last:border-r-0 text-foreground flex items-center justify-center"
+                                                            style={{ width: `${col.px}px` }}
                                                         >
                                                             {col.label}
                                                         </div>
@@ -486,16 +487,16 @@ export function PlayerDetailDialog({
                                                 <div
                                                     key={matchItem.matchId || index}
                                                     className={cn(
-                                                        "flex hover:bg-muted/50 transition-colors border-b border-border/30",
+                                                        "flex w-max hover:bg-muted/50 transition-colors border-b border-border/30",
                                                         index % 2 === 0 ? "bg-background" : "bg-muted/10", // Alternating rows
                                                         isUpcoming && "opacity-70 bg-muted/5"
                                                     )}
                                                 >
                                                     {/* Match Info */}
-                                                    <div className="w-[30px] py-2 border-r border-border/50 items-center justify-center flex text-muted-foreground font-mono text-[10px]">
+                                                    <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 items-center justify-center flex text-muted-foreground font-mono text-[10px]">
                                                         {weekNum}
                                                     </div>
-                                                    <div className="w-[150px] py-2 border-r border-border/50 text-left px-3 flex flex-col justify-center">
+                                                    <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 flex flex-col justify-center">
                                                         <span className="font-semibold text-foreground flex items-center justify-between">
                                                             <span>vs {opponentShort}</span>
                                                             {isUpcoming && (
@@ -512,7 +513,7 @@ export function PlayerDetailDialog({
                                                     </div>
 
                                                     {/* Fantasy Points */}
-                                                    <div className="w-[80px] py-2 border-r border-border/50 bg-muted/20 font-bold text-primary flex items-center justify-center text-sm">
+                                                    <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 bg-muted/20 font-bold text-primary flex items-center justify-center text-sm">
                                                         {hasStats ? fpts.toFixed(1) : (isUpcoming ? '' : 'DNP')}
                                                     </div>
 
@@ -531,7 +532,7 @@ export function PlayerDetailDialog({
                                                                     else if (col.key === 'runs' && section.id === 'batting' && (val as number) >= 30) {
                                                                         // Highlight high runs
                                                                         return (
-                                                                            <div key={col.key} className={cn(col.w, "py-2 border-r border-border/50 flex items-center justify-center")}>
+                                                                            <div key={col.key} className="flex-shrink-0 py-2 border-r border-border/50 flex items-center justify-center" style={{ width: `${col.px}px` }}>
                                                                                 <span className="text-foreground font-semibold">{val}</span>
                                                                             </div>
                                                                         );
@@ -539,7 +540,7 @@ export function PlayerDetailDialog({
                                                                     else if (col.key === 'wickets' && (val as number) >= 2) {
                                                                         // Highlight high wickets
                                                                         return (
-                                                                            <div key={col.key} className={cn(col.w, "py-2 border-r border-border/50 flex items-center justify-center")}>
+                                                                            <div key={col.key} className="flex-shrink-0 py-2 border-r border-border/50 flex items-center justify-center" style={{ width: `${col.px}px` }}>
                                                                                 <span className="text-foreground font-semibold">{val}</span>
                                                                             </div>
                                                                         );
@@ -552,7 +553,8 @@ export function PlayerDetailDialog({
                                                                 return (
                                                                     <div
                                                                         key={col.key}
-                                                                        className={cn(col.w, "py-2 border-r border-border/50 flex items-center justify-center text-muted-foreground")}
+                                                                        className="flex-shrink-0 py-2 border-r border-border/50 flex items-center justify-center text-muted-foreground"
+                                                                        style={{ width: `${col.px}px` }}
                                                                     >
                                                                         {isUpcoming ? '' : (hasStats ? val : 'DNP')}
                                                                     </div>
