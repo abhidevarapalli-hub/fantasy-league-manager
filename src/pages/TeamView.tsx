@@ -239,17 +239,8 @@ const TeamView = () => {
         </div>
       }
       headerActions={
-        <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+        <div className="flex items-center gap-2">
           {!canEdit && <Lock className="w-3.5 h-3.5 text-muted-foreground opacity-50" />}
-          <div className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm",
-            internationalCount > config.maxInternational
-              ? "bg-destructive/10 text-destructive border border-destructive/20"
-              : "bg-primary/10 text-primary border border-primary/20"
-          )}>
-            <Plane className="w-3 h-3" />
-            <span className="tabular-nums">{internationalCount}/{config.maxInternational} INT</span>
-          </div>
         </div>
       }
     >
@@ -309,20 +300,31 @@ const TeamView = () => {
 
         {/* Active 11 */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-              <Users className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-foreground">Active 11</h2>
-              <p className="text-xs text-muted-foreground">Starting lineup ({activePlayers.length}/{config.activeSize})</p>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                <Users className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-foreground">Starting Roster</h2>
+                  <div className={cn(
+                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter border shadow-sm",
+                    internationalCount > config.maxInternational
+                      ? "bg-destructive/10 text-destructive border-destructive/20"
+                      : "bg-primary/5 text-primary/70 border-primary/10"
+                  )}>
+                    <Plane className="w-2.5 h-2.5" />
+                    <span className="tabular-nums">{internationalCount}/{config.maxInternational} INT</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Starting lineup ({activePlayers.length}/{config.activeSize})</p>
+              </div>
             </div>
 
-            <div className="flex-1 flex justify-end">
-              <Badge variant="outline" className="bg-background text-[10px] uppercase border-border/50 shadow-sm text-muted-foreground tracking-widest hidden sm:inline-flex">
-                Starters
-              </Badge>
-            </div>
+            <Badge variant="outline" className="bg-background text-[10px] uppercase border-border/50 shadow-sm text-muted-foreground tracking-widest">
+              Starters
+            </Badge>
           </div>
 
           <div className="space-y-2">
