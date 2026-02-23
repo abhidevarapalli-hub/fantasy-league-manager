@@ -61,6 +61,8 @@ Key characteristics:
 - Use the playwright MCP when asked to verify changes in the browser
 - Look for servers before starting a new server, kill old ones if a new one needs to start
 - Consider database schema changes with future scalability in mind
+- When a migration renames or drops a table/column, update `supabase/seed.sql` in the same commit — CI runs `supabase db reset` which applies migrations then seed, so a stale seed will fail the build
+- Always create migrations with `npm run supabase:migration -- <name>` to avoid timestamp collisions
 
 ## Local Development Setup
 
@@ -122,6 +124,7 @@ Requires `VITE_RAPIDAPI_KEY` in `.env.local`. The flag `VITE_USE_LIVE_API=true` 
 - `npm run dev:full:live` — Start Supabase + Vite with live API
 - `npm run supabase:reset` — Drop and recreate local DB (re-applies migrations + seed)
 - `npm run supabase:status` — Show local Supabase URLs and keys
+- `npm run supabase:migration -- <name>` — Create a new migration with a timestamp-safe filename (always use this instead of creating migration files manually)
 - `npm run supabase:stop` — Stop local Docker containers
 - `npm run supabase:functions` — Serve edge functions locally
 - Supabase Studio: http://127.0.0.1:54323
@@ -131,6 +134,31 @@ Requires `VITE_RAPIDAPI_KEY` in `.env.local`. The flag `VITE_USE_LIVE_API=true` 
 - Local: `127.0.0.1:54322` (Docker, via `supabase start`)
 - Migrations: `supabase/migrations/`
 - Seed data: `supabase/seed.sql`
+
+### Migration Deployment (CI-Only)
+
+Production migrations can **only** be deployed through GitHub Actions CI. Local CLI usage is blocked by design.
+
+**Guardrails in place:**
+- `supabase/config.toml` uses `project_id = "local-dev"` — not a valid remote project, so `supabase db push` fails locally
+- `npm run supabase:push` prints an error and exits — no accidental pushes
+- `supabase:link` script has been removed — no linking to production locally
+- CI `safety-check` job fails if anyone commits the production project ref back into `config.toml`
+- The `deploy` job in `deploy-migrations.yml` only runs on `main` branch
+
+**PR validation** — The CI workflow (`ci.yml`) includes a `migrate-check` job that spins up a local Supabase instance and runs `supabase db reset` to validate all migrations apply cleanly. This runs on every PR and push to `main`.
+
+**Production deployment** — The `deploy-migrations.yml` workflow automatically deploys migrations to production when migration files change on `main`. It can also be triggered manually via `workflow_dispatch` (from `main` only).
+- Validates migrations locally first, then deploys to production
+- The `deploy` job uses a GitHub `production` environment — configure [environment protection rules](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment#environment-protection-rules) to require manual approval before production deploys
+- **Never** run `supabase db push` manually — it is blocked locally, and production deploys happen through CI only
+
+**Required GitHub Actions secrets** (these live only in GitHub, never on developer machines):
+| Secret | Purpose |
+|--------|---------|
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI auth (generate a CI-only token at supabase.com/dashboard/account/tokens) |
+| `SUPABASE_DB_PASSWORD` | Production database password |
+| `SUPABASE_PROJECT_REF` | Production project ref |
 
 ## Don't Change
 
