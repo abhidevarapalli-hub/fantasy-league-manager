@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Manager, Match } from "@/lib/supabase-types";
 import { useGameStore } from "@/store/useGameStore";
 import { useMatchupData, PlayerWithMatches } from "@/hooks/useMatchupData";
@@ -171,15 +172,17 @@ const RosterSection = ({
 const MatchupRow = ({
     homePlayer,
     awayPlayer,
+    assignedRoleLabel,
     onPlayerClick
 }: {
     homePlayer?: PlayerWithMatches;
     awayPlayer?: PlayerWithMatches;
+    assignedRoleLabel?: string;
     onPlayerClick: (playerId: string) => void;
 }) => {
     // Helper to render a single player side
-    const renderPlayerSide = (playerData: PlayerWithMatches | undefined, align: 'left' | 'right') => {
-        if (!playerData) return <div className="flex-1 opacity-0">Empty</div>;
+    const renderPlayerSide = (playerData: PlayerWithMatches | null | undefined, align: 'left' | 'right') => {
+        if (!playerData) return <div className="flex-1 flex items-center min-w-0" />;
 
         const { player, totalPoints, cricketMatches } = playerData;
         const now = new Date();
@@ -191,8 +194,11 @@ const MatchupRow = ({
         return (
             <div
                 className={cn(
-                    "flex-1 flex items-center gap-2 min-w-0 cursor-pointer active:opacity-70 transition-opacity",
-                    align === 'right' ? "flex-row-reverse text-right" : "flex-row text-left"
+                    "flex-1 flex items-center gap-2 min-w-0 cursor-pointer active:opacity-70 transition-all rounded-md p-1 -mx-1",
+                    align === 'right' ? "flex-row-reverse text-right" : "flex-row text-left",
+                    playerData.isCaptain && (align === 'left' ? "bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/20" : "bg-gradient-to-l from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/20"),
+                    playerData.isViceCaptain && (align === 'left' ? "bg-gradient-to-r from-slate-400/15 via-slate-400/5 to-transparent border border-slate-400/20" : "bg-gradient-to-l from-slate-400/15 via-slate-400/5 to-transparent border border-slate-400/20"),
+                    !playerData.isCaptain && !playerData.isViceCaptain && "hover:bg-muted/30"
                 )}
                 onClick={() => onPlayerClick(player.id)}
             >
@@ -216,7 +222,7 @@ const MatchupRow = ({
                 {/* Info */}
                 <div className="flex-col overflow-hidden">
                     <p className="text-[11px] font-bold leading-tight truncate text-foreground/90">
-                        {player.name.split(' ').slice(-1)[0]}
+                        {player.name.split(' ').length > 1 ? `${player.name.charAt(0)}. ${player.name.split(' ').slice(1).join(' ')}` : player.name}
                         {playerData.isCaptain && (
                             <span className="ml-1 px-1 py-0.5 text-[8px] font-black rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/50 leading-none">C</span>
                         )}
@@ -251,7 +257,12 @@ const MatchupRow = ({
         );
     };
 
-    const role = homePlayer?.player.role || awayPlayer?.player.role || 'Unset';
+    let displayRoleLabel = assignedRoleLabel || 'UNSET';
+    if (!assignedRoleLabel && (homePlayer || awayPlayer)) {
+        if (homePlayer) displayRoleLabel = homePlayer.player.role;
+        else if (awayPlayer) displayRoleLabel = awayPlayer.player.role;
+        displayRoleLabel = displayRoleLabel === 'Batsman' ? 'BAT' : displayRoleLabel === 'Bowler' ? 'BWL' : displayRoleLabel === 'All Rounder' ? 'AR' : displayRoleLabel === 'Wicket Keeper' ? 'WK' : displayRoleLabel;
+    }
 
     return (
         <div className="flex items-center justify-between py-2 border-b border-border/30 last:border-0 relative">
@@ -262,12 +273,14 @@ const MatchupRow = ({
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
                 <div className={cn(
                     "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter border shadow-sm min-w-[32px] text-center",
-                    role === 'Batsman' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
-                    role === 'Bowler' && "bg-red-500/10 text-red-500 border-red-500/20",
-                    role === 'All Rounder' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
-                    role === 'Wicket Keeper' && "bg-green-500/10 text-green-500 border-green-500/20",
+                    displayRoleLabel === 'BAT' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                    displayRoleLabel === 'BWL' && "bg-red-500/10 text-red-500 border-red-500/20",
+                    displayRoleLabel === 'AR' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
+                    displayRoleLabel === 'WK' && "bg-green-500/10 text-green-500 border-green-500/20",
+                    displayRoleLabel === 'FLEX' && "bg-amber-500/10 text-amber-500 border-amber-500/20",
+                    displayRoleLabel === 'UNSET' && "bg-muted text-muted-foreground border-border",
                 )}>
-                    {role === 'Batsman' ? 'BAT' : role === 'Bowler' ? 'BWL' : role === 'All Rounder' ? 'AR' : 'WK'}
+                    {displayRoleLabel}
                 </div>
             </div>
 
@@ -277,52 +290,97 @@ const MatchupRow = ({
     );
 };
 
-const MobileRosterSection = ({
+type SlotDef = { roleLabel: string; player: PlayerWithMatches | null };
+
+const assignToSlots = (players: PlayerWithMatches[]): SlotDef[] => {
+    const unassigned = [...players];
+
+    const pullPlayer = (roles: string[]) => {
+        const idx = unassigned.findIndex(p => roles.includes(p.player.role));
+        if (idx !== -1) return unassigned.splice(idx, 1)[0] || null;
+        return null;
+    };
+
+    const slots: SlotDef[] = [];
+    slots.push({ roleLabel: 'WK', player: pullPlayer(['Wicket Keeper']) });
+    for (let i = 0; i < 3; i++) slots.push({ roleLabel: 'BAT', player: pullPlayer(['Batsman', 'Wicket Keeper']) });
+    for (let i = 0; i < 2; i++) slots.push({ roleLabel: 'AR', player: pullPlayer(['All Rounder']) });
+    for (let i = 0; i < 3; i++) slots.push({ roleLabel: 'BWL', player: pullPlayer(['Bowler']) });
+    for (let i = 0; i < 2; i++) slots.push({ roleLabel: 'FLEX', player: unassigned.length > 0 ? unassigned.shift()! : null });
+
+    while (unassigned.length > 0) {
+        slots.push({ roleLabel: 'FLEX', player: unassigned.shift()! });
+    }
+
+    return slots;
+};
+
+const HeadToHeadSection = ({
     title,
     homePlayers,
     awayPlayers,
-    onPlayerClick
+    onPlayerClick,
+    useSlots = false
 }: {
     title: string;
     homePlayers: PlayerWithMatches[];
     awayPlayers: PlayerWithMatches[];
     onPlayerClick: (playerId: string) => void;
+    useSlots?: boolean;
 }) => {
-    // Sort Order: WK -> BAT -> AR -> BOWL
-    const roleOrder = ['Wicket Keeper', 'Batsman', 'All Rounder', 'Bowler'];
-    const sortParams = (p: PlayerWithMatches) => roleOrder.indexOf(p.player.role);
+    let rows: { home: PlayerWithMatches | null, away: PlayerWithMatches | null, label: string }[] = [];
 
-    const sortedHome = [...homePlayers].sort((a, b) => {
-        const aP = a.isCaptain ? -2 : a.isViceCaptain ? -1 : 0;
-        const bP = b.isCaptain ? -2 : b.isViceCaptain ? -1 : 0;
-        if (aP !== bP) return aP - bP;
-        return sortParams(a) - sortParams(b);
-    });
-    const sortedAway = [...awayPlayers].sort((a, b) => {
-        const aP = a.isCaptain ? -2 : a.isViceCaptain ? -1 : 0;
-        const bP = b.isCaptain ? -2 : b.isViceCaptain ? -1 : 0;
-        if (aP !== bP) return aP - bP;
-        return sortParams(a) - sortParams(b);
-    });
+    if (useSlots) {
+        const homeSlots = assignToSlots(homePlayers);
+        const awaySlots = assignToSlots(awayPlayers);
+        const maxCount = Math.max(homeSlots.length, awaySlots.length);
 
-    const maxCount = Math.max(sortedHome.length, sortedAway.length);
+        for (let i = 0; i < maxCount; i++) {
+            rows.push({
+                home: homeSlots[i]?.player || null,
+                away: awaySlots[i]?.player || null,
+                label: homeSlots[i]?.roleLabel || awaySlots[i]?.roleLabel || 'UNSET'
+            });
+        }
+    } else {
+        const roleOrder = ['Wicket Keeper', 'Batsman', 'All Rounder', 'Bowler'];
+        const sortParams = (p: PlayerWithMatches) => roleOrder.indexOf(p.player.role);
 
-    if (maxCount === 0) return null;
+        const sortedHome = [...homePlayers].sort((a, b) => sortParams(a) - sortParams(b));
+        const sortedAway = [...awayPlayers].sort((a, b) => sortParams(a) - sortParams(b));
+
+        const maxCount = Math.max(sortedHome.length, sortedAway.length);
+        for (let i = 0; i < maxCount; i++) {
+            let label = 'UNSET';
+            if (sortedHome[i] || sortedAway[i]) {
+                const r = sortedHome[i]?.player.role || sortedAway[i]?.player.role;
+                label = r === 'Batsman' ? 'BAT' : r === 'Bowler' ? 'BWL' : r === 'All Rounder' ? 'AR' : r === 'Wicket Keeper' ? 'WK' : 'UNSET';
+            }
+            rows.push({
+                home: sortedHome[i] || null,
+                away: sortedAway[i] || null,
+                label
+            });
+        }
+    }
+
+    if (rows.length === 0) return null;
 
     return (
         <div className="bg-card/30 rounded-xl border border-border/50 overflow-hidden">
             <div className="bg-muted/40 px-3 py-1.5 border-b border-border/50 flex justify-between items-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</span>
                 <span className="text-[10px] font-mono text-muted-foreground opacity-60">
-                    {title === 'Starters' ? 'Starting XI' : 'Bench'}
+                    {title === 'Starters' ? 'Starting XI' : 'Reserve'}
                 </span>
             </div>
             <div className="px-2">
-                {Array.from({ length: maxCount }).map((_, i) => (
+                {rows.map((row, i) => (
                     <MatchupRow
                         key={i}
-                        homePlayer={sortedHome[i]}
-                        awayPlayer={sortedAway[i]}
+                        homePlayer={row.home || undefined}
+                        awayPlayer={row.away || undefined}
+                        assignedRoleLabel={useSlots ? row.label : undefined}
                         onPlayerClick={onPlayerClick}
                     />
                 ))}
@@ -341,6 +399,7 @@ export function MatchupDetail({
     const players = useGameStore(state => state.players);
     const currentLeagueId = useGameStore(state => state.currentLeagueId);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const navigate = useNavigate();
 
     const matchWeek = Number(match.week);
 
@@ -379,7 +438,17 @@ export function MatchupDetail({
                     <div className="flex items-center justify-between gap-4">
                         {/* Home Team */}
                         <div className="flex-1 text-left">
-                            <p className="text-lg font-bold truncate">{homeManager?.teamName || "TBD"}</p>
+                            <p
+                                className="text-lg font-bold truncate cursor-pointer hover:underline text-foreground"
+                                onClick={() => {
+                                    if (homeManager) {
+                                        navigate(`/${currentLeagueId}/team/${homeManager.id}`);
+                                        onOpenChange(false);
+                                    }
+                                }}
+                            >
+                                {homeManager?.teamName || "TBD"}
+                            </p>
                             <p className="text-sm text-muted-foreground truncate">{homeManager?.name || "-"}</p>
                             <div className="flex items-baseline gap-2 mt-1">
                                 <span className="text-3xl font-bold">
@@ -405,7 +474,17 @@ export function MatchupDetail({
 
                         {/* Away Team */}
                         <div className="flex-1 text-right">
-                            <p className="text-lg font-bold truncate">{awayManager?.teamName || "TBD"}</p>
+                            <p
+                                className="text-lg font-bold truncate cursor-pointer hover:underline text-foreground"
+                                onClick={() => {
+                                    if (awayManager) {
+                                        navigate(`/${currentLeagueId}/team/${awayManager.id}`);
+                                        onOpenChange(false);
+                                    }
+                                }}
+                            >
+                                {awayManager?.teamName || "TBD"}
+                            </p>
                             <p className="text-sm text-muted-foreground truncate">{awayManager?.name || "-"}</p>
                             <div className="flex items-baseline gap-2 mt-1 justify-end">
                                 {awayManager && (
@@ -437,54 +516,22 @@ export function MatchupDetail({
 
                 {/* Roster Display */}
                 {!matchupData.loading && !matchupData.error && (
-                    <>
-                        {/* Mobile View: Head-to-Head Rows */}
-                        <div className="block md:hidden space-y-6 pt-4">
-                            <MobileRosterSection
-                                title="Starters"
-                                homePlayers={homeStarters}
-                                awayPlayers={awayStarters}
-                                onPlayerClick={setSelectedPlayerId}
-                            />
-                            <MobileRosterSection
-                                title="Bench"
-                                homePlayers={homeBench}
-                                awayPlayers={awayBench}
-                                onPlayerClick={setSelectedPlayerId}
-                            />
-                        </div>
-
-                        {/* Desktop View: Side-by-Side Columns */}
-                        <div className="hidden md:grid grid-cols-2 gap-6 pt-4">
-                            {/* Home Team Roster */}
-                            <div className="space-y-4">
-                                <RosterSection
-                                    title="Starters"
-                                    players={homeStarters}
-                                    onPlayerClick={setSelectedPlayerId}
-                                />
-                                <RosterSection
-                                    title="Bench"
-                                    players={homeBench}
-                                    onPlayerClick={setSelectedPlayerId}
-                                />
-                            </div>
-
-                            {/* Away Team Roster */}
-                            <div className="space-y-4">
-                                <RosterSection
-                                    title="Starters"
-                                    players={awayStarters}
-                                    onPlayerClick={setSelectedPlayerId}
-                                />
-                                <RosterSection
-                                    title="Bench"
-                                    players={awayBench}
-                                    onPlayerClick={setSelectedPlayerId}
-                                />
-                            </div>
-                        </div>
-                    </>
+                    <div className="space-y-6 pt-4">
+                        <HeadToHeadSection
+                            title="Starters"
+                            homePlayers={homeStarters}
+                            awayPlayers={awayStarters}
+                            onPlayerClick={setSelectedPlayerId}
+                            useSlots={true}
+                        />
+                        <HeadToHeadSection
+                            title="Bench"
+                            homePlayers={homeBench}
+                            awayPlayers={awayBench}
+                            onPlayerClick={setSelectedPlayerId}
+                            useSlots={false}
+                        />
+                    </div>
                 )}
 
                 <PlayerDetailDialog

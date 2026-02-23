@@ -12,7 +12,6 @@ interface RosterManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   player: Player | null;
-  preselectedManagerId?: string;
 }
 
 const teamBadgeColors: Record<string, string> = {
@@ -28,22 +27,23 @@ const teamBadgeColors: Record<string, string> = {
   LSG: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
 };
 
-export const RosterManagementDialog = ({ open, onOpenChange, player, preselectedManagerId }: RosterManagementDialogProps) => {
+export const RosterManagementDialog = ({ open, onOpenChange, player }: RosterManagementDialogProps) => {
   const managers = useGameStore(state => state.managers);
   const players = useGameStore(state => state.players);
   const addFreeAgent = useGameStore(state => state.addFreeAgent);
   const getManagerRosterCount = useGameStore(state => state.getManagerRosterCount);
-  const [selectedManagerId, setSelectedManagerId] = useState<string>('');
+  const currentManagerId = useGameStore(state => state.currentManagerId);
+  const selectedManagerId = currentManagerId || '';
+
   const [dropPlayerId, setDropPlayerId] = useState<string>('none');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset state when dialog opens/closes or player changes
   useEffect(() => {
     if (open) {
-      setSelectedManagerId(preselectedManagerId || '');
       setDropPlayerId('none');
     }
-  }, [open, player?.id, preselectedManagerId]);
+  }, [open, player?.id]);
 
   const selectedManager = useMemo(() => {
     return managers.find(m => m.id === selectedManagerId);
@@ -70,12 +70,13 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
     return true;
   }, [selectedManagerId, player, mustDrop, dropPlayerId]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (overrideDropId?: string) => {
     if (!player || !selectedManagerId) return;
 
     setIsSubmitting(true);
     try {
-      const dropPlayer = dropPlayerId !== 'none' ? dropPlayerId : undefined;
+      const actualDropId = overrideDropId !== undefined ? overrideDropId : dropPlayerId;
+      const dropPlayer = actualDropId !== 'none' ? actualDropId : undefined;
       await addFreeAgent(selectedManagerId, player.id, dropPlayer);
 
       const manager = managers.find(m => m.id === selectedManagerId);
@@ -95,7 +96,18 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
     }
   };
 
+  // Auto-submit if no drop is required
+  useEffect(() => {
+    if (open && player && selectedManagerId && !mustDrop && !isSubmitting) {
+      // Small timeout to let the dialog render visually immediately close to prevent flashing, but react state is fast enough
+      handleSubmit('none');
+    }
+  }, [open, player, selectedManagerId, mustDrop]);
+
   if (!player) return null;
+
+  // If we don't need to drop, don't show the dialog contents while it auto-submits
+  if (!mustDrop) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -130,51 +142,9 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
             </div>
           </div>
 
-          {/* Manager Selection */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Select Manager
-            </label>
-            {preselectedManagerId ? (
-              // Locked manager display for non-league managers
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">
-                    {managers.find(m => m.id === preselectedManagerId)?.teamName}
-                  </p>
-                  <span className="text-xs text-muted-foreground">
-                    ({rosterCount}/14 players)
-                  </span>
-                </div>
-              </div>
-            ) : (
-              // Dropdown for league managers
-              <Select value={selectedManagerId} onValueChange={setSelectedManagerId}>
-                <SelectTrigger className="bg-muted border-border">
-                  <SelectValue placeholder="Choose a manager..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {managers.map(manager => {
-                    const count = getManagerRosterCount(manager.id);
-                    return (
-                      <SelectItem key={manager.id} value={manager.id}>
-                        <span className="flex items-center gap-2">
-                          {manager.teamName}
-                          <span className="text-muted-foreground text-xs">
-                            ({count}/14)
-                          </span>
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
           {/* Drop Player Section - Only shows after manager is selected */}
           {selectedManager && (
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   {mustDrop ? 'Drop Player (Required)' : 'Drop Player (Optional)'}
@@ -248,7 +218,7 @@ export const RosterManagementDialog = ({ open, onOpenChange, player, preselected
             <Button
               className="flex-1"
               disabled={!canSubmit || isSubmitting}
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
             >
               {isSubmitting ? 'Processing...' : 'Confirm'}
             </Button>

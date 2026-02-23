@@ -11,6 +11,7 @@ import { Player } from '@/lib/supabase-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RosterGrid } from '@/components/RosterGrid';
+import { DraftTimer, DraftTimerProps } from '@/components/DraftTimer';
 import { buildOptimalActive11 } from '@/lib/roster-validation';
 import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
 import { getTeamPillStyles } from '@/lib/team-colors';
@@ -61,6 +62,7 @@ interface AvailablePlayersDrawerProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   targetPick?: { round: number; position: number } | null;
+  draftTimerProps?: DraftTimerProps;
 }
 
 export const AvailablePlayersDrawer = ({
@@ -70,7 +72,8 @@ export const AvailablePlayersDrawer = ({
   onDraftPlayer,
   open: externalOpen,
   onOpenChange: setExternalOpen,
-  targetPick
+  targetPick,
+  draftTimerProps
 }: AvailablePlayersDrawerProps) => {
   const players = useGameStore(state => state.players);
   const managers = useGameStore(state => state.managers);
@@ -164,11 +167,16 @@ export const AvailablePlayersDrawer = ({
           </Button>
         </SheetTrigger>
         <SheetContent side="right" className="p-0 sm:max-w-md md:max-w-xl flex flex-col h-full z-[60]">
-          <SheetHeader className="px-6 pt-6 pb-2">
+          <SheetHeader className="px-6 pt-6 pb-2 flex flex-row items-center justify-between">
             <SheetTitle className="flex items-center gap-2">
               <Filter className="w-5 h-5 text-primary" />
               Draft Board
             </SheetTitle>
+            {draftTimerProps && (
+              <div className="scale-90 origin-right -m-4">
+                <DraftTimer {...draftTimerProps} />
+              </div>
+            )}
           </SheetHeader>
 
           <Tabs defaultValue="available" className="flex-1 flex flex-col overflow-hidden">

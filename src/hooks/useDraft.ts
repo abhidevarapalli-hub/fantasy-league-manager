@@ -63,7 +63,8 @@ export const useDraft = () => {
             .from('draft_state')
             .insert({
               league_id: leagueId,
-              status: 'pre_draft' as "pre_draft" | "active" | "paused" | "completed"
+              status: 'pre_draft' as "pre_draft" | "active" | "paused" | "completed",
+              clock_duration_seconds: store.config.draftTimerSeconds || 60
             })
             .select('*')
             .single();
@@ -509,17 +510,28 @@ export const useDraft = () => {
       const { orderNode } = pickData;
       const hasManager = !!orderNode?.managerId;
       const manager = hasManager ? managers.find(m => m.id === orderNode!.managerId) : null;
-      const shouldImmediatePick = !hasManager || (manager && !manager.userId);
 
-      // If immediate or time is up, trigger the check RPC
-      if (shouldImmediatePick || getRemainingTime() <= 0) {
+      // Check for auto-draft enabled or no user (CPU)
+      const orderItem = draftOrder.find(o => o.managerId === orderNode?.managerId);
+      const isAutoDraftEnabled = orderItem?.autoDraftEnabled || !manager?.userId;
+
+      // If immediate (CPU/Auto) or time is up, trigger the check RPC
+      if (isAutoDraftEnabled || getRemainingTime() <= 0) {
         if (!processingPicksRef.current.has('checking')) {
           processingPicksRef.current.add('checking');
+
+          // Add a small random jitter to prevent multiple clients hitting the RPC at the exact same millisecond
+          const jitter = Math.random() * 2000;
+
+          await new Promise(resolve => setTimeout(resolve, jitter));
+
           try {
             await supabase.rpc('check_auto_draft', { p_league_id: leagueId! });
-          } catch (e) { console.error(e) }
-          finally {
-            setTimeout(() => processingPicksRef.current.delete('checking'), 2000);
+          } catch (e) {
+            console.error('[useDraft] Auto-draft check failed:', e);
+          } finally {
+            // Wait at least 3 seconds before another check for this client
+            setTimeout(() => processingPicksRef.current.delete('checking'), 3000);
           }
         }
       }
@@ -527,9 +539,9 @@ export const useDraft = () => {
 
     tick();
 
-    const timer = setInterval(tick, 2000);
+    const timer = setInterval(tick, 3000); // Check every 3 seconds instead of 2
     return () => clearInterval(timer);
-  }, [draftState, getRemainingTime, managers, getCurrentPickData, leagueId]);
+  }, [draftState, getRemainingTime, managers, draftOrder, getCurrentPickData, leagueId]);
 
   // Auto-complete all remaining picks
   const autoCompleteAllPicks = useCallback(async () => {

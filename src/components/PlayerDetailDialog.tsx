@@ -20,6 +20,7 @@ import { getTeamColors } from '@/lib/team-colors';
 import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { DraftTimer, DraftTimerProps } from '@/components/DraftTimer';
 
 /** Extended player data with optional fields from DB/API */
 interface ExtendedPlayer extends Player {
@@ -45,6 +46,7 @@ interface PlayerDetailDialogProps {
     onDrop?: () => void;
     onTrade?: () => void;
     onDraft?: () => void;
+    draftTimerProps?: DraftTimerProps;
 }
 
 import { calculateFantasyPoints } from '@/lib/scoring-utils';
@@ -60,6 +62,7 @@ export function PlayerDetailDialog({
     onDrop,
     onTrade,
     onDraft,
+    draftTimerProps,
 }: PlayerDetailDialogProps) {
     // First, try to get extended player data from our database
     // This has the cricbuzz_id and image_id we need
@@ -402,13 +405,10 @@ export function PlayerDetailDialog({
 
                     {/* Content Section */}
                     <div className="bg-background flex-1 flex flex-col min-h-0 relative z-30">
-                        {/* Pseudo Tabs */}
+                        {/* Section Header */}
                         <div className="flex items-center px-4 md:px-6 pt-4 border-b border-border/40">
-                            <div className="px-4 pb-3 border-b-2 border-primary font-bold text-xs md:text-sm tracking-wide text-foreground uppercase cursor-pointer">
+                            <div className="px-4 pb-3 border-b-2 border-primary font-bold text-xs md:text-sm tracking-wide text-foreground uppercase">
                                 Game Log
-                            </div>
-                            <div className="px-4 pb-3 text-muted-foreground font-semibold text-xs md:text-sm tracking-wide uppercase hover:text-foreground transition-colors cursor-pointer">
-                                Summary
                             </div>
                         </div>
 
@@ -423,15 +423,15 @@ export function PlayerDetailDialog({
                                     {/* Unified Grid Table */}
                                     <div className="grid text-xs text-center border-b border-border/50">
                                         {/* Header Row 1 - Groups */}
-                                        <div className="flex w-max bg-muted/30 font-bold text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
+                                        <div className="flex w-full min-w-[700px] md:min-w-full bg-muted/30 font-bold text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
                                             <div className="w-[180px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-background/95 backdrop-blur-sm">MATCH</div>
                                             <div className="w-[80px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-indigo-500/10 text-indigo-400">FANTASY</div>
 
                                             {sections.map(section => (
                                                 <div
                                                     key={section.id}
-                                                    className={cn("flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 last:border-r-0", section.color)}
-                                                    style={{ width: `${section.width}px` }}
+                                                    className={cn("h-8 flex items-center justify-center border-r border-border/50 last:border-r-0", section.color)}
+                                                    style={{ flex: `${section.width} 1 0%`, minWidth: `${section.width}px` }}
                                                 >
                                                     {section.label}
                                                 </div>
@@ -439,22 +439,22 @@ export function PlayerDetailDialog({
                                         </div>
 
                                         {/* Header Row 2 - Columns */}
-                                        <div className="flex w-max bg-background/95 backdrop-blur-sm font-bold border-b border-border/50 sticky top-[32px] z-10 shadow-sm text-[10px] md:text-xs">
+                                        <div className="flex w-full min-w-[700px] md:min-w-full bg-background/95 backdrop-blur-sm font-bold border-b border-border/50 sticky top-[32px] z-10 shadow-sm text-[10px] md:text-xs">
                                             {/* Match Columns */}
                                             <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 text-muted-foreground flex items-center justify-center">WK</div>
                                             <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 text-muted-foreground flex items-center">OPP</div>
 
                                             {/* Fantasy Columns */}
-                                            <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 bg-indigo-500/5 text-foreground flex items-center justify-center">FPTS</div>
+                                            <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 text-indigo-400 bg-indigo-500/5 flex items-center justify-center">FPTS</div>
 
-                                            {/* Dynamic Columns */}
+                                            {/* Dynamic Section Columns */}
                                             {sections.map(section => (
-                                                <React.Fragment key={section.id}>
+                                                <React.Fragment key={`${section.id}-cols`}>
                                                     {section.cols.map(col => (
                                                         <div
-                                                            key={col.label}
-                                                            className="flex-shrink-0 py-2 border-r border-border/50 last:border-r-0 text-foreground flex items-center justify-center"
-                                                            style={{ width: `${col.px}px` }}
+                                                            key={col.key}
+                                                            className={cn("py-2 border-r border-border/50 last:border-r-0 flex items-center justify-center", section.color)}
+                                                            style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
                                                         >
                                                             {col.label}
                                                         </div>
@@ -487,7 +487,7 @@ export function PlayerDetailDialog({
                                                 <div
                                                     key={matchItem.matchId || index}
                                                     className={cn(
-                                                        "flex w-max hover:bg-muted/50 transition-colors border-b border-border/30",
+                                                        "flex w-full min-w-[700px] md:min-w-full hover:bg-muted/50 transition-colors border-b border-border/30",
                                                         index % 2 === 0 ? "bg-background" : "bg-muted/10", // Alternating rows
                                                         isUpcoming && "opacity-70 bg-muted/5"
                                                     )}
@@ -532,7 +532,7 @@ export function PlayerDetailDialog({
                                                                     else if (col.key === 'runs' && section.id === 'batting' && (val as number) >= 30) {
                                                                         // Highlight high runs
                                                                         return (
-                                                                            <div key={col.key} className="flex-shrink-0 py-2 border-r border-border/50 flex items-center justify-center" style={{ width: `${col.px}px` }}>
+                                                                            <div key={col.key} className="py-2 border-r border-border/50 flex items-center justify-center" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
                                                                                 <span className="text-foreground font-semibold">{val}</span>
                                                                             </div>
                                                                         );
@@ -540,7 +540,7 @@ export function PlayerDetailDialog({
                                                                     else if (col.key === 'wickets' && (val as number) >= 2) {
                                                                         // Highlight high wickets
                                                                         return (
-                                                                            <div key={col.key} className="flex-shrink-0 py-2 border-r border-border/50 flex items-center justify-center" style={{ width: `${col.px}px` }}>
+                                                                            <div key={col.key} className="py-2 border-r border-border/50 flex items-center justify-center" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
                                                                                 <span className="text-foreground font-semibold">{val}</span>
                                                                             </div>
                                                                         );
@@ -553,8 +553,8 @@ export function PlayerDetailDialog({
                                                                 return (
                                                                     <div
                                                                         key={col.key}
-                                                                        className="flex-shrink-0 py-2 border-r border-border/50 flex items-center justify-center text-muted-foreground"
-                                                                        style={{ width: `${col.px}px` }}
+                                                                        className="py-2 border-r border-border/50 flex items-center justify-center text-muted-foreground"
+                                                                        style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
                                                                     >
                                                                         {isUpcoming ? '' : (hasStats ? val : 'DNP')}
                                                                     </div>
@@ -580,8 +580,13 @@ export function PlayerDetailDialog({
                         </ScrollArea>
 
                         {/* Action Bar */}
-                        {(onAdd || onDrop || onTrade || (canDraft && onDraft)) && (
-                            <div className="p-4 md:p-6 bg-background/95 backdrop-blur-xl border-t border-border/20 flex flex-col sm:flex-row gap-3 flex-shrink-0 z-40 sticky bottom-0 shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
+                        {(onAdd || onDrop || onTrade || (canDraft && onDraft) || draftTimerProps) && (
+                            <div className="p-4 md:p-6 bg-background/95 backdrop-blur-xl border-t border-border/20 flex flex-col sm:flex-row gap-3 flex-shrink-0 z-40 sticky bottom-0 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] sm:items-center">
+                                {draftTimerProps && (
+                                    <div className="flex-shrink-0 w-full sm:w-auto flex justify-center sm:justify-start sm:mr-auto sm:scale-110 sm:origin-left">
+                                        <DraftTimer {...draftTimerProps} className="w-full sm:w-auto justify-center" />
+                                    </div>
+                                )}
                                 {/* Draft Case */}
                                 {canDraft && onDraft && (
                                     <Button
@@ -594,7 +599,7 @@ export function PlayerDetailDialog({
                                 )}
 
                                 {/* Free Agent Case */}
-                                {!owningManager && onAdd && !canDraft && (
+                                {!owningManager && onAdd && !canDraft && draftState?.isFinalized && (
                                     <Button
                                         onClick={onAdd}
                                         className="flex-1 gap-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-indigo-500/20 w-full"
@@ -605,7 +610,7 @@ export function PlayerDetailDialog({
                                 )}
 
                                 {/* Owned by Current User Case */}
-                                {owningManager && managerProfile && owningManager.id === managerProfile.id && onDrop && (
+                                {owningManager && managerProfile && owningManager.id === managerProfile.id && onDrop && draftState?.isFinalized && (
                                     <Button
                                         onClick={onDrop}
                                         variant="destructive"
@@ -617,7 +622,7 @@ export function PlayerDetailDialog({
                                 )}
 
                                 {/* Owned by Someone Else Case */}
-                                {owningManager && managerProfile && owningManager.id !== managerProfile.id && onTrade && (
+                                {owningManager && managerProfile && owningManager.id !== managerProfile.id && onTrade && draftState?.isFinalized && (
                                     <Button
                                         onClick={onTrade}
                                         className="flex-1 gap-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg w-full"

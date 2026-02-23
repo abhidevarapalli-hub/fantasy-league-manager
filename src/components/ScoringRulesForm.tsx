@@ -6,6 +6,10 @@ import {
   Trophy,
   Plus,
   Trash2,
+  Timer,
+  Users,
+  Layout,
+  Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +18,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScoringRules, BattingRules, BowlingRules } from '@/lib/scoring-types';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import { validateLeagueMinimums } from '@/lib/roster-validation';
 
 type NumericValue = string | number | '';
 
@@ -43,10 +53,47 @@ const NumericField = ({ label, value, onChange, description, className, disabled
 interface ScoringRulesFormProps {
   rules: ScoringRules;
   onChange: (rules: ScoringRules) => void;
+  draftTimerSeconds?: number;
+  onDraftTimerChange?: (seconds: number) => void;
+  // Roster config props
+  activeSize?: number;
+  onActiveSizeChange?: (val: number) => void;
+  benchSize?: number;
+  onBenchSizeChange?: (val: number) => void;
+  minBatWk?: number;
+  onMinBatWkChange?: (val: number) => void;
+  minBowlers?: number;
+  onMinBowlersChange?: (val: number) => void;
+  minAllRounders?: number;
+  onMinAllRoundersChange?: (val: number) => void;
+  requireWk?: boolean;
+  onRequireWkChange?: (val: boolean) => void;
+  maxInternational?: number;
+  onMaxInternationalChange?: (val: number) => void;
   disabled?: boolean;
 }
 
-export const ScoringRulesForm = ({ rules, onChange, disabled = false }: ScoringRulesFormProps) => {
+export const ScoringRulesForm = ({
+  rules,
+  onChange,
+  draftTimerSeconds = 60,
+  onDraftTimerChange,
+  activeSize = 11,
+  onActiveSizeChange,
+  benchSize = 3,
+  onBenchSizeChange,
+  minBatWk = 4,
+  onMinBatWkChange,
+  minBowlers = 3,
+  onMinBowlersChange,
+  minAllRounders = 2,
+  onMinAllRoundersChange,
+  requireWk = true,
+  onRequireWkChange,
+  maxInternational = 4,
+  onMaxInternationalChange,
+  disabled = false
+}: ScoringRulesFormProps) => {
   const updateNestedField = (category: keyof ScoringRules, field: string, value: unknown) => {
     if (disabled) return;
     onChange({
@@ -112,33 +159,257 @@ export const ScoringRulesForm = ({ rules, onChange, disabled = false }: ScoringR
   };
 
   return (
-    <Tabs defaultValue="common" className="w-full">
-      <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-8">
-        <TabsTrigger value="common" className="gap-2">
+    <Tabs defaultValue="general" className="w-full">
+      <TabsList className="grid w-full grid-cols-2 mb-8">
+        <TabsTrigger value="general" className="gap-2">
           <Settings className="w-4 h-4" />
           General
         </TabsTrigger>
-        <TabsTrigger value="batting" className="gap-2">
-          <Zap className="w-4 h-4" />
-          Batting
-        </TabsTrigger>
-        <TabsTrigger value="bowling" className="gap-2">
-          <Target className="w-4 h-4" />
-          Bowling
-        </TabsTrigger>
-        <TabsTrigger value="fielding" className="gap-2">
-          <Shield className="w-4 h-4" />
-          Fielding
+        <TabsTrigger value="scoring" className="gap-2">
+          <Trophy className="w-4 h-4" />
+          Scoring
         </TabsTrigger>
       </TabsList>
 
-      {/* COMMON RULES */}
-      <TabsContent value="common" className="space-y-6">
+      {/* GENERAL TAB */}
+      <TabsContent value="general" className="space-y-6">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <div className="p-2 bg-primary/10 rounded-lg">
-                <Trophy className="w-5 h-5 text-primary" />
+                <Settings className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>Draft & Roster</CardTitle>
+                <CardDescription>Configure draft settings and roster requirements</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            {onDraftTimerChange && (
+              <div className="space-y-3 pb-6 border-b border-border/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 bg-primary/10 rounded-md">
+                    <Timer className="w-4 h-4 text-primary" />
+                  </div>
+                  <Label className="text-base font-semibold">Draft Pick Timer</Label>
+                </div>
+                <RadioGroup
+                  value={draftTimerSeconds.toString()}
+                  onValueChange={(val) => onDraftTimerChange(parseInt(val))}
+                  disabled={disabled}
+                  className="grid grid-cols-3 sm:grid-cols-5 gap-3"
+                >
+                  {[30, 60, 90, 120, 200].map((seconds) => (
+                    <div key={seconds}>
+                      <RadioGroupItem
+                        value={seconds.toString()}
+                        id={`timer-form-${seconds}`}
+                        className="peer sr-only"
+                      />
+                      <Label
+                        htmlFor={`timer-form-${seconds}`}
+                        className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all h-12"
+                      >
+                        <span className="text-sm font-bold">{seconds}s</span>
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">Time allowed for each manager to make their pick during the draft.</p>
+              </div>
+            )}
+
+            {/* ROSTER CONFIGURATION BLOCK */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-primary/10 rounded-md">
+                    <Layout className="w-4 h-4 text-primary" />
+                  </div>
+                  <Label className="text-base font-semibold">Roster Configuration</Label>
+                </div>
+                {onActiveSizeChange && (
+                  <div className="flex flex-col items-end">
+                    <span className={cn(
+                      "text-sm font-bold px-2 py-0.5 rounded-md",
+                      !validateLeagueMinimums({
+                        activeSize,
+                        benchSize,
+                        minBatWk,
+                        minBowlers,
+                        minAllRounders,
+                        requireWk,
+                        maxBatWk: 7,
+                        maxBowlers: 6,
+                        maxAllRounders: 4,
+                        maxInternational,
+                        managerCount: 8 // dummy for validation
+                      }).isValid ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
+                    )}>
+                      Total: {minBatWk + minBowlers + minAllRounders} / {activeSize}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {!validateLeagueMinimums({
+                activeSize,
+                benchSize,
+                minBatWk,
+                minBowlers,
+                minAllRounders,
+                requireWk,
+                maxBatWk: 7,
+                maxBowlers: 6,
+                maxAllRounders: 4,
+                maxInternational,
+                managerCount: 8
+              }).isValid && (
+                  <Alert variant="destructive" className="py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      {validateLeagueMinimums({
+                        activeSize,
+                        benchSize,
+                        minBatWk,
+                        minBowlers,
+                        minAllRounders,
+                        requireWk,
+                        maxBatWk: 7,
+                        maxBowlers: 6,
+                        maxAllRounders: 4,
+                        maxInternational,
+                        managerCount: 8
+                      }).message}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                      Active Size
+                    </Label>
+                    <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{activeSize}</span>
+                  </div>
+                  <Slider
+                    value={[activeSize]}
+                    min={6}
+                    max={11}
+                    step={1}
+                    disabled={disabled || !onActiveSizeChange}
+                    onValueChange={([v]) => onActiveSizeChange?.(v)}
+                  />
+                  <p className="text-[10px] text-muted-foreground">Players in the starting lineup (6-11).</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                      Bench Size
+                    </Label>
+                    <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{benchSize}</span>
+                  </div>
+                  <Slider
+                    value={[benchSize]}
+                    min={0}
+                    max={5}
+                    step={1}
+                    disabled={disabled || !onBenchSizeChange}
+                    onValueChange={([v]) => onBenchSizeChange?.(v)}
+                  />
+                  <p className="text-[10px] text-muted-foreground">Reserve players (0-5).</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                      Max International
+                    </Label>
+                    <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{maxInternational}</span>
+                  </div>
+                  <Slider
+                    value={[maxInternational]}
+                    min={1}
+                    max={11}
+                    step={1}
+                    disabled={disabled || !onMaxInternationalChange}
+                    onValueChange={([v]) => onMaxInternationalChange?.(v)}
+                  />
+                  <p className="text-[10px] text-muted-foreground">Limit for non-domestic players (1-11).</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs font-medium text-muted-foreground">Min BAT/WK</Label>
+                    <span className="text-xs font-bold">{minBatWk}</span>
+                  </div>
+                  <Slider
+                    value={[minBatWk]}
+                    min={1}
+                    max={8}
+                    step={1}
+                    disabled={disabled || !onMinBatWkChange}
+                    onValueChange={([v]) => onMinBatWkChange?.(v)}
+                  />
+                  <div className="flex items-center justify-between p-2 rounded bg-muted/30 border border-border/50 mt-2">
+                    <span className="text-[10px] font-medium">Require WK</span>
+                    <Switch
+                      checked={requireWk}
+                      disabled={disabled || !onRequireWkChange}
+                      onCheckedChange={onRequireWkChange}
+                      className="scale-75"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs font-medium text-muted-foreground">Min All-Rounders</Label>
+                    <span className="text-xs font-bold">{minAllRounders}</span>
+                  </div>
+                  <Slider
+                    value={[minAllRounders]}
+                    min={0}
+                    max={6}
+                    step={1}
+                    disabled={disabled || !onMinAllRoundersChange}
+                    onValueChange={([v]) => onMinAllRoundersChange?.(v)}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs font-medium text-muted-foreground">Min Bowlers</Label>
+                    <span className="text-xs font-bold">{minBowlers}</span>
+                  </div>
+                  <Slider
+                    value={[minBowlers]}
+                    min={1}
+                    max={8}
+                    step={1}
+                    disabled={disabled || !onMinBowlersChange}
+                    onValueChange={([v]) => onMinBowlersChange?.(v)}
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* SCORING TAB */}
+      <TabsContent value="scoring" className="space-y-8">
+        {/* MATCH POINTS (previously common) */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Globe className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <CardTitle>Match Points</CardTitle>
@@ -146,41 +417,41 @@ export const ScoringRulesForm = ({ rules, onChange, disabled = false }: ScoringR
               </div>
             </div>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <NumericField
-              label="Starting XI Presence"
-              value={rules.common?.starting11}
-              onChange={(val: NumericValue) => updateNestedField('common', 'starting11', val)}
-              description="Awarded to every player in the starting XI"
-              disabled={disabled}
-            />
-            <NumericField
-              label="Match Winning Team"
-              value={rules.common?.matchWinningTeam}
-              onChange={(val: NumericValue) => updateNestedField('common', 'matchWinningTeam', val)}
-              description="Awarded to every player in the winning team"
-              disabled={disabled}
-            />
-            <NumericField
-              label="Man of the Match"
-              value={rules.common?.manOfTheMatch}
-              onChange={(val: NumericValue) => updateNestedField('common', 'manOfTheMatch', val)}
-              description="Bonus for being the MoTM"
-              disabled={disabled}
-            />
-            <NumericField
-              label="Impact Player Bonus"
-              value={rules.common?.impactPlayer}
-              onChange={(val: NumericValue) => updateNestedField('common', 'impactPlayer', val)}
-              description="Awarded for appearing as an impact player"
-              disabled={disabled}
-            />
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <NumericField
+                label="Starting XI Presence"
+                value={rules.common?.starting11}
+                onChange={(val: NumericValue) => updateNestedField('common', 'starting11', val)}
+                description="Awarded to every player in the starting XI"
+                disabled={disabled}
+              />
+              <NumericField
+                label="Match Winning Team"
+                value={rules.common?.matchWinningTeam}
+                onChange={(val: NumericValue) => updateNestedField('common', 'matchWinningTeam', val)}
+                description="Awarded to every player in the winning team"
+                disabled={disabled}
+              />
+              <NumericField
+                label="Man of the Match"
+                value={rules.common?.manOfTheMatch}
+                onChange={(val: NumericValue) => updateNestedField('common', 'manOfTheMatch', val)}
+                description="Bonus for being the MoTM"
+                disabled={disabled}
+              />
+              <NumericField
+                label="Impact Player Bonus"
+                value={rules.common?.impactPlayer}
+                onChange={(val: NumericValue) => updateNestedField('common', 'impactPlayer', val)}
+                description="Awarded for appearing as an impact player"
+                disabled={disabled}
+              />
+            </div>
           </CardContent>
         </Card>
-      </TabsContent>
 
-      {/* BATTING RULES */}
-      <TabsContent value="batting" className="space-y-6">
+        {/* BATTING RULES */}
         <Card>
           <CardHeader>
             <CardTitle>Basic Batting</CardTitle>
@@ -334,10 +605,6 @@ export const ScoringRulesForm = ({ rules, onChange, disabled = false }: ScoringR
             ))}
           </CardContent>
         </Card>
-      </TabsContent>
-
-      {/* BOWLING RULES */}
-      <TabsContent value="bowling" className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Basic Bowling</CardTitle>
@@ -485,10 +752,6 @@ export const ScoringRulesForm = ({ rules, onChange, disabled = false }: ScoringR
             ))}
           </CardContent>
         </Card>
-      </TabsContent>
-
-      {/* FIELDING RULES */}
-      <TabsContent value="fielding" className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Regular Fielding</CardTitle>

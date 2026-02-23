@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Target, Shirt } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Activity, Settings, ClipboardList, ArrowLeftRight, Target, Shirt, ScrollText, LayoutList } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -23,20 +23,21 @@ export function AppSidebar() {
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
   const { leagueId } = useParams<{ leagueId: string }>();
   const currentManagerId = useGameStore(state => state.currentManagerId);
+  const draftState = useGameStore(state => state.draftState);
 
   // On mobile, always show labels (no collapse mode)
   const showLabels = isMobile || !collapsed;
 
   const navItems = leagueId ? [
     { title: 'Home', url: `/${leagueId}`, icon: LayoutDashboard },
-    ...(currentManagerId ? [
+    ...(currentManagerId && draftState?.isFinalized ? [
       { title: 'My Team', url: `/${leagueId}/team/${currentManagerId}`, icon: Shirt },
     ] : []),
     { title: 'Players', url: `/${leagueId}/players`, icon: UsersRound },
     { title: 'Trades', url: `/${leagueId}/trades`, icon: ArrowLeftRight },
     { title: 'Activity', url: `/${leagueId}/activity`, icon: Activity },
-    { title: 'Draft', url: `/${leagueId}/draft`, icon: ClipboardList },
-    { title: 'Scoring', url: `/${leagueId}/scoring`, icon: Target },
+    { title: 'Draft', url: `/${leagueId}/draft`, icon: LayoutList },
+    { title: 'Rules', url: `/${leagueId}/rules`, icon: ScrollText },
     ...(isLeagueManager ? [
       { title: 'Admin', url: `/${leagueId}/admin`, icon: Settings },
     ] : []),

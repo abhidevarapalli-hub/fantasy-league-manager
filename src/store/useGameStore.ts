@@ -349,8 +349,11 @@ export const useGameStore = create<GameState>()(
         const player1InActive = manager.activeRoster.includes(player1Id);
         const player2InActive = manager.activeRoster.includes(player2Id);
 
-        if ((player1InActive && player2InActive) || (!player1InActive && !player2InActive)) {
-          return { success: false, error: "Players must be in different sections to swap" };
+        // If both are in the same section, it's an intra-section swap (e.g. Active <-> Active)
+        // For now, these are valid but don't require DB updates as slot assignment is deterministic
+        if (player1InActive === player2InActive) {
+          // Future-proofing: return success to close dialog.
+          return { success: true };
         }
 
         // Swap slot_types in junction table for all weeks from currentWeek+1 onward
@@ -765,6 +768,10 @@ export const useGameStore = create<GameState>()(
             dbUpdate.max_international = configUpdate.maxInternational;
             changes.push(`Max international: ${config.maxInternational} → ${configUpdate.maxInternational}`);
           }
+          if (configUpdate.draftTimerSeconds !== undefined && configUpdate.draftTimerSeconds !== config.draftTimerSeconds) {
+            dbUpdate.draft_timer_seconds = configUpdate.draftTimerSeconds;
+            changes.push(`Draft timer: ${config.draftTimerSeconds}s → ${configUpdate.draftTimerSeconds}s`);
+          }
 
           // If no changes, return early
           if (Object.keys(dbUpdate).length === 0) {
@@ -999,6 +1006,7 @@ export const useGameStore = create<GameState>()(
                 maxInternational: (leagueData.max_international as number) ?? 4,
                 requireWk: (leagueData.require_wk as boolean) ?? true,
                 maxFromTeam: (leagueData.max_from_team as number) ?? 11,
+                draftTimerSeconds: (leagueData.draft_timer_seconds as number) ?? 60,
               },
             });
           }

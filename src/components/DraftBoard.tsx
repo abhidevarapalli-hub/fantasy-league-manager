@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
+import { DraftTimer } from '@/components/DraftTimer';
 import { cn } from '@/lib/utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { toast } from 'sonner';
@@ -155,60 +156,6 @@ const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, 
             <User className="w-6 h-6 opacity-30" />
           )}
         </div>
-      )}
-    </div>
-  );
-};
-
-const DraftTimer = ({ getRemainingTime, isActive, isPaused }: { getRemainingTime: () => number, isActive: boolean, isPaused: boolean }) => {
-  const [timeLeft, setTimeLeft] = useState(getRemainingTime());
-  const timerRef = useRef<NodeJS.Timeout>();
-
-  useEffect(() => {
-    if (isActive && !isPaused) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(getRemainingTime());
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-      setTimeLeft(getRemainingTime());
-    }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isActive, isPaused, getRemainingTime]);
-
-  // Update immediately when state changes
-  useEffect(() => {
-    setTimeLeft(getRemainingTime());
-  }, [getRemainingTime]);
-
-  const seconds = Math.ceil(timeLeft / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  const isCritical = seconds < 15;
-
-  if (!isActive) return null;
-
-  return (
-    <div className={cn(
-      "flex items-center gap-2 px-4 py-2 rounded-full border shadow-lg transition-all duration-500",
-      isPaused ? "bg-muted border-border text-muted-foreground" :
-        isCritical ? "bg-red-500 border-red-600 text-white animate-pulse" :
-          "bg-primary border-primary-foreground/20 text-primary-foreground"
-    )}>
-      <Timer className={cn("w-5 h-5", !isPaused && "animate-spin-slow")} />
-      <div className="flex flex-col">
-        <span className="text-[10px] uppercase font-bold leading-none opacity-80">
-          {isPaused ? "Paused" : "Pick Clock"}
-        </span>
-        <span className="text-xl font-mono font-black leading-none">
-          {minutes}:{remainingSeconds.toString().padStart(2, '0')}
-        </span>
-      </div>
-      {isCritical && !isPaused && (
-        <AlertCircle className="w-5 h-5 animate-bounce" />
       )}
     </div>
   );
@@ -493,12 +440,23 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
   const rounds = config.activeSize + config.benchSize;
   const positions = config.managerCount;
 
+  const currentTurnManager = getManagerAtPosition(currentPosition);
+  const isMyTurn = currentTurnManager?.id === useGameStore.getState().currentManagerId;
+
+  const currentTimerProps = draftState?.isActive && !draftState?.isFinalized ? {
+    getRemainingTime,
+    isActive: draftState.isActive,
+    isPaused: !!draftState.pausedAt,
+    isMyTurn,
+    currentTeamName: currentTurnManager?.teamName
+  } : undefined;
+
   return (
     <div className="space-y-4 pb-28">
       {/* Floating Timer Widget */}
-      {draftState?.isActive && !draftState?.isFinalized && !detailPlayer && (
+      {draftState?.isActive && !draftState?.isFinalized && !detailPlayer && !drawerOpen && (
         <div className="fixed bottom-safe left-1/2 -translate-x-1/2 mb-6 md:mb-8 z-[200] flex flex-col items-center gap-2 pointer-events-none">
-          {draftState.isActive && !draftState.pausedAt && getManagerAtPosition(currentPosition)?.id === useGameStore.getState().currentManagerId && (
+          {draftState.isActive && !draftState.pausedAt && isMyTurn && (
             <div className="bg-primary px-6 py-1.5 rounded-full shadow-lg border-2 border-primary-foreground/20 animate-in fade-in slide-in-from-bottom-4 duration-300 pointer-events-auto">
               <span className="text-primary-foreground font-black text-xs md:text-sm tracking-tighter uppercase flex items-center gap-1.5">
                 <Zap className="w-4 h-4 fill-current" />
@@ -507,11 +465,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
             </div>
           )}
           <div className="pointer-events-auto shadow-2xl rounded-full">
-            <DraftTimer
-              getRemainingTime={getRemainingTime}
-              isActive={draftState.isActive}
-              isPaused={!!draftState.pausedAt}
-            />
+            <DraftTimer {...currentTimerProps!} />
           </div>
         </div>
       )}
@@ -723,8 +677,9 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
           onOpenChange={setDrawerOpen}
           targetPick={selectedCell || (draftState?.isActive && !draftState.isFinalized ? { round: currentRound, position: currentPosition } : null)}
           draftedPlayerIds={getDraftedPlayerIds()}
-          canPick={getManagerAtPosition(currentPosition)?.id === currentManagerId}
+          canPick={getManagerAtPosition(currentPosition)?.id === useGameStore.getState().currentManagerId}
           onDraftPlayer={handlePickConfirm}
+          draftTimerProps={currentTimerProps}
         />
       )}
 
@@ -733,10 +688,11 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
           player={detailPlayer}
           open={!!detailPlayer}
           onOpenChange={(open) => !open && setDetailPlayer(null)}
-          onDraft={(draftState?.isActive && !draftState?.isFinalized && getManagerAtPosition(currentPosition)?.id === currentManagerId && !getDraftedPlayerIds().includes(detailPlayer.id)) ? () => {
+          onDraft={(draftState?.isActive && !draftState?.isFinalized && getManagerAtPosition(currentPosition)?.id === useGameStore.getState().currentManagerId && !getDraftedPlayerIds().includes(detailPlayer.id)) ? () => {
             handlePickConfirm(detailPlayer.id);
             setDetailPlayer(null);
           } : undefined}
+          draftTimerProps={currentTimerProps}
         />
       )}
     </div>

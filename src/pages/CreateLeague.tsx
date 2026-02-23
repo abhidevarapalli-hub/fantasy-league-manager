@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trophy, Users, Shield, Layout, Save, ChevronRight, Globe, Zap } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Shield, Layout, Save, ChevronRight, Globe, Zap, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import { DEFAULT_SCORING_RULES, ScoringRules as ScoringRulesType, sanitizeScorin
 import type { Json } from '@/integrations/supabase/types';
 import { ScoringRulesForm } from '@/components/ScoringRulesForm';
 import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 const STEP_LABELS = ['Configure Rules', 'Scoring Rules', 'Team Identity'] as const;
 
@@ -38,6 +39,7 @@ const CreateLeague = () => {
     const [managerCount, setManagerCount] = useState(8);
     const [activeSize, setActiveSize] = useState(11);
     const [benchSize, setBenchSize] = useState(3);
+    const [draftTimer, setDraftTimer] = useState(60);
 
     // Position Minimums (Defaults for Size 11)
     const [minBatWk, setMinBatWk] = useState(4);
@@ -111,6 +113,7 @@ const CreateLeague = () => {
                 manager_count: managerCount,
                 active_size: activeSize,
                 bench_size: benchSize,
+                draft_timer_seconds: draftTimer,
                 min_bat_wk: minBatWk,
                 min_bowlers: minBowlers,
                 min_all_rounders: minAllRounders,
@@ -151,6 +154,7 @@ const CreateLeague = () => {
                     max_all_rounders: 4,
                     max_from_team: 11,
                     max_international: selectedTournament.type === 'international' ? 11 : 4,
+                    draft_timer_seconds: draftTimer,
                 };
 
                 const resultWithoutTournament = await supabase
@@ -538,6 +542,43 @@ const CreateLeague = () => {
                                                 onValueChange={([v]) => setBenchSize(v)}
                                             />
                                             <p className="text-xs text-muted-foreground">Reserve players kept out of the lineup (0-5).</p>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <Label className="font-semibold flex items-center gap-2">
+                                                    <Timer className="w-4 h-4 text-primary" />
+                                                    Draft Timer
+                                                </Label>
+                                                <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{draftTimer}s</span>
+                                            </div>
+                                            <RadioGroup
+                                                value={String(draftTimer)}
+                                                onValueChange={(v) => setDraftTimer(Number(v))}
+                                                className="grid grid-cols-5 gap-2"
+                                            >
+                                                {[30, 60, 90, 120, 200].map((t) => (
+                                                    <div key={t}>
+                                                        <RadioGroupItem
+                                                            value={String(t)}
+                                                            id={`timer-${t}`}
+                                                            className="sr-only"
+                                                        />
+                                                        <Label
+                                                            htmlFor={`timer-${t}`}
+                                                            className={cn(
+                                                                "flex items-center justify-center p-2 rounded-md border-2 cursor-pointer transition-all text-sm font-medium",
+                                                                draftTimer === t
+                                                                    ? "border-primary bg-primary/5 text-primary"
+                                                                    : "border-border hover:border-primary/30 hover:bg-primary/5"
+                                                            )}
+                                                        >
+                                                            {t}s
+                                                        </Label>
+                                                    </div>
+                                                ))}
+                                            </RadioGroup>
+                                            <p className="text-xs text-muted-foreground">Default time limit for each pick.</p>
                                         </div>
                                     </div>
 
