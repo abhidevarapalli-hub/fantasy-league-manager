@@ -497,7 +497,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     <div className="space-y-4 pb-28">
       {/* Floating Timer Widget */}
       {draftState?.isActive && !draftState?.isFinalized && (
-        <div className="fixed bottom-safe left-1/2 -translate-x-1/2 mb-6 md:mb-8 z-[110] flex flex-col items-center gap-2 pointer-events-none">
+        <div className="fixed bottom-safe left-1/2 -translate-x-1/2 mb-6 md:mb-8 z-[200] flex flex-col items-center gap-2 pointer-events-none">
           {draftState.isActive && !draftState.pausedAt && getManagerAtPosition(currentPosition)?.id === useGameStore.getState().currentManagerId && (
             <div className="bg-primary px-6 py-1.5 rounded-full shadow-lg border-2 border-primary-foreground/20 animate-in fade-in slide-in-from-bottom-4 duration-300 pointer-events-auto">
               <span className="text-primary-foreground font-black text-xs md:text-sm tracking-tighter uppercase flex items-center gap-1.5">
