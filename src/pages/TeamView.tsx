@@ -14,6 +14,8 @@ import {
   sortPlayersByRole,
   canSwapInActive,
   canAddToActive,
+  canRemoveFromActive,
+  PlayerRole,
   SlotRequirement,
 } from '@/lib/roster-validation';
 
@@ -158,27 +160,51 @@ const TeamView = () => {
   const handleSwap = async (targetPlayer: Player) => {
     if (!playerToSwap || !teamId) return;
 
-    // Validate the swap - determine which player is going TO active
+    // Validate the swap
     let swapValidation;
     if (playerToSwap.from === 'bench') {
-      // Bench player going to active, target (active) player leaving
-      swapValidation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer, config);
+      if (targetPlayer.id === playerToSwap.player.id) {
+        // Filling an empty slot
+        swapValidation = canAddToActive(activePlayers, playerToSwap.player, config);
+      } else {
+        // Replacing an active player
+        swapValidation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer, targetPlayer.role, config);
+      }
+    } else if (targetPlayer.id === 'bench-target') {
+      // Moving active player to bench
+      swapValidation = canRemoveFromActive(activePlayers, playerToSwap.player);
     } else {
-      // Active player going to bench, target (bench) player coming to active
-      swapValidation = canSwapInActive(activePlayers, targetPlayer, playerToSwap.player, config);
+      // Intra-active swap
+      swapValidation = canSwapInActive(activePlayers, targetPlayer, playerToSwap.player, playerToSwap.player.role, config);
     }
 
-
     if (!swapValidation.isValid) {
-      toast.error(swapValidation.errors[0] || 'Invalid swap');
+      toast.error(swapValidation.errors?.[0] || 'Invalid swap');
       return;
     }
 
-    const result = await swapPlayers(teamId, playerToSwap.player.id, targetPlayer.id);
-    if (!result.success && result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success('Players swapped successfully');
+    try {
+      if (playerToSwap.from === 'bench') {
+        if (targetPlayer.id === playerToSwap.player.id) {
+          // Fill empty slot
+          await moveToActive(teamId, playerToSwap.player.id);
+          toast.success(`${playerToSwap.player.name} moved to active roster`);
+        } else {
+          // Swap bench with active
+          await swapPlayers(teamId, playerToSwap.player.id, targetPlayer.id);
+          toast.success(`Swapped ${playerToSwap.player.name} with ${targetPlayer.name}`);
+        }
+      } else if (targetPlayer.id === 'bench-target') {
+        // Active to bench
+        await moveToBench(teamId, playerToSwap.player.id);
+        toast.success(`${playerToSwap.player.name} moved to bench`);
+      } else {
+        // Intra-active swap
+        await swapPlayers(teamId, playerToSwap.player.id, targetPlayer.id);
+        toast.success(`Swapped ${playerToSwap.player.name} with ${targetPlayer.name}`);
+      }
+    } catch (error) {
+      toast.error('Failed to perform swap');
     }
 
     setSwapDialogOpen(false);
@@ -187,35 +213,48 @@ const TeamView = () => {
 
   return (
     <AppLayout
-      title={manager.teamName}
-      subtitle={`${manager.name} • ${totalPlayers}/${totalRosterCap} players`}
+      title={
+        <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-3">
+          <span className="truncate">{manager.teamName}</span>
+          <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">{manager.name}</span>
+        </div>
+      }
+      subtitle={
+        <div className="flex flex-col gap-1.5 mt-0.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1">
+            <div className="flex items-center gap-2 bg-muted/50 px-2 py-1.5 rounded-md border border-border/50 shadow-sm">
+              <span className="text-sm font-bold text-foreground tabular-nums">{manager.wins}W - {manager.losses}L</span>
+              <span className="text-[10px] text-muted-foreground font-bold tracking-tighter uppercase whitespace-nowrap">Record</span>
+            </div>
+            <div className="flex items-center gap-2 bg-primary/5 px-2 py-1.5 rounded-md border border-primary/20 shadow-sm">
+              <span className="text-sm font-bold text-primary tabular-nums">{manager.points.toFixed(1)}</span>
+              <span className="text-[10px] text-primary/70 font-bold tracking-tighter uppercase whitespace-nowrap">Points</span>
+            </div>
+            <div className="flex items-center gap-2 bg-amber-500/5 px-2 py-1.5 rounded-md border border-amber-500/20 shadow-sm">
+              <Trophy className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-sm font-bold text-amber-500 tabular-nums">#{standingsPosition}</span>
+              <span className="text-[10px] text-amber-500/70 font-bold tracking-tighter uppercase whitespace-nowrap">Rank</span>
+            </div>
+          </div>
+        </div>
+      }
       headerActions={
-        <>
+        <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+          {!canEdit && <Lock className="w-3.5 h-3.5 text-muted-foreground opacity-50" />}
           <div className={cn(
-            "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm",
             internationalCount > config.maxInternational
-              ? "bg-destructive/20 text-destructive"
-              : "bg-primary/20 text-primary"
+              ? "bg-destructive/10 text-destructive border border-destructive/20"
+              : "bg-primary/10 text-primary border border-primary/20"
           )}>
             <Plane className="w-3 h-3" />
-            {internationalCount}/{config.maxInternational}
+            <span className="tabular-nums">{internationalCount}/{config.maxInternational} INT</span>
           </div>
-          {!canEdit && <Lock className="w-4 h-4 text-muted-foreground" />}
-        </>
+        </div>
       }
     >
 
       <div className="px-4 py-4 space-y-6">
-        {/* Back button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(-1)}
-          className="text-muted-foreground hover:text-foreground -ml-2"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back
-        </Button>
 
         {/* Week & Lock Indicator */}
         {isTeamLocked ? (
@@ -248,31 +287,8 @@ const TeamView = () => {
           </div>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-3">
-          <div className="bg-card rounded-xl border border-border p-3 text-center">
-            <div className="flex items-center justify-center gap-1">
-              <Trophy className="w-4 h-4 text-amber-500" />
-              <p className="text-2xl font-bold text-amber-500">{standingsPosition}</p>
-            </div>
-            <p className="text-xs text-muted-foreground">Rank</p>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-3 text-center">
-            <p className="text-2xl font-bold text-success">{manager.wins}</p>
-            <p className="text-xs text-muted-foreground">Wins</p>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-3 text-center">
-            <p className="text-2xl font-bold text-destructive">{manager.losses}</p>
-            <p className="text-xs text-muted-foreground">Losses</p>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-3 text-center">
-            <p className="text-2xl font-bold text-primary">{manager.points}</p>
-            <p className="text-xs text-muted-foreground">Points</p>
-          </div>
-        </div>
-
         {/* Separator */}
-        <div className="border-b border-border" />
+        <div className="border-b border-border/50" />
 
         {/* Validation Errors */}
         {!validation.isValid && validation.errors.length > 0 && (
@@ -302,61 +318,134 @@ const TeamView = () => {
               <p className="text-xs text-muted-foreground">Starting lineup ({activePlayers.length}/{config.activeSize})</p>
             </div>
 
+            <div className="flex-1 flex justify-end">
+              <Badge variant="outline" className="bg-background text-[10px] uppercase border-border/50 shadow-sm text-muted-foreground tracking-widest hidden sm:inline-flex">
+                Starters
+              </Badge>
+            </div>
           </div>
 
           <div className="space-y-2">
-            {[...slots].sort((a, b) => {
-              const aC = a.player && manager.captainId === a.player.id ? -2 : a.player && manager.viceCaptainId === a.player.id ? -1 : 0;
-              const bC = b.player && manager.captainId === b.player.id ? -2 : b.player && manager.viceCaptainId === b.player.id ? -1 : 0;
-              return aC - bC;
-            }).map((slot, index) => (
-              slot.filled && slot.player ? (
-                <PlayerCard
-                  key={slot.player.id}
-                  player={slot.player}
-                  isOwned
-                  captainBadge={
-                    manager.captainId === slot.player.id ? 'C'
-                      : manager.viceCaptainId === slot.player.id ? 'VC'
-                        : null
-                  }
-                  onSetCaptain={canEdit && manager.captainId !== slot.player.id ? () => handleSetCaptain(slot.player!.id) : undefined}
-                  onSetViceCaptain={canEdit && manager.viceCaptainId !== slot.player.id ? () => handleSetViceCaptain(slot.player!.id) : undefined}
-                  onSwap={canEdit && benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
-                  onClick={() => setDetailPlayer(slot.player!)}
-                />
-              ) : (
-                <button
-                  key={`empty-${index}`}
-                  onClick={canEdit ? () => setSlotToFill(slot) : undefined}
-                  className={cn(
-                    "w-full p-4 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center gap-3 transition-all text-left",
-                    canEdit && "hover:border-primary/50 hover:bg-primary/5 cursor-pointer"
-                  )}
-                >
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
-                    {roleIcons[slot.role] || '👤'}
+            {/* We want to render exactly 11 slots in a specific order: WK, 3 BAT, 2 AR, 3 BWL, 2 FLEX */}
+            {(() => {
+              // Create a copy of active players to map to slots
+              const unassigned = [...activePlayers];
+
+              const pullPlayer = (roles: string[]) => {
+                const idx = unassigned.findIndex(p => roles.includes(p.role));
+                if (idx !== -1) return unassigned.splice(idx, 1)[0] || null;
+                return null;
+              };
+
+              const assignedSlots: { roleLabel: string, player: Player | null, originalSlotData?: SlotRequirement }[] = [];
+              assignedSlots.push({ roleLabel: 'WK', player: pullPlayer(['Wicket Keeper']) });
+              for (let i = 0; i < 3; i++) assignedSlots.push({ roleLabel: 'BAT', player: pullPlayer(['Batsman', 'Wicket Keeper']) });
+              for (let i = 0; i < 2; i++) assignedSlots.push({ roleLabel: 'AR', player: pullPlayer(['All Rounder']) });
+              for (let i = 0; i < 3; i++) assignedSlots.push({ roleLabel: 'BWL', player: pullPlayer(['Bowler']) });
+
+              const remainingFlexCount = 11 - assignedSlots.length;
+              for (let i = 0; i < remainingFlexCount; i++) {
+                assignedSlots.push({ roleLabel: 'FLEX', player: unassigned.length > 0 ? unassigned.shift()! : null });
+              }
+
+              // We also need to map these visual slots back to the validation 'slots' 
+              // so the 'setSlotToFill' dialg works correctly with `SlotRequirement` data
+              const mappedSlots = assignedSlots.map(visualSlot => {
+                // Find a matching requirement from the `roster-validation.ts` slots
+                let correspondingReq = slots.find(s => !s.filled && (
+                  (visualSlot.roleLabel === 'WK' && s.role === 'Wicket Keeper') ||
+                  (visualSlot.roleLabel === 'BAT' && ['Batsman', 'WK/BAT'].includes(s.role)) ||
+                  (visualSlot.roleLabel === 'AR' && ['All Rounder', 'AR/BWL'].includes(s.role)) ||
+                  (visualSlot.roleLabel === 'BWL' && s.role === 'Bowler') ||
+                  (visualSlot.roleLabel === 'FLEX' && s.role === 'Any Position')
+                ));
+
+                // fallback to Flex if specific role requirement is not found.
+                if (!correspondingReq && !visualSlot.player) {
+                  correspondingReq = slots.find(s => !s.filled && s.role === 'Any Position');
+                }
+
+                return { ...visualSlot, originalSlotData: correspondingReq };
+              });
+
+              return mappedSlots.map((slot, index) => (
+                slot.player ? (
+                  <div key={slot.player.id} className="relative flex items-center">
+                    <div className="w-12 shrink-0 flex justify-center">
+                      <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-tight",
+                        slot.roleLabel === 'BAT' ? "text-blue-500" :
+                          slot.roleLabel === 'BWL' ? "text-red-500" :
+                            slot.roleLabel === 'AR' ? "text-purple-500" :
+                              slot.roleLabel === 'WK' ? "text-green-500" :
+                                "text-amber-500"
+                      )}>
+                        {slot.roleLabel}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <PlayerCard
+                        player={slot.player}
+                        isOwned
+                        captainBadge={
+                          manager.captainId === slot.player.id ? 'C'
+                            : manager.viceCaptainId === slot.player.id ? 'VC'
+                              : null
+                        }
+                        onSetCaptain={canEdit && manager.captainId !== slot.player.id ? () => handleSetCaptain(slot.player!.id) : undefined}
+                        onSetViceCaptain={canEdit && manager.viceCaptainId !== slot.player.id ? () => handleSetViceCaptain(slot.player!.id) : undefined}
+                        onSwap={canEdit && benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
+                        onClick={() => setDetailPlayer(slot.player!)}
+                      />
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Empty Slot</p>
-                    <p className="text-xs text-muted-foreground/70">{slot.label} required</p>
+                ) : (
+                  <div key={`empty-${index}`} className="relative flex items-center">
+                    <div className="w-12 shrink-0 flex justify-center">
+                      <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-tight opacity-50",
+                        slot.roleLabel === 'BAT' ? "text-blue-500" :
+                          slot.roleLabel === 'BWL' ? "text-red-500" :
+                            slot.roleLabel === 'AR' ? "text-purple-500" :
+                              slot.roleLabel === 'WK' ? "text-green-500" :
+                                "text-amber-500"
+                      )}>
+                        {slot.roleLabel}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={canEdit && slot.originalSlotData ? () => setSlotToFill(slot.originalSlotData!) : undefined}
+                      className={cn(
+                        "flex-1 p-[14px] rounded-xl border border-dashed border-border bg-muted/10 flex items-center gap-3 transition-all text-left group",
+                        canEdit && slot.originalSlotData && "hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-10 h-10 rounded-full bg-background border flex items-center justify-center text-lg transition-colors group-hover:border-primary/30",
+                        slot.roleLabel === 'BAT' ? "border-blue-500/20 text-blue-500/50" :
+                          slot.roleLabel === 'BWL' ? "border-red-500/20 text-red-500/50" :
+                            slot.roleLabel === 'AR' ? "border-purple-500/20 text-purple-500/50" :
+                              slot.roleLabel === 'WK' ? "border-green-500/20 text-green-500/50" :
+                                "border-amber-500/20 text-amber-500/50"
+                      )}>
+                        {canEdit ? <Plus className="w-4 h-4 opacity-50" /> : '👤'}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-muted-foreground/80 group-hover:text-foreground transition-colors">Empty</p>
+                      </div>
+                    </button>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {slot.label}
-                  </Badge>
-                </button>
-              )
-            ))}
+                )
+              ));
+            })()}
           </div>
         </section>
 
         {/* Bench */}
         <section>
-          <div className="flex items-center gap-2 mb-3 pt-2">
-            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-              <UserMinus className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
+          <div className="flex items-center justify-between mb-3 pt-4">
+            <div className="flex items-center gap-2">
               <h2 className="font-semibold text-foreground">Bench</h2>
               <p className="text-xs text-muted-foreground">Reserves ({benchPlayers.length}/{config.benchSize})</p>
             </div>
@@ -364,25 +453,46 @@ const TeamView = () => {
 
           <div className="space-y-2">
             {sortedBench.map((player) => (
-              <PlayerCard
-                key={player.id}
-                player={player}
-                isOwned
-                onSwap={canEdit && activePlayers.length > 0 ? () => handleStartSwap(player, 'bench') : undefined}
-                onClick={() => setDetailPlayer(player)}
-              />
+              <div key={player.id} className="relative flex items-center">
+                <div className="w-12 shrink-0 flex justify-center">
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase tracking-tight",
+                    player.role === 'Batsman' ? "text-blue-500" :
+                      player.role === 'Bowler' ? "text-red-500" :
+                        player.role === 'All Rounder' ? "text-purple-500" :
+                          player.role === 'Wicket Keeper' ? "text-green-500" :
+                            "text-amber-500"
+                  )}>
+                    BN
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <PlayerCard
+                    player={player}
+                    isOwned
+                    onSwap={canEdit && activePlayers.length > 0 ? () => handleStartSwap(player, 'bench') : undefined}
+                    onClick={() => setDetailPlayer(player)}
+                  />
+                </div>
+              </div>
             ))}
 
             {/* Empty bench slots */}
             {Array.from({ length: Math.max(0, config.benchSize - benchPlayers.length) }).map((_, i) => (
-              <div
-                key={`bench-empty-${i}`}
-                className="p-3 rounded-xl border border-dashed border-border bg-muted/10 flex items-center gap-3 opacity-60"
-              >
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
-                  👤
+              <div key={`bench-empty-${i}`} className="relative flex items-center">
+                <div className="w-12 shrink-0 flex justify-center">
+                  <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground opacity-50">
+                    BN
+                  </span>
                 </div>
-                <p className="text-xs font-medium text-muted-foreground">Empty Bench Slot</p>
+                <div className="flex-1 p-[14px] rounded-xl border border-dashed border-border bg-muted/10 flex items-center gap-3 opacity-60">
+                  <div className="w-10 h-10 rounded-full bg-background border border-muted-foreground/20 flex items-center justify-center text-lg text-muted-foreground/50">
+                    👤
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Empty Bench Slot</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -481,48 +591,141 @@ const TeamView = () => {
           </DialogHeader>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground mb-4">
-              Select a player from {playerToSwap?.from === 'active' ? 'bench' : 'active roster'} to swap with:
+              Select a player or slot to swap {playerToSwap?.player.name} with:
             </p>
             {playerToSwap && (
-              <>
-                {/* Regular Players */}
-                {(playerToSwap.from === 'active' ? sortedBench : sortPlayersByRole(activePlayers)).map(player => {
-                  const isValidSwap = playerToSwap.from === 'bench'
-                    ? canSwapInActive(activePlayers, playerToSwap.player, player, config).isValid
-                    : canSwapInActive(activePlayers, player, playerToSwap.player, config).isValid;
+              <div className="space-y-3">
+                {/* 1. All other Active Players (Intra-roster swap) */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Active Roster</p>
+                  {activePlayers
+                    .filter(p => {
+                      if (!playerToSwap) return false;
+                      return p.id !== playerToSwap.player.id;
+                    })
+                    .map(player => {
+                      if (!playerToSwap) return null;
+                      // If swapping from bench, playerToSwap is moving INTO active, 'player' is moving OUT
+                      // targetSlotRole is the role of the slot we are clicking on ('player.role')
+                      const isValidSwap = playerToSwap.from === 'bench'
+                        ? canSwapInActive(activePlayers, playerToSwap.player, player, player.role, config).isValid
+                        : canSwapInActive(activePlayers, player, playerToSwap.player, playerToSwap.player.role, config).isValid;
 
-                  return (
-                    <button
-                      key={player.id}
-                      onClick={() => isValidSwap && handleSwap(player)}
-                      disabled={!isValidSwap}
-                      className={cn(
-                        "w-full text-left p-3 rounded-lg border transition-colors",
-                        isValidSwap
-                          ? "border-border hover:border-primary bg-card"
-                          : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
-                          {roleIcons[player.role] || '👤'}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">{player.name}</p>
-                          <p className="text-xs text-muted-foreground">{player.team} • {player.role}</p>
-                        </div>
-                        {player.isInternational && (
-                          <Plane className="w-4 h-4 text-muted-foreground" />
+                      return (
+                        <button
+                          key={player.id}
+                          onClick={() => isValidSwap && handleSwap(player)}
+                          disabled={!isValidSwap}
+                          className={cn(
+                            "w-full text-left p-3 rounded-lg border transition-colors",
+                            isValidSwap
+                              ? "border-border hover:border-primary bg-card"
+                              : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm">
+                              {roleIcons[player.role] || '👤'}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-foreground">{player.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {player.role} •
+                                {isValidSwap ? " Swap to this slot" : " Position constraint"}
+                              </p>
+                            </div>
+                            <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                            {!isValidSwap && <Lock className="w-3 h-3 text-destructive" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+
+                {/* 1.5. Empty Active Slots (If swapping from bench) */}
+                {playerToSwap.from === 'bench' && activePlayers.length < config.activeSize && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Empty Active Slots</p>
+                    {getActiveRosterSlots(activePlayers, config)
+                      .filter(slot => !slot.filled)
+                      .map((slot, idx) => {
+                        if (!playerToSwap) return null;
+                        // player is moving into an empty slot - use slot.role as target
+                        const validation = canSwapInActive(activePlayers, playerToSwap.player, { id: 'hole' } as Player, slot.role as PlayerRole | 'Any Position' | 'BENCH', config);
+                        const isClickable = validation.isValid;
+
+                        return (
+                          <button
+                            key={`empty-${idx}`}
+                            onClick={() => isClickable && handleSwap(playerToSwap.player)}
+                            disabled={!isClickable}
+                            className={cn(
+                              "w-full text-left p-3 rounded-lg border border-dashed transition-colors",
+                              isClickable
+                                ? "border-primary/50 hover:border-primary bg-primary/5"
+                                : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full border border-dashed border-primary/50 flex items-center justify-center text-xs text-primary/50">
+                                {roleIcons[slot.role] || '+'}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium text-foreground">{slot.label}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {isClickable ? "Fill this slot" : (validation.errors[0] || "Constraint violation")}
+                                </p>
+                              </div>
+                              <Plus className="w-4 h-4 text-primary/50" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* 2. Bench Players */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bench</p>
+                  {sortedBench.map(player => {
+                    const isValidSwap = playerToSwap.from === 'bench'
+                      ? canSwapInActive(activePlayers, playerToSwap.player, player, 'BENCH', config).isValid
+                      : true; // Swapping active to bench is always fine role-wise
+
+                    return (
+                      <button
+                        key={player.id}
+                        onClick={() => isValidSwap && handleSwap({ ...player, id: 'bench-target' } as Player)}
+                        disabled={!isValidSwap}
+                        className={cn(
+                          "w-full text-left p-3 rounded-lg border transition-colors",
+                          isValidSwap
+                            ? "border-border hover:border-primary bg-card"
+                            : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
                         )}
-                      </div>
-                    </button>
-                  );
-                })}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
+                            {roleIcons[player.role] || '👤'}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-foreground">{player.name}</p>
+                              <Badge variant="outline" className="text-[8px] h-3.5 px-1">BN</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{player.role} • {playerToSwap.from === 'active' ? 'Swap to Active' : 'Swap on Bench'}</p>
+                          </div>
+                          {player.isInternational && <Plane className="w-4 h-4 text-muted-foreground" />}
+                          {!isValidSwap && <Lock className="w-3 h-3 text-destructive" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                {/* Empty Slot Option */}
-                {playerToSwap.from === 'active' ? (
-                  // Moving to Bench (if bench has space)
-                  benchPlayers.length < config.benchSize && (
+                {/* 3. Special Actions (Move to Bench) */}
+                {playerToSwap.from === 'active' && benchPlayers.length < config.benchSize && (
+                  <div className="pt-2 border-t border-border/50">
                     <button
                       onClick={() => {
                         handleMoveToBench(playerToSwap.player.id);
@@ -532,7 +735,7 @@ const TeamView = () => {
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm opacity-60">
-                          <Plus className="w-4 h-4" />
+                          <ArrowUpDown className="w-4 h-4 rotate-90" />
                         </div>
                         <div className="flex-1 text-muted-foreground">
                           <p className="font-medium">Move to Empty Bench Slot</p>
@@ -540,52 +743,52 @@ const TeamView = () => {
                         </div>
                       </div>
                     </button>
-                  )
-                ) : (
-                  // Moving to Active (if active has any empty slots)
-                  slots.filter(s => !s.filled).length > 0 && (
-                    <div className="pt-2 border-t border-border mt-2">
-                      <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-2 px-1">Move to Empty Active Slot</p>
-                      {slots.filter(s => !s.filled).map((slot, i) => {
-                        const validation = canAddToActive(activePlayers, playerToSwap.player, config);
-                        const isValid = validation.isValid;
-
-                        return (
-                          <button
-                            key={`empty-active-${i}`}
-                            onClick={() => {
-                              if (isValid) {
-                                handleMoveToActive(playerToSwap.player.id);
-                                setSwapDialogOpen(false);
-                              }
-                            }}
-                            disabled={!isValid}
-                            className={cn(
-                              "w-full text-left p-3 rounded-lg border transition-colors mb-2",
-                              isValid
-                                ? "border-border hover:border-primary bg-card"
-                                : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
-                                {roleIcons[slot.role] || '👤'}
-                              </div>
-                              <div className="flex-1">
-                                <p className="font-medium text-foreground">{slot.label}</p>
-                                <p className="text-[10px] text-muted-foreground">Fill empty {slot.role} slot</p>
-                              </div>
-                              {!isValid && (
-                                <span className="text-[10px] text-destructive">{validation.errors[0]}</span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )
+                  </div>
                 )}
-              </>
+
+                {/* 4. Filling Empty Active Slots */}
+                {playerToSwap.from === 'bench' && slots.filter(s => !s.filled).length > 0 && (
+                  <div className="pt-2 border-t border-border/50">
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-2 px-1">Move to Empty Active Slot</p>
+                    {slots.filter(s => !s.filled).map((slot, i) => {
+                      const validation = canAddToActive(activePlayers, playerToSwap.player, config);
+                      const isValid = validation.isValid;
+
+                      return (
+                        <button
+                          key={`empty-active-${i}`}
+                          onClick={() => {
+                            if (isValid) {
+                              handleMoveToActive(playerToSwap.player.id);
+                              setSwapDialogOpen(false);
+                            }
+                          }}
+                          disabled={!isValid}
+                          className={cn(
+                            "w-full text-left p-3 rounded-lg border transition-colors mb-2",
+                            isValid
+                              ? "border-border hover:border-primary bg-card"
+                              : "border-border/50 bg-muted/30 opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
+                              {roleIcons[slot.role] || '👤'}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-foreground">{slot.label}</p>
+                              <p className="text-[10px] text-muted-foreground">Fill empty {slot.role} slot</p>
+                            </div>
+                            {!isValid && (
+                              <span className="text-[10px] text-destructive">{validation.errors[0]}</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </DialogContent>
@@ -671,7 +874,7 @@ const TeamView = () => {
         onOpenChange={(open) => !open && setDetailPlayer(null)}
         onDrop={canEdit && detailPlayer ? () => dropPlayerOnly(teamId!, detailPlayer.id) : undefined}
       />
-    </AppLayout>
+    </AppLayout >
   );
 };
 

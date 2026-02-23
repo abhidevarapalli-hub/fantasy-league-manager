@@ -15,6 +15,7 @@ export interface LeagueConfig {
   maxInternational: number;
   requireWk: boolean;
   maxFromTeam?: number;
+  draftTimerSeconds?: number;
 }
 
 // Default configuration for backwards compatibility and fallback
@@ -30,7 +31,8 @@ export const DEFAULT_LEAGUE_CONFIG: LeagueConfig = {
   maxAllRounders: 4,
   maxInternational: 4,
   requireWk: true,
-  maxFromTeam: 11
+  maxFromTeam: 11,
+  draftTimerSeconds: 60
 };
 
 /**
@@ -62,6 +64,21 @@ export interface RosterCounts {
   bowlers: number;
   international: number;
   total: number;
+}
+
+/**
+ * Role Compatibility Matrix
+ * Defines which roles can be placed into which slots.
+ */
+export const ROLE_COMPATIBILITY: Record<PlayerRole, (PlayerRole | 'Any Position' | 'BENCH')[]> = {
+  'Wicket Keeper': ['Wicket Keeper', 'Batsman', 'Any Position', 'BENCH'],
+  'Batsman': ['Batsman', 'Any Position', 'BENCH'],
+  'All Rounder': ['All Rounder', 'Any Position', 'BENCH'],
+  'Bowler': ['Bowler', 'Any Position', 'BENCH']
+};
+
+export function isRoleCompatible(playerRole: PlayerRole, targetSlotRole: PlayerRole | 'Any Position' | 'BENCH'): boolean {
+  return ROLE_COMPATIBILITY[playerRole].includes(targetSlotRole);
 }
 
 export interface RosterValidationResult {
@@ -209,15 +226,45 @@ export function canRemoveFromActive(currentActive: Player[], playerToRemove: Pla
   return { isValid: true, errors: [], counts };
 }
 
-// Check if swapping a player (for roster transactions) would be valid
 export function canSwapInActive(
   currentActive: Player[],
   playerToAdd: Player,
   playerToRemove: Player,
+  targetSlotRole: PlayerRole | 'Any Position' | 'BENCH' = 'Any Position',
   config: LeagueConfig = DEFAULT_LEAGUE_CONFIG
 ): RosterValidationResult {
-  const newActive = currentActive.filter(p => p.id !== playerToRemove.id);
-  return canAddToActive(newActive, playerToAdd, config);
+  // 1. Role Compatibility Check (Primary for simplified UX)
+  // If moving into a specific slot (intra-active or into a slot on bench), 
+  // ensure the added player's role is compatible with that slot.
+  if (!isRoleCompatible(playerToAdd.role, targetSlotRole)) {
+    return {
+      isValid: false,
+      errors: [`Position constraint: ${playerToAdd.role} cannot move to ${targetSlotRole} slot`],
+      counts: countRosterPlayers([...currentActive.filter(p => p.id !== playerToRemove.id), playerToAdd])
+    };
+  }
+
+  // 2. Full Simulated Validation
+  // We simulate the removal of one player and the addition of the other.
+  // Then we validate if the resulting 11 players meet all league minimum requirements.
+  const newActive = [...currentActive.filter(p => p.id !== playerToRemove.id), playerToAdd];
+
+  // If we are at full strength (11 players), we must strictly validate the resulting squad
+  if (newActive.length === config.activeSize) {
+    const validationResult = validateActiveRoster(newActive, config);
+    if (!validationResult.isValid) {
+      return {
+        ...validationResult,
+        errors: validationResult.errors.map(err => `Roster constraint: ${err}`)
+      };
+    }
+  }
+
+  // 3. Forward-looking validation (Ensuring future holes CAN be filled)
+  // Even if the roster isn't full yet (e.g. 10 players), we check if adding this player 
+  // makes the remaining slots insufficient for required minimums.
+  const activeAfterRemoval = currentActive.filter(p => p.id !== playerToRemove.id);
+  return canAddToActive(activeAfterRemoval, playerToAdd, config);
 }
 
 
