@@ -196,7 +196,6 @@ export type Database = {
       draft_order: {
         Row: {
           auto_draft_enabled: boolean | null
-          created_at: string
           id: string
           league_id: string | null
           manager_id: string | null
@@ -204,7 +203,6 @@ export type Database = {
         }
         Insert: {
           auto_draft_enabled?: boolean | null
-          created_at?: string
           id?: string
           league_id?: string | null
           manager_id?: string | null
@@ -212,7 +210,6 @@ export type Database = {
         }
         Update: {
           auto_draft_enabled?: boolean | null
-          created_at?: string
           id?: string
           league_id?: string | null
           manager_id?: string | null
@@ -237,37 +234,34 @@ export type Database = {
       }
       draft_picks: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           is_auto_draft: boolean | null
           league_id: string | null
           manager_id: string | null
-          pick_position: number
+          pick_number: number
           player_id: string | null
           round: number
-          updated_at: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           is_auto_draft?: boolean | null
           league_id?: string | null
           manager_id?: string | null
-          pick_position: number
+          pick_number: number
           player_id?: string | null
           round: number
-          updated_at?: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           is_auto_draft?: boolean | null
           league_id?: string | null
           manager_id?: string | null
-          pick_position?: number
+          pick_number?: number
           player_id?: string | null
           round?: number
-          updated_at?: string
         }
         Relationships: [
           {
@@ -302,40 +296,49 @@ export type Database = {
       }
       draft_state: {
         Row: {
-          created_at: string
-          current_pick_start_at: string | null
-          finalized_at: string | null
-          id: string
-          is_active: boolean | null
-          is_finalized: boolean
-          league_id: string | null
+          clock_duration_seconds: number | null
+          created_at: string | null
+          current_position: number | null
+          current_round: number | null
+          last_pick_at: string | null
+          league_id: string
           paused_at: string | null
+          status: string | null
+          total_paused_duration_ms: number | null
+          updated_at: string | null
+          version: number | null
         }
         Insert: {
-          created_at?: string
-          current_pick_start_at?: string | null
-          finalized_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_finalized?: boolean
-          league_id?: string | null
+          clock_duration_seconds?: number | null
+          created_at?: string | null
+          current_position?: number | null
+          current_round?: number | null
+          last_pick_at?: string | null
+          league_id: string
           paused_at?: string | null
+          status?: string | null
+          total_paused_duration_ms?: number | null
+          updated_at?: string | null
+          version?: number | null
         }
         Update: {
-          created_at?: string
-          current_pick_start_at?: string | null
-          finalized_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_finalized?: boolean
-          league_id?: string | null
+          clock_duration_seconds?: number | null
+          created_at?: string | null
+          current_position?: number | null
+          current_round?: number | null
+          last_pick_at?: string | null
+          league_id?: string
           paused_at?: string | null
+          status?: string | null
+          total_paused_duration_ms?: number | null
+          updated_at?: string | null
+          version?: number | null
         }
         Relationships: [
           {
             foreignKeyName: "draft_state_league_id_fkey"
             columns: ["league_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "leagues"
             referencedColumns: ["id"]
           },
@@ -702,18 +705,26 @@ export type Database = {
           active_size: number
           bench_size: number
           created_at: string
-          current_week: number
+          current_week: number | null
+          draft_timer_seconds: number | null
           id: string
           league_manager_id: string | null
           league_manager_username: string | null
           manager_count: number
+          max_all_rounders: number | null
+          max_bat_wk: number | null
           max_batsmen: number
+          max_bowlers: number | null
+          max_from_team: number | null
           max_international: number
+          max_wks: number | null
           min_all_rounders: number
+          min_bat_wk: number | null
           min_batsmen: number
           min_bowlers: number
           min_wks: number
           name: string
+          require_wk: boolean | null
           tournament_id: number | null
           tournament_name: string | null
           updated_at: string
@@ -722,18 +733,26 @@ export type Database = {
           active_size?: number
           bench_size?: number
           created_at?: string
-          current_week?: number
+          current_week?: number | null
+          draft_timer_seconds?: number | null
           id?: string
           league_manager_id?: string | null
           league_manager_username?: string | null
           manager_count?: number
+          max_all_rounders?: number | null
+          max_bat_wk?: number | null
           max_batsmen?: number
+          max_bowlers?: number | null
+          max_from_team?: number | null
           max_international?: number
+          max_wks?: number | null
           min_all_rounders?: number
+          min_bat_wk?: number | null
           min_batsmen?: number
           min_bowlers?: number
           min_wks?: number
           name: string
+          require_wk?: boolean | null
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
@@ -742,18 +761,26 @@ export type Database = {
           active_size?: number
           bench_size?: number
           created_at?: string
-          current_week?: number
+          current_week?: number | null
+          draft_timer_seconds?: number | null
           id?: string
           league_manager_id?: string | null
           league_manager_username?: string | null
           manager_count?: number
+          max_all_rounders?: number | null
+          max_bat_wk?: number | null
           max_batsmen?: number
+          max_bowlers?: number | null
+          max_from_team?: number | null
           max_international?: number
+          max_wks?: number | null
           min_all_rounders?: number
+          min_bat_wk?: number | null
           min_batsmen?: number
           min_bowlers?: number
           min_wks?: number
           name?: string
+          require_wk?: boolean | null
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
@@ -1826,6 +1853,7 @@ export type Database = {
           batting_position: number | null
           catches: number | null
           created_at: string | null
+          cricbuzz_match_id: number | null
           cricbuzz_player_id: string | null
           dismissal_type: string | null
           dots: number | null
@@ -1919,6 +1947,7 @@ export type Database = {
         Returns: boolean
       }
       batch_update_league_scores: { Args: { p_updates: Json }; Returns: number }
+      check_auto_draft: { Args: { p_league_id: string }; Returns: Json }
       disable_match_polling: {
         Args: { p_cricbuzz_match_id: number }
         Returns: undefined
@@ -1926,6 +1955,15 @@ export type Database = {
       enable_match_polling: {
         Args: { p_cricbuzz_match_id: number; p_initial_state?: string }
         Returns: string
+      }
+      execute_draft_pick: {
+        Args: {
+          p_is_auto_draft: boolean
+          p_league_id: string
+          p_manager_id: string
+          p_player_id: string
+        }
+        Returns: Json
       }
       finalize_match_stats: {
         Args: {
@@ -2015,16 +2053,6 @@ export type Database = {
         Args: { p_league_id: string; p_player_id: string; p_week: number }
         Returns: number
       }
-      get_upcoming_matches_to_activate: {
-        Args: { p_lookahead_minutes?: number }
-        Returns: {
-          cricbuzz_match_id: number
-          current_state: string
-          match_date: string
-          match_description: string
-          match_id: string
-        }[]
-      }
       is_league_manager_of: { Args: { p_league_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       record_poll_error: {
@@ -2043,6 +2071,7 @@ export type Database = {
         Args: { p_cricbuzz_match_id: number }
         Returns: undefined
       }
+      sync_league_rosters: { Args: { p_league_id: string }; Returns: undefined }
       update_league_standings: {
         Args: { league_uuid: string }
         Returns: undefined
