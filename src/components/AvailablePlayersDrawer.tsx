@@ -203,115 +203,59 @@ export const AvailablePlayersDrawer = ({
                   )}
                 </div>
 
-                {/* Filters Sections */}
-                <div className="space-y-4">
+                {/* Filters Row */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {/* Team Filter */}
-                  <div className="space-y-2">
-                    <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">League Teams</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        onClick={() => setSelectedTeam(null)}
-                        className={cn(
-                          "px-3 py-1.5 text-[11px] font-bold rounded-md border transition-all uppercase",
-                          !selectedTeam
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
-                        )}
-                      >
-                        All
-                      </button>
-                      {availableTeams.map((team) => {
-                        const styles = getTeamPillStyles(team, selectedTeam === team);
-                        return (
-                          <button
-                            key={team}
-                            onClick={() => setSelectedTeam(selectedTeam === team ? null : team)}
-                            className={cn(
-                              "px-3 py-1.5 text-[11px] font-bold rounded-md border transition-all uppercase",
-                              styles.className,
-                            )}
-                            style={styles.style}
-                          >
-                            {team}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Team</h3>
+                    <Select value={selectedTeam || "all"} onValueChange={(val) => setSelectedTeam(val === "all" ? null : val)}>
+                      <SelectTrigger className="h-8 text-xs bg-muted/50 border-transparent focus:ring-1 focus:ring-primary">
+                        <SelectValue placeholder="All Teams" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[200]">
+                        <SelectItem value="all" className="text-xs font-bold text-muted-foreground">ALL TEAMS</SelectItem>
+                        {availableTeams.map(team => (
+                          <SelectItem key={team} value={team} className="text-xs font-bold">{team}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Position & Nationality Row */}
-                  <div className="flex flex-row gap-8 items-start">
-                    {/* Position Filter */}
-                    <div className="space-y-2">
-                      <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Role</h3>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => setSelectedRole('All')}
-                          className={cn(
-                            "px-3 py-1.5 text-[11px] font-bold rounded-md border transition-all uppercase",
-                            selectedRole === 'All'
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
-                          )}
-                        >
-                          All
-                        </button>
-                        {Object.keys(roleAbbreviations).map((role) => (
-                          role !== 'All' && (
-                            <button
-                              key={role}
-                              onClick={() => setSelectedRole(role as RoleFilter)}
-                              className={cn(
-                                "px-3 py-1.5 text-[11px] font-bold rounded-md border transition-colors uppercase",
-                                selectedRole === role
-                                  ? ROLE_AND_NATIONALITY_COLORS[role as keyof typeof ROLE_AND_NATIONALITY_COLORS]
-                                  : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
-                              )}
-                            >
-                              {roleAbbreviations[role]}
-                            </button>
-                          )
+                  {/* Role Filter */}
+                  <div className="space-y-1.5">
+                    <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Role</h3>
+                    <Select value={selectedRole} onValueChange={(val) => setSelectedRole(val as RoleFilter)}>
+                      <SelectTrigger className="h-8 text-xs bg-muted/50 border-transparent focus:ring-1 focus:ring-primary">
+                        <SelectValue placeholder="All Roles" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[200]">
+                        <SelectItem value="All" className="text-xs font-bold text-muted-foreground">ALL ROLES</SelectItem>
+                        {Object.keys(roleAbbreviations).filter(r => r !== 'All').map(role => (
+                          <SelectItem key={role} value={role} className="text-xs font-bold">{roleAbbreviations[role]}</SelectItem>
                         ))}
-                      </div>
-                    </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    {/* Nationality Filter */}
-                    <div className="space-y-2">
-                      <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Nationality</h3>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => setSelectedNationality('All')}
-                          className={cn(
-                            "px-3 py-1.5 text-[11px] font-bold rounded-md border transition-all uppercase",
-                            selectedNationality === 'All'
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
-                          )}
-                        >
-                          All
-                        </button>
-                        {['International', 'Domestic'].map((nat) => (
-                          <button
-                            key={nat}
-                            onClick={() => setSelectedNationality(nat as NationalityFilter)}
-                            className={cn(
-                              "px-3 py-1.5 text-[11px] font-bold rounded-md border transition-colors uppercase",
-                              selectedNationality === nat
-                                ? ROLE_AND_NATIONALITY_COLORS[nat as keyof typeof ROLE_AND_NATIONALITY_COLORS]
-                                : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
-                            )}
-                          >
-                            {nat}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Nationality Filter */}
+                  <div className="space-y-1.5 col-span-2 md:col-span-1">
+                    <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Nationality</h3>
+                    <Select value={selectedNationality} onValueChange={(val) => setSelectedNationality(val as NationalityFilter)}>
+                      <SelectTrigger className="h-8 text-xs bg-muted/50 border-transparent focus:ring-1 focus:ring-primary">
+                        <SelectValue placeholder="All Nationalities" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[200]">
+                        <SelectItem value="All" className="text-xs font-bold text-muted-foreground">ALL</SelectItem>
+                        <SelectItem value="International" className="text-xs font-bold">INTERNATIONAL</SelectItem>
+                        <SelectItem value="Domestic" className="text-xs font-bold">DOMESTIC</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
 
               {/* Player List */}
-              <div className="flex-1 overflow-y-auto mt-4 px-6 pb-20 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto mt-4 px-6 pb-32 custom-scrollbar">
                 {filteredPlayers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-sm">
                     <p className="font-medium">No players found</p>
