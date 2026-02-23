@@ -32,6 +32,7 @@ const Players = () => {
   const tournamentId = useGameStore(state => state.tournamentId);
   const managerProfile = useAuthStore(state => state.managerProfile);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
+  const draftState = useGameStore(state => state.draftState);
 
   const { proposeTrade } = useTrades();
 
@@ -139,112 +140,121 @@ const Players = () => {
 
   return (
     <AppLayout title="Player Pool" subtitle={`${filteredPlayers.length} players`}>
-      <div className="sticky top-0 z-30 bg-background border-b border-border">
-        {/* Search */}
-        <div className="px-4 pt-3 pb-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search players..."
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border/50">
+        {/* Row 1: Position Filters + Search */}
+        <div className="px-4 py-2 flex items-center justify-between gap-4 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-1.5 min-w-fit">
+            {['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'].map((role) => {
+              const shortRole = role === 'All Rounder' ? 'AR' : role === 'Wicket Keeper' ? 'WK' : role === 'Batsman' ? 'BAT' : role === 'Bowler' ? 'BOWL' : role;
+              const isActive = selectedRole === role;
+              return (
+                <button
+                  key={role}
+                  onClick={() => setSelectedRole(role as RoleFilter)}
+                  className={cn(
+                    "px-3 py-1.5 text-[11px] font-bold rounded-md transition-all uppercase tracking-wider",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  )}
+                >
+                  {shortRole}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative flex-1 max-w-xs min-w-[120px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60" />
+            <input
+              type="text"
+              placeholder="Find player..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10 bg-muted border-border"
+              className="w-full bg-muted/40 border border-border/40 rounded-md py-1.5 pl-8 pr-8 text-xs focus:outline-none focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground/50"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted-foreground/20"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted-foreground/20 transition-colors"
               >
-                <X className="w-4 h-4 text-muted-foreground" />
+                <X className="w-3 h-3 text-muted-foreground/60" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Free Agent Filter */}
-        <div className="px-4 pb-2">
-          <button
-            onClick={() => setShowOnlyFreeAgents(!showOnlyFreeAgents)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
-              showOnlyFreeAgents
-                ? "bg-secondary/20 text-secondary border-secondary/30"
-                : "bg-muted/50 text-muted-foreground border-border hover:border-secondary/30"
-            )}
-          >
-            <Filter className="w-3 h-3" />
-            {showOnlyFreeAgents ? 'Showing Free Agents Only' : 'Show Free Agents Only'}
-          </button>
-        </div>
-
-        {/* Team Filter Pills */}
-        <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
-          <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Team</p>
-          <div className="flex gap-2">
-            {availableTeams.map((team) => {
-              const styles = getTeamPillStyles(team, selectedTeam === team);
-              return (
-                <button
-                  key={team}
-                  onClick={() => setSelectedTeam(team)}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                    styles.className
-                  )}
-                  style={styles.style}
-                >
-                  {team}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Role and Nationality Filter Pills - Same Row */}
-        <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
-          <div className="flex items-start gap-6">
-            {/* Role Filter */}
-            <div className="flex-shrink-0">
-              <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Position</p>
-              <div className="flex gap-2">
-                {['All', 'Batsman', 'Bowler', 'All Rounder', 'Wicket Keeper'].map((role) => (
-                  <button
-                    key={role}
-                    onClick={() => setSelectedRole(role as RoleFilter)}
-                    className={cn(
-                      "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                      selectedRole === role
-                        ? ROLE_AND_NATIONALITY_FILTERS[role as keyof typeof ROLE_AND_NATIONALITY_FILTERS]
-                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
-                    )}
-                  >
-                    {role}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Nationality Filter */}
-            <div className="flex-shrink-0">
-              <p className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Nationality</p>
-              <div className="flex gap-2">
-                {['All', 'Domestic', 'International'].map((nationality) => (
+        {/* Row 2: Nationality + Status Toggles */}
+        <div className="px-4 py-1.5 flex items-center justify-between gap-4 border-t border-border/20">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              {['All', 'Domestic', 'International'].map((nationality) => {
+                const shortLabel = nationality === 'Domestic' ? 'DOM' : nationality === 'International' ? 'INTL' : nationality;
+                const isActive = selectedNationality === nationality;
+                return (
                   <button
                     key={nationality}
                     onClick={() => setSelectedNationality(nationality as NationalityFilter)}
                     className={cn(
-                      "px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap",
-                      selectedNationality === nationality
-                        ? ROLE_AND_NATIONALITY_FILTERS[nationality as keyof typeof ROLE_AND_NATIONALITY_FILTERS]
-                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/30"
+                      "px-2 py-1 text-[10px] font-medium rounded transition-all uppercase tracking-tight",
+                      isActive
+                        ? "bg-secondary/20 text-secondary border border-secondary/30"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     )}
                   >
-                    {nationality}
+                    {shortLabel}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowOnlyFreeAgents(!showOnlyFreeAgents)}
+              className="flex items-center gap-2 group cursor-pointer"
+            >
+              <div className={cn(
+                "w-3.5 h-3.5 rounded-sm border transition-all flex items-center justify-center",
+                showOnlyFreeAgents
+                  ? "bg-primary border-primary"
+                  : "border-muted-foreground/40 group-hover:border-primary/50"
+              )}>
+                {showOnlyFreeAgents && <Filter className="w-2.5 h-2.5 text-primary-foreground" />}
+              </div>
+              <span className={cn(
+                "text-[10px] font-medium transition-colors",
+                showOnlyFreeAgents ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+              )}>
+                Free Agents
+              </span>
+            </button>
+
+            {/* Placeholder for settings icon like in sleeper */}
+            <button className="p-1 rounded hover:bg-muted transition-colors">
+              <Filter className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-foreground" />
+            </button>
+          </div>
+        </div>
+
+        {/* Row 3: Team Filter Pills */}
+        <div className="px-4 py-1.5 flex items-center gap-2 overflow-x-auto scrollbar-hide border-t border-border/10">
+          {availableTeams.map((team) => {
+            const styles = getTeamPillStyles(team, selectedTeam === team);
+            return (
+              <button
+                key={team}
+                onClick={() => setSelectedTeam(team)}
+                className={cn(
+                  "px-2.5 py-1 text-[10px] font-semibold rounded transition-all whitespace-nowrap border uppercase tracking-tighter",
+                  styles.className
+                )}
+                style={styles.style}
+              >
+                {team}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -261,9 +271,9 @@ const Players = () => {
                 key={player.id}
                 player={player}
                 isOwned={false}
-                showActions={(!rosteredBy && (isLeagueManager || !!currentUserManagerId)) || canTrade}
-                onAdd={!rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
-                onTrade={canTrade ? () => handleTradePlayer(player.id) : undefined}
+                showActions={Boolean(draftState?.isFinalized && ((!rosteredBy && (isLeagueManager || !!currentUserManagerId)) || canTrade))}
+                onAdd={draftState?.isFinalized && !rosteredBy && (isLeagueManager || !!currentUserManagerId) ? () => handleAddPlayer(player.id) : undefined}
+                onTrade={draftState?.isFinalized && canTrade ? () => handleTradePlayer(player.id) : undefined}
                 onClick={() => handlePlayerClick(player)}
                 managerName={rosteredBy}
               />
@@ -282,7 +292,6 @@ const Players = () => {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         player={selectedPlayer}
-        preselectedManagerId={isLeagueManager ? undefined : currentUserManagerId}
       />
 
       <TradeDialog
