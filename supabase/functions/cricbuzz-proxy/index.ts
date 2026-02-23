@@ -112,7 +112,18 @@ serve(async (req) => {
       });
     }
 
-    const data = await response.json();
+    const text = await response.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // Cricbuzz returned non-JSON (empty body, HTML error page, rate limit)
+      console.error(`Non-JSON response from Cricbuzz (${response.status}): ${text.slice(0, 200)}`);
+      return new Response(
+        JSON.stringify({ error: 'Cricbuzz returned non-JSON response', status: response.status }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Cache successful responses (JSON only)
     if (response.ok) {

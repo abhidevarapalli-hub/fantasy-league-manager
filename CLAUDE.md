@@ -50,7 +50,7 @@ Key characteristics:
 - Read-heavy with predictable spikes during live games
  
 ## Coding Rules
- 
+
 - Use TypeScript for all new files
 - Test critical functions
 - Comment complex logic
@@ -61,6 +61,16 @@ Key characteristics:
 - Use the playwright MCP when asked to verify changes in the browser
 - Look for servers before starting a new server, kill old ones if a new one needs to start
 - Consider database schema changes with future scalability in mind
+
+### Supabase Type Safety
+- CI runs `npx tsc -p tsconfig.app.json --noEmit` — this is stricter than a plain `tsc --noEmit` since it uses the app-specific config
+- **After any database schema change** (new columns, new RPC functions, altered tables), you must:
+  1. Create a migration in `supabase/migrations/`
+  2. Apply it locally: `npm run supabase:reset`
+  3. Regenerate types: `npx supabase gen types typescript --local > src/integrations/supabase/types.ts`
+  4. Remove any stray debug lines (e.g. "Connecting to db ...") from the top of the generated file
+  5. Run `npx tsc -p tsconfig.app.json --noEmit` to verify before pushing
+- The generated `src/integrations/supabase/types.ts` must stay in sync with the database schema; mismatches cause CI "Type Check" failures
 
 ## Local Development Setup
 
