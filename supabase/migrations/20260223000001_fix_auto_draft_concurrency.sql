@@ -3,8 +3,10 @@
 
 -- 1. Add Unique Constraints to draft_picks
 -- Ensure a player can only be drafted once in a league
+ALTER TABLE public.draft_picks DROP CONSTRAINT IF EXISTS draft_picks_league_player_unique;
 ALTER TABLE public.draft_picks ADD CONSTRAINT draft_picks_league_player_unique UNIQUE (league_id, player_id);
 -- Ensure a specific pick position (round/pick_number) can only be filled once
+ALTER TABLE public.draft_picks DROP CONSTRAINT IF EXISTS draft_picks_league_pick_unique;
 ALTER TABLE public.draft_picks ADD CONSTRAINT draft_picks_league_pick_unique UNIQUE (league_id, round, pick_number);
 
 -- 2. Enhanced execute_draft_pick with defensive checks
