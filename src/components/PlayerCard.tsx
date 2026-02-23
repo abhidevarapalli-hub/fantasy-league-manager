@@ -107,10 +107,15 @@ export const PlayerCard = ({
         <div className="flex items-center gap-1.5 leading-tight">
           <p className={cn(
             "font-medium truncate",
-            variant === 'compact' ? "text-xs" : "text-sm md:text-base",
+            variant === 'compact' ? "text-xs" : "text-sm",
             teamColors.text
           )}>
-            {player.name}
+            <span className="md:hidden">
+              {player.name.split(' ').length > 1
+                ? `${player.name.charAt(0)}. ${player.name.split(' ').slice(1).join(' ')}`
+                : player.name}
+            </span>
+            <span className="hidden md:inline">{player.name}</span>
           </p>
           {captainBadge && (
             <span className={cn(
