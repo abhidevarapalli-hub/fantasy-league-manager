@@ -44,6 +44,7 @@ interface PlayerDetailDialogProps {
     onAdd?: () => void;
     onDrop?: () => void;
     onTrade?: () => void;
+    onDraft?: () => void;
 }
 
 import { calculateFantasyPoints } from '@/lib/scoring-utils';
@@ -58,6 +59,7 @@ export function PlayerDetailDialog({
     onAdd,
     onDrop,
     onTrade,
+    onDraft,
 }: PlayerDetailDialogProps) {
     // First, try to get extended player data from our database
     // This has the cricbuzz_id and image_id we need
@@ -126,19 +128,54 @@ export function PlayerDetailDialog({
         playerTeamShort
     );
 
-    const { currentLeagueId, draftState } = useGameStore();
+    const { currentLeagueId, draftState, draftPicks } = useGameStore();
     const { data: playerStatsMap } = usePlayerMatchStats(player?.id, currentLeagueId);
 
     const teamColors = getTeamColors(player?.team || 'OTHER');
     const imageId = tournamentPlayer?.imageId || extendedData?.imageId;
 
     const { managers } = useGameStore();
+
+    const isDraftActive = useMemo(() => {
+        return draftState?.isActive && !draftState?.isFinalized;
+    }, [draftState]);
+
     const owningManager = useMemo(() => {
         if (!player) return null;
+
+        // During an active draft, trust draftPicks as the source of truth for ownership
+        if (isDraftActive) {
+            const pick = draftPicks.find(p => p.playerId === player.id);
+            if (pick) {
+                return managers.find(m => m.id === pick.managerId) || null;
+            }
+            return null;
+        }
+
         return managers.find(m => m.activeRoster?.includes(player.id) || m.bench?.includes(player.id));
-    }, [managers, player]);
+    }, [managers, player, draftPicks, isDraftActive]);
 
     const managerProfile = useAuthStore(state => state.managerProfile);
+
+    const isDrafted = useMemo(() => {
+        if (!player) return false;
+        if (isDraftActive) {
+            return draftPicks.some(p => p.playerId === player.id);
+        }
+        return managers.some(m => m.activeRoster?.includes(player.id) || m.bench?.includes(player.id));
+    }, [managers, player, draftPicks, isDraftActive]);
+
+    const isMyTurn = useMemo(() => {
+        if (!managerProfile || !draftState) return false;
+        // In the draft feature, we usually have draftOrder to determine which manager is at which position
+        const { draftOrder } = useGameStore.getState();
+        const currentActiveManagerId = draftOrder.find(o => o.position === draftState.currentPosition)?.managerId;
+        return currentActiveManagerId === managerProfile.id;
+    }, [managerProfile, draftState]);
+
+    const canDraft = useMemo(() => {
+        return draftState?.isActive && !draftState?.isFinalized && isMyTurn && !isDrafted;
+    }, [draftState, isMyTurn, isDrafted]);
 
     // Define Sections and Columns dynamically based on Role
     const sections = useMemo(() => {
@@ -201,7 +238,7 @@ export function PlayerDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90vh]">
+            <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90vh] z-[100]">
                 <div className="relative flex flex-col w-full h-full max-h-[90vh] bg-[#0f1014] rounded-xl overflow-hidden border border-border/50 shadow-2xl">
                     {/* Header Background Gradient */}
                     <div className={cn("absolute inset-x-0 top-0 h-48 bg-gradient-to-b opacity-20 pointer-events-none", teamColors.bg)} />
@@ -467,10 +504,21 @@ export function PlayerDetailDialog({
                         </ScrollArea>
 
                         {/* Action Bar */}
-                        {(onAdd || onDrop || onTrade) && (
+                        {(onAdd || onDrop || onTrade || (canDraft && onDraft)) && (
                             <div className="p-4 border-t border-border/50 bg-muted/20 flex gap-3 flex-shrink-0 z-20">
+                                {/* Draft Case */}
+                                {canDraft && onDraft && (
+                                    <Button
+                                        onClick={onDraft}
+                                        className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        Draft Player
+                                    </Button>
+                                )}
+
                                 {/* Free Agent Case */}
-                                {!owningManager && onAdd && (
+                                {!owningManager && onAdd && !canDraft && (
                                     <Button
                                         onClick={onAdd}
                                         className="flex-1 gap-2 bg-primary hover:bg-primary/90"

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
+import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { cn } from '@/lib/utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { toast } from 'sonner';
@@ -54,12 +55,12 @@ const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, 
 
   return (
     <div
-      onClick={manager && !readOnly ? onCellClick : undefined}
+      onClick={onCellClick}
       className={cn(
         "relative min-h-[80px] p-2 border rounded-lg transition-all overflow-hidden",
         !player && "bg-muted/50 border-border text-muted-foreground",
-        manager && !readOnly ? "cursor-pointer hover:opacity-80" : "cursor-default",
-        !manager && "opacity-50",
+        "cursor-pointer hover:opacity-80",
+        !manager && !player && "opacity-50",
         isEmpty && manager && !readOnly && "border-dashed",
         isActive && !player && "border-primary ring-2 ring-primary ring-inset animate-pulse",
         isMyCol && !player && !isActive && "bg-primary/5 border-primary/20"
@@ -379,14 +380,23 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     autoCompleteAllPicks,
   } = useDraft();
 
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ round: number; position: number } | null>(null);
+  const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Draft is read-only if explicitly set OR if draft is finalized
   const isEffectivelyReadOnly = readOnly || draftState?.isFinalized;
 
   const handleCellClick = (round: number, position: number) => {
+    const pick = getPick(round, position);
+    const player = getPlayerForPick(pick);
+
+    if (player) {
+      setDetailPlayer(player);
+      return;
+    }
+
     if (isEffectivelyReadOnly) return;
 
     // Permission check: only LM can click any cell. Non-LM can ONLY click the active cell that belongs to them.
@@ -398,16 +408,26 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     }
 
     setSelectedCell({ round, position });
-    setDialogOpen(true);
+    setDrawerOpen(true);
   };
 
-  const handlePickConfirm = async (playerId: string) => {
-    if (!selectedCell || isEffectivelyReadOnly) return;
+  const handlePickConfirm = async (playerId: string, round?: number, position?: number) => {
+    const targetRound = round ?? selectedCell?.round;
+    const targetPosition = position ?? selectedCell?.position;
+
+    if (!targetRound || !targetPosition || isEffectivelyReadOnly) return;
+
     setIsSubmitting(true);
     try {
-      await makePick(selectedCell.round, selectedCell.position, playerId);
-      setDialogOpen(false);
-      setSelectedCell(null);
+      await makePick(targetRound, targetPosition, playerId);
+      // We don't necessarily want to close the drawer here if it was opened via the button
+      // But if it was opened via a cell click, maybe we should close it or clear selection
+      if (selectedCell) {
+        setSelectedCell(null);
+        // Only close if it's the LM specifically clicking cells to fill them
+        // If it's the active picking turn, maybe keep it open?
+        // User said "Instead we always want to open the draft board"
+      }
     } catch (error) {
       console.error('[DraftBoard] Pick confirmation error:', error);
     } finally {
@@ -477,7 +497,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     <div className="space-y-4 pb-28">
       {/* Top Floating Bar for Timer */}
       {draftState?.isActive && !draftState?.isFinalized && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] flex flex-col items-center gap-2">
           <DraftTimer
             getRemainingTime={getRemainingTime}
             isActive={draftState.isActive}
@@ -557,17 +577,33 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                     )}>
                       #{position}
                     </span>
-                    {manager && !isEffectivelyReadOnly && (
-                      <button
-                        onClick={() => manager && toggleAutoDraft(manager.id, !orderItem?.autoDraftEnabled)}
-                        className={cn(
-                          "transition-colors",
-                          orderItem?.autoDraftEnabled ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    {manager && (
+                      <div className="flex items-center gap-1 min-h-[12px]">
+                        {isLeagueManager && !isEffectivelyReadOnly ? (
+                          <button
+                            onClick={() => toggleAutoDraft(manager.id, !orderItem?.autoDraftEnabled)}
+                            className={cn(
+                              "flex items-center gap-1 h-5 px-1.5 rounded-full transition-all duration-200 border",
+                              orderItem?.autoDraftEnabled
+                                ? "bg-primary/10 border-primary/30 text-primary scale-105 shadow-sm"
+                                : "bg-muted/50 border-transparent text-muted-foreground/30 hover:text-muted-foreground/80 hover:bg-muted"
+                            )}
+                            title={orderItem?.autoDraftEnabled ? "Auto-drafting enabled" : "Enable auto-drafting"}
+                          >
+                            <Bot className={cn("w-3.5 h-3.5", orderItem?.autoDraftEnabled && "animate-pulse")} />
+                            {orderItem?.autoDraftEnabled && (
+                              <span className="text-[9px] font-bold tracking-tighter">AUTO</span>
+                            )}
+                          </button>
+                        ) : (
+                          orderItem?.autoDraftEnabled && (
+                            <div className="flex items-center gap-1 bg-primary/10 border border-primary/20 rounded-full px-1.5 h-5 text-primary">
+                              <Bot className="w-3.5 h-3.5 animate-pulse" />
+                              <span className="text-[9px] font-bold tracking-tighter">AUTO</span>
+                            </div>
+                          )
                         )}
-                        title={orderItem?.autoDraftEnabled ? "Auto-draft active" : "Enable auto-draft"}
-                      >
-                        <Bot className={cn("w-3 h-3", orderItem?.autoDraftEnabled && "animate-pulse")} />
-                      </button>
+                      </div>
                     )}
                   </div>
                   {isEffectivelyReadOnly ? (
@@ -676,25 +712,29 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
         )}
       </div>
 
-      {/* Draft Pick Dialog - only if not read-only */}
-      {!isEffectivelyReadOnly && (
-        <DraftPickDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          round={selectedCell?.round || 0}
-          position={selectedCell?.position || 0}
-          manager={selectedManager}
-          draftedPlayerIds={getDraftedPlayerIds().filter(id => id !== selectedPick?.playerId)}
-          currentPlayerId={selectedPick?.playerId || null}
-          onConfirm={handlePickConfirm}
-        />
-      )}
+      {/* Draft Pick Dialog removed in favor of AvailablePlayersDrawer opening directly */}
+
 
       {!isEffectivelyReadOnly && (
         <AvailablePlayersDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          targetPick={selectedCell || (draftState?.isActive && !draftState.isFinalized ? { round: currentRound, position: currentPosition } : null)}
           draftedPlayerIds={getDraftedPlayerIds()}
-          canPick={isLeagueManager || (currentRound === currentRound && getManagerAtPosition(currentPosition)?.id === currentManagerId)}
-          onDraftPlayer={(playerId) => makePick(currentRound, currentPosition, playerId)}
+          canPick={getManagerAtPosition(currentPosition)?.id === currentManagerId}
+          onDraftPlayer={handlePickConfirm}
+        />
+      )}
+
+      {detailPlayer && (
+        <PlayerDetailDialog
+          player={detailPlayer}
+          open={!!detailPlayer}
+          onOpenChange={(open) => !open && setDetailPlayer(null)}
+          onDraft={(draftState?.isActive && !draftState?.isFinalized && getManagerAtPosition(currentPosition)?.id === currentManagerId && !getDraftedPlayerIds().includes(detailPlayer.id)) ? () => {
+            handlePickConfirm(detailPlayer.id);
+            setDetailPlayer(null);
+          } : undefined}
         />
       )}
     </div>

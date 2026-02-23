@@ -57,14 +57,20 @@ interface AvailablePlayersDrawerProps {
   draftedPlayerIds: string[];
   onSelectPlayer?: (playerId: string) => void;
   canPick?: boolean;
-  onDraftPlayer?: (playerId: string) => void;
+  onDraftPlayer?: (playerId: string, round?: number, position?: number) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  targetPick?: { round: number; position: number } | null;
 }
 
 export const AvailablePlayersDrawer = ({
   draftedPlayerIds,
   onSelectPlayer,
   canPick = false,
-  onDraftPlayer
+  onDraftPlayer,
+  open: externalOpen,
+  onOpenChange: setExternalOpen,
+  targetPick
 }: AvailablePlayersDrawerProps) => {
   const players = useGameStore(state => state.players);
   const managers = useGameStore(state => state.managers);
@@ -73,7 +79,10 @@ export const AvailablePlayersDrawer = ({
   const currentManagerId = useGameStore(state => state.currentManagerId);
 
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = setExternalOpen || setInternalOpen;
+
   const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
 
   // Initialize selectedManagerId to currentManagerId
@@ -154,7 +163,7 @@ export const AvailablePlayersDrawer = ({
             )}
           </Button>
         </SheetTrigger>
-        <SheetContent side="right" className="p-0 sm:max-w-md md:max-w-xl flex flex-col h-full z-[70]">
+        <SheetContent side="right" className="p-0 sm:max-w-md md:max-w-xl flex flex-col h-full z-[60]">
           <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle className="flex items-center gap-2">
               <Filter className="w-5 h-5 text-primary" />
@@ -323,7 +332,7 @@ export const AvailablePlayersDrawer = ({
                         )}
                       >
                         <div
-                          onClick={() => onSelectPlayer ? onSelectPlayer(player.id) : setDetailPlayer(player)}
+                          onClick={() => setDetailPlayer(player)}
                           className="cursor-pointer"
                         >
                           <PlayerCard
@@ -341,7 +350,7 @@ export const AvailablePlayersDrawer = ({
                               className="h-7 px-2 text-[10px] font-bold bg-primary hover:bg-primary/90 shadow-lg"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onDraftPlayer(player.id);
+                                setDetailPlayer(player);
                               }}
                             >
                               <Zap className="w-3 h-3 mr-1 fill-current" />
@@ -414,6 +423,14 @@ export const AvailablePlayersDrawer = ({
           player={detailPlayer}
           open={!!detailPlayer}
           onOpenChange={(open) => !open && setDetailPlayer(null)}
+          onDraft={onDraftPlayer ? () => {
+            if (targetPick) {
+              onDraftPlayer(detailPlayer.id, targetPick.round, targetPick.position);
+            } else {
+              onDraftPlayer(detailPlayer.id);
+            }
+            setDetailPlayer(null); // Close dialog after draft
+          } : undefined}
         />
       )}
     </>
