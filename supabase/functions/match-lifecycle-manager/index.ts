@@ -34,6 +34,14 @@ serve(async (req) => {
 
     console.log(`[Lifecycle] Checking for matches to activate (lookahead: ${lookaheadMinutes}min)`);
 
+    // Auto-link any unlinked cricket_matches to leagues by tournament_id
+    const { data: linkResult, error: linkError } = await supabase.rpc('auto_link_league_matches');
+    if (linkError) {
+      console.warn('[Lifecycle] auto_link_league_matches failed:', linkError.message);
+    } else if (linkResult?.[0]?.rows_inserted > 0) {
+      console.log(`[Lifecycle] Auto-linked ${linkResult[0].rows_inserted} new league_matches`);
+    }
+
     // Find matches approaching start time
     const { data: upcomingMatches, error: queryError } = await supabase
       .rpc('get_upcoming_matches_to_activate', {
