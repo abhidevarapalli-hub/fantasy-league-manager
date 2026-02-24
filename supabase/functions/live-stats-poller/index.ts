@@ -300,14 +300,7 @@ function calculateFantasyPoints(stats: ParsedPlayerStats, rules: ScoringRules, i
   total += stats.fours * rules.batting.four;
   total += stats.sixes * rules.batting.six;
 
-  // Batting milestones
-  for (const milestone of rules.batting.milestones) {
-    if (stats.runs >= milestone.runs) {
-      total = total - (total > 0 ? 0 : 0); // Reset milestone
-      total += milestone.points;
-    }
-  }
-  // Only apply highest milestone
+  // Batting milestones — apply only the highest qualifying milestone
   let milestoneBonus = 0;
   for (const milestone of rules.batting.milestones) {
     if (stats.runs >= milestone.runs) {
@@ -598,11 +591,23 @@ serve(async (req) => {
         .select('id, name, cricbuzz_id')
         .eq('league_id', league_id);
 
-      // Get roster entries from junction table
+      // Get current week from league_matches (league-specific data)
+      // Must be fetched before roster query so we can filter by week
+      const { data: leagueMatchData } = await supabase
+        .from('league_matches')
+        .select('week')
+        .eq('league_id', league_id)
+        .eq('match_id', match_id)
+        .single();
+
+      const week = leagueMatchData?.week || 1;
+
+      // Get roster entries from junction table — filtered by week
       const { data: rosterEntries } = await supabase
         .from('manager_roster')
         .select('manager_id, player_id, slot_type')
-        .eq('league_id', league_id);
+        .eq('league_id', league_id)
+        .eq('week', week);
 
       // Create lookup maps
       const cricbuzzToPlayer = new Map<string, { playerId: string; playerName: string }>();
@@ -626,16 +631,6 @@ serve(async (req) => {
           });
         }
       }
-
-      // Get current week from league_matches (league-specific data)
-      const { data: leagueMatchData } = await supabase
-        .from('league_matches')
-        .select('week')
-        .eq('league_id', league_id)
-        .eq('match_id', match_id)
-        .single();
-
-      const week = leagueMatchData?.week || 1;
 
       // Prepare global raw stats for match_player_stats (one per cricbuzz player per match)
       const globalStatsRecords = parsedStats.map(s => ({
