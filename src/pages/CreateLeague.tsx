@@ -381,7 +381,7 @@ const CreateLeague = () => {
 
                 const { error: linkError } = await supabase
                     .from('league_matches')
-                    .insert(leagueMatchRows);
+                    .upsert(leagueMatchRows, { onConflict: 'league_id,match_id', ignoreDuplicates: true });
 
                 if (linkError) {
                     console.warn('[CreateLeague] ⚠️ Failed to link matches:', linkError);

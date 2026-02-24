@@ -2076,6 +2076,12 @@ export type Database = {
       }
       is_league_manager_of: { Args: { p_league_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      reconcile_match_states: {
+        Args: never
+        Returns: {
+          rows_updated: number
+        }[]
+      }
       record_poll_error: {
         Args: { p_cricbuzz_match_id: number; p_error_message: string }
         Returns: undefined
