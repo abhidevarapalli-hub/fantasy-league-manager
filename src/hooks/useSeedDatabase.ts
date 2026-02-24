@@ -437,8 +437,12 @@ export const useSeedDatabase = () => {
           console.error("[Seed] API not configured — cannot seed international tournament with IPL data. Set VITE_RAPIDAPI_KEY in .env.development.");
           return false;
         }
-        console.warn("[Seed] API not configured, using hardcoded IPL data");
-        return await seedDatabase(leagueId);
+        if (import.meta.env.DEV) {
+          console.warn("[Seed] API not configured, using hardcoded IPL data (dev only)");
+          return await seedDatabase(leagueId);
+        }
+        console.error("[Seed] API not configured. Cannot create league without live data.");
+        return false;
       }
 
       console.log(`[Seed] Fetching from ${tournament?.shortName || tournamentId}...`);
@@ -456,7 +460,12 @@ export const useSeedDatabase = () => {
           console.error("[Seed] Cannot fall back to IPL data for international tournament.");
           return false;
         }
-        return await seedDatabase(leagueId);
+        if (import.meta.env.DEV) {
+          console.warn("[Seed] API fetch failed, using hardcoded IPL data (dev only)");
+          return await seedDatabase(leagueId);
+        }
+        console.error("[Seed] API fetch failed. Cannot create league without live data.");
+        return false;
       }
 
       if (!teamsWithPlayers || teamsWithPlayers.length === 0) {
@@ -464,7 +473,12 @@ export const useSeedDatabase = () => {
           console.error("[Seed] API returned no teams for international tournament — refusing to fall back to IPL data.");
           return false;
         }
-        return await seedDatabase(leagueId);
+        if (import.meta.env.DEV) {
+          console.warn("[Seed] API returned no teams, using hardcoded IPL data (dev only)");
+          return await seedDatabase(leagueId);
+        }
+        console.error("[Seed] API returned no teams. Cannot create league without live data.");
+        return false;
       }
 
       console.log(`[useSeedDatabase] 📥 Processing ${teamsWithPlayers.length} teams...`);
@@ -578,7 +592,12 @@ export const useSeedDatabase = () => {
         console.error("[Seed] Cannot fall back to IPL data for international tournament.");
         return false;
       }
-      return await seedDatabase(leagueId);
+      if (import.meta.env.DEV) {
+        console.warn("[Seed] Tournament seeding failed, using hardcoded IPL data (dev only)");
+        return await seedDatabase(leagueId);
+      }
+      console.error("[Seed] Tournament seeding failed. Cannot create league without live data.");
+      return false;
     } finally {
       setSeeding(false);
     }
