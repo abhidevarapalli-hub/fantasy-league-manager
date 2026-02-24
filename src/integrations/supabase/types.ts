@@ -793,6 +793,7 @@ export type Database = {
           errors: string | null
           id: string
           matches_activated: number | null
+          matches_backfilled: number | null
           matches_checked: number | null
           run_at: string | null
         }
@@ -801,6 +802,7 @@ export type Database = {
           errors?: string | null
           id?: string
           matches_activated?: number | null
+          matches_backfilled?: number | null
           matches_checked?: number | null
           run_at?: string | null
         }
@@ -809,6 +811,7 @@ export type Database = {
           errors?: string | null
           id?: string
           matches_activated?: number | null
+          matches_backfilled?: number | null
           matches_checked?: number | null
           run_at?: string | null
         }
@@ -2049,6 +2052,15 @@ export type Database = {
       get_manager_weekly_points: {
         Args: { p_league_id: string; p_manager_id: string; p_week: number }
         Returns: number
+      }
+      get_matches_needing_backfill: {
+        Args: { p_max_results?: number }
+        Returns: {
+          cricbuzz_match_id: number
+          match_date: string
+          match_description: string
+          match_id: string
+        }[]
       }
       get_matches_to_poll: {
         Args: never
