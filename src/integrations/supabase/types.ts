@@ -1953,7 +1953,11 @@ export type Database = {
         Returns: undefined
       }
       enable_match_polling: {
-        Args: { p_cricbuzz_match_id: number; p_initial_state?: string }
+        Args: {
+          p_auto?: boolean
+          p_cricbuzz_match_id: number
+          p_initial_state?: string
+        }
         Returns: string
       }
       execute_draft_pick: {
@@ -2052,6 +2056,17 @@ export type Database = {
       get_player_weekly_points: {
         Args: { p_league_id: string; p_player_id: string; p_week: number }
         Returns: number
+      }
+      get_upcoming_matches_to_activate: {
+        Args: { p_lookahead_minutes?: number }
+        Returns: {
+          cricbuzz_match_id: number
+          match_date: string
+          match_description: string
+          match_id: string
+          team1_name: string
+          team2_name: string
+        }[]
       }
       is_league_manager_of: { Args: { p_league_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
