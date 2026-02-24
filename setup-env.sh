@@ -18,7 +18,7 @@ ENV_FILES=(
   ".env.development.local"
   ".env.local"
   "supabase/.env"
-  "CLAUDE.md"
+  ".claude/settings.local.json"
 )
 
 for file in "${ENV_FILES[@]}"; do
