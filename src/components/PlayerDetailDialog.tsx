@@ -455,8 +455,11 @@ export function PlayerDetailDialog({
 
                                             const matchDate = matchItem.matchDate;
                                             const opponentShort = matchItem.opponentShort;
-                                            // If we have stats, the match is not upcoming regardless of stale state
-                                            const isUpcoming = hasStats ? false : matchItem.isUpcoming;
+                                            // If we have stats, the match is not upcoming.
+                                            // If no stats but match is in the past or state is Complete, treat as DNP (not upcoming).
+                                            const isUpcoming = hasStats
+                                                ? false
+                                                : matchItem.isUpcoming && matchItem.matchDate > new Date() && matchItem.matchState !== 'Complete';
                                             const result = matchItem.result;
 
                                             // Week number
