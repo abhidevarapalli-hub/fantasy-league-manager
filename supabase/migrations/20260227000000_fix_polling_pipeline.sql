@@ -64,35 +64,11 @@ END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- ============================================
--- 2. Replace enable_match_polling (2-param → 3-param with p_auto)
--- The lifecycle manager calls this with p_auto: true
+-- 2. enable_match_polling — superseded by migration 20260224195201
+--    (4-param version with p_match_id UUID)
+--    Only drop the old 2-param overload if it still exists.
 -- ============================================
 DROP FUNCTION IF EXISTS enable_match_polling(INTEGER, TEXT);
-
-CREATE OR REPLACE FUNCTION enable_match_polling(
-  p_cricbuzz_match_id INTEGER,
-  p_initial_state TEXT DEFAULT 'Live',
-  p_auto BOOLEAN DEFAULT false
-)
-RETURNS UUID AS $$
-DECLARE
-  v_id UUID;
-BEGIN
-  INSERT INTO live_match_polling (cricbuzz_match_id, match_state, polling_enabled, auto_enabled)
-  VALUES (p_cricbuzz_match_id, p_initial_state, true, true)
-  ON CONFLICT (cricbuzz_match_id)
-  DO UPDATE SET
-    polling_enabled = true,
-    match_state = EXCLUDED.match_state,
-    auto_enabled = CASE WHEN p_auto THEN live_match_polling.auto_enabled ELSE true END,
-    error_count = 0,
-    last_error = NULL,
-    updated_at = NOW()
-  RETURNING id INTO v_id;
-
-  RETURN v_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================
 -- 3. Rewrite finalize_match_stats for new schema
@@ -233,8 +209,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================
 GRANT EXECUTE ON FUNCTION get_upcoming_matches_to_activate(INTEGER) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_upcoming_matches_to_activate(INTEGER) TO service_role;
-GRANT EXECUTE ON FUNCTION enable_match_polling(INTEGER, TEXT, BOOLEAN) TO authenticated;
-GRANT EXECUTE ON FUNCTION enable_match_polling(INTEGER, TEXT, BOOLEAN) TO service_role;
+-- enable_match_polling grants handled by migration 20260224195201 (4-param version)
 GRANT EXECUTE ON FUNCTION finalize_match_stats(UUID, UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION finalize_match_stats(UUID, UUID, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION acquire_polling_lock(INTEGER, INTEGER) TO authenticated;
