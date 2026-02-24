@@ -362,32 +362,19 @@ const CreateLeague = () => {
             }
 
             // 5b. Link all tournament matches to this league via league_matches
+            // Uses the DB function which joins leagues.tournament_id → cricket_matches.series_id
+            // and inserts with ON CONFLICT DO NOTHING to avoid duplicate-key errors.
             console.log(`[CreateLeague] 🔗 Step 5b: Linking tournament matches to league...`);
             const step5bStart = performance.now();
 
-            const { data: tournamentMatches, error: matchFetchError } = await supabase
-                .from('cricket_matches')
-                .select('id, match_week')
-                .eq('series_id', selectedTournament.id);
+            const { data: linkResult, error: linkError } = await supabase
+                .rpc('auto_link_league_matches');
 
-            if (matchFetchError) {
-                console.warn('[CreateLeague] ⚠️ Failed to fetch tournament matches:', matchFetchError);
-            } else if (tournamentMatches && tournamentMatches.length > 0) {
-                const leagueMatchRows = tournamentMatches.map(m => ({
-                    league_id: league.id,
-                    match_id: m.id,
-                    week: m.match_week,
-                }));
-
-                const { error: linkError } = await supabase
-                    .from('league_matches')
-                    .upsert(leagueMatchRows, { onConflict: 'league_id,match_id', ignoreDuplicates: true });
-
-                if (linkError) {
-                    console.warn('[CreateLeague] ⚠️ Failed to link matches:', linkError);
-                } else {
-                    console.log(`[CreateLeague] ✅ Linked ${leagueMatchRows.length} matches to league`);
-                }
+            if (linkError) {
+                console.warn('[CreateLeague] ⚠️ Failed to link matches:', linkError);
+            } else {
+                const inserted = linkResult?.[0]?.rows_inserted ?? 0;
+                console.log(`[CreateLeague] ✅ Linked ${inserted} matches to league`);
             }
 
             const step5bDuration = performance.now() - step5bStart;
