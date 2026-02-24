@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# $3 is 1 for branch checkout, 0 for file checkout
+# git worktree add triggers a branch checkout
+if [ "$3" = "1" ]; then
+  MAIN_WORKTREE="$(git worktree list --porcelain | head -1 | sed 's/worktree //')"
+  SCRIPT="$MAIN_WORKTREE/setup-env.sh"
+  if [ -f "$SCRIPT" ]; then
+    bash "$SCRIPT"
+  fi
+fi
