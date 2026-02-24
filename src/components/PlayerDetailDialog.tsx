@@ -383,15 +383,15 @@ export function PlayerDetailDialog({
                     </div>
 
                     {/* Content Section */}
-                    <div className="bg-background flex-1 flex flex-col min-h-0 relative z-30">
+                    <div className="bg-background flex-1 flex flex-col min-h-0 overflow-hidden relative z-30">
                         {/* Section Header */}
-                        <div className="flex items-center px-4 md:px-6 pt-4 border-b border-border/40">
+                        <div className="flex items-center px-4 md:px-6 pt-4 border-b border-border/40 flex-shrink-0">
                             <div className="px-4 pb-3 border-b-2 border-primary font-bold text-xs md:text-sm tracking-wide text-foreground uppercase">
                                 Game Log
                             </div>
                         </div>
 
-                        <ScrollArea className="flex-1 w-full bg-background/50">
+                        <ScrollArea className="flex-1 min-h-0 w-full bg-background/50">
                             <div className="p-0">
                                 <div className="min-w-[700px] md:min-w-full pb-4">
                                     {/* Year/Filter header */}
