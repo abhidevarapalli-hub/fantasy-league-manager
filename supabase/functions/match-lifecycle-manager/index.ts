@@ -42,6 +42,14 @@ serve(async (req) => {
       console.log(`[Lifecycle] Auto-linked ${linkResult[0].rows_inserted} new league_matches`);
     }
 
+    // Reconcile stale match states (e.g. result says "won" but state still 'Upcoming')
+    const { data: reconcileResult, error: reconcileError } = await supabase.rpc('reconcile_match_states');
+    if (reconcileError) {
+      console.warn('[Lifecycle] reconcile_match_states failed:', reconcileError.message);
+    } else if (reconcileResult?.[0]?.rows_updated > 0) {
+      console.log(`[Lifecycle] Reconciled ${reconcileResult[0].rows_updated} stale match states`);
+    }
+
     // Find matches approaching start time
     const { data: upcomingMatches, error: queryError } = await supabase
       .rpc('get_upcoming_matches_to_activate', {

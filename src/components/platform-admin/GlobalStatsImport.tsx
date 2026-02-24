@@ -91,6 +91,26 @@ export const GlobalStatsImport = () => {
     ? SUPPORTED_TOURNAMENTS.find(t => t.id.toString() === selectedTournamentId) || null
     : null;
 
+  // Derive display match state from DB columns.
+  // The `state` column may be stale ('Upcoming') even for completed matches,
+  // so we also check the `result` text and match date.
+  const deriveMatchState = (
+    state: string | null,
+    result: string | null,
+    matchDate: string | null,
+  ): GlobalMatch['matchState'] => {
+    if (state === 'Complete' || state === 'In Progress') {
+      return state === 'In Progress' ? 'Live' : 'Complete';
+    }
+    // If result contains a winner pattern, it's complete
+    if (result && /\bwon\b/i.test(result)) return 'Complete';
+    // If match date is in the past and there's a non-placeholder result, likely complete
+    if (result && matchDate && new Date(matchDate) < new Date() && !/starts at/i.test(result)) {
+      return 'Complete';
+    }
+    return 'Upcoming';
+  };
+
   // Fetch all global matches from cricket_matches
   const fetchGlobalMatches = useCallback(async () => {
     const { data, error } = await supabase
@@ -124,7 +144,7 @@ export const GlobalStatsImport = () => {
         result: m.result || '',
         matchDate: m.match_date || '',
         venue: m.venue || '',
-        matchState: (m.state as GlobalMatch['matchState']) ?? 'Upcoming',
+        matchState: deriveMatchState(m.state, m.result, m.match_date),
         pollingEnabled: undefined, // populated from pollingStatuses
         linkedLeagueCount: leagueCountMap.get(m.id) || 0,
         hasRawStats: matchIdsWithStats.has(m.id),
