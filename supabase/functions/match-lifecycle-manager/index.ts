@@ -14,6 +14,7 @@ serve(async (req) => {
   const startTime = Date.now();
   let matchesChecked = 0;
   let matchesActivated = 0;
+  let matchesBackfilled = 0;
   const errors: string[] = [];
 
   try {
@@ -63,30 +64,10 @@ serve(async (req) => {
     matchesChecked = upcomingMatches?.length ?? 0;
     console.log(`[Lifecycle] Found ${matchesChecked} matches to activate`);
 
-    if (!upcomingMatches || upcomingMatches.length === 0) {
-      // Log the run even when nothing was activated
-      await supabase.from('lifecycle_audit_log').insert({
-        matches_activated: 0,
-        matches_checked: 0,
-        duration_ms: Date.now() - startTime,
-      });
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'No matches need activation',
-          matchesChecked: 0,
-          matchesActivated: 0,
-          duration: Date.now() - startTime,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Enable polling for each match
     const activatedMatches: Array<{ cricbuzz_match_id: number; match_description: string }> = [];
 
-    for (const match of upcomingMatches) {
+    for (const match of (upcomingMatches || [])) {
       try {
         const { data, error } = await supabase.rpc('enable_match_polling', {
           p_cricbuzz_match_id: match.cricbuzz_match_id,
@@ -145,12 +126,69 @@ serve(async (req) => {
       }
     }
 
+    // ── Backfill stats for completed matches that were never polled ──
+    try {
+      const { data: backfillMatches, error: backfillQueryError } = await supabase
+        .rpc('get_matches_needing_backfill', { p_max_results: 3 });
+
+      if (backfillQueryError) {
+        console.warn('[Lifecycle] get_matches_needing_backfill failed:', backfillQueryError.message);
+        errors.push(`backfill query: ${backfillQueryError.message}`);
+      } else if (backfillMatches && backfillMatches.length > 0) {
+        console.log(`[Lifecycle] Found ${backfillMatches.length} completed match(es) needing stats backfill`);
+        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? supabaseServiceKey;
+
+        for (const match of backfillMatches) {
+          try {
+            console.log(`[Lifecycle] Backfilling stats for match ${match.cricbuzz_match_id} (${match.match_description})`);
+            const backfillResponse = await fetch(
+              `${supabaseUrl}/functions/v1/live-stats-poller`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`,
+                  'apikey': supabaseAnonKey,
+                },
+                body: JSON.stringify({ cricbuzz_match_id: match.cricbuzz_match_id }),
+              }
+            );
+
+            if (!backfillResponse.ok) {
+              const errBody = await backfillResponse.text();
+              console.error(`[Lifecycle] Backfill failed for match ${match.cricbuzz_match_id}:`, errBody);
+              errors.push(`backfill ${match.cricbuzz_match_id}: ${errBody}`);
+            } else {
+              const backfillResult = await backfillResponse.json();
+              console.log(`[Lifecycle] Backfill result for match ${match.cricbuzz_match_id}:`, backfillResult);
+              matchesBackfilled++;
+            }
+
+            // Rate limit: wait 1.5s between API calls
+            if (match !== backfillMatches[backfillMatches.length - 1]) {
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+          } catch (err) {
+            const errMsg = (err as Error).message;
+            console.error(`[Lifecycle] Error backfilling match ${match.cricbuzz_match_id}:`, errMsg);
+            errors.push(`backfill ${match.cricbuzz_match_id}: ${errMsg}`);
+          }
+        }
+
+        console.log(`[Lifecycle] Backfill complete: ${matchesBackfilled}/${backfillMatches.length} succeeded`);
+      }
+    } catch (err) {
+      console.error('[Lifecycle] Backfill step error:', (err as Error).message);
+      errors.push(`backfill: ${(err as Error).message}`);
+    }
+
     const durationMs = Date.now() - startTime;
 
     // Insert audit log
     await supabase.from('lifecycle_audit_log').insert({
       matches_activated: matchesActivated,
       matches_checked: matchesChecked,
+      matches_backfilled: matchesBackfilled,
       errors: errors.length > 0 ? errors.join('; ') : null,
       duration_ms: durationMs,
     });
@@ -160,6 +198,7 @@ serve(async (req) => {
         success: true,
         matchesChecked,
         matchesActivated,
+        matchesBackfilled,
         activatedMatches,
         errors: errors.length > 0 ? errors : undefined,
         duration: durationMs,
@@ -178,6 +217,7 @@ serve(async (req) => {
       await supabase.from('lifecycle_audit_log').insert({
         matches_activated: matchesActivated,
         matches_checked: matchesChecked,
+        matches_backfilled: matchesBackfilled,
         errors: (error as Error).message,
         duration_ms: durationMs,
       });
