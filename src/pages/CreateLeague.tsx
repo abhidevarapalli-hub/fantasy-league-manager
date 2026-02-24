@@ -23,7 +23,7 @@ import { ScoringRulesForm } from '@/components/ScoringRulesForm';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
-const STEP_LABELS = ['Configure Rules', 'Scoring Rules', 'Team Identity'] as const;
+const STEP_LABELS = ['League Name', 'General Rules', 'Roster Configuration', 'Draft Settings', 'Scoring Rules', 'Team Identity'] as const;
 
 const CreateLeague = () => {
     const navigate = useNavigate();
@@ -40,6 +40,8 @@ const CreateLeague = () => {
     const [activeSize, setActiveSize] = useState(11);
     const [benchSize, setBenchSize] = useState(3);
     const [draftTimer, setDraftTimer] = useState(60);
+    const [draftDate, setDraftDate] = useState('');
+    const [draftTime, setDraftTime] = useState('');
 
     // Position Minimums (Defaults for Size 11)
     const [minBatWk, setMinBatWk] = useState(4);
@@ -435,37 +437,45 @@ const CreateLeague = () => {
                             <Trophy className="w-8 h-8 text-primary" />
                         </div>
                         <h1 className="text-4xl font-extrabold tracking-tight">Create New League</h1>
-                        <p className="text-muted-foreground text-lg italic">Step {step} of 3: {STEP_LABELS[step - 1]}</p>
+                        <p className="text-muted-foreground text-lg italic">Step {step} of 6: {STEP_LABELS[step - 1]}</p>
                     </div>
 
                     <Card className="border-2 border-primary/10 shadow-xl overflow-hidden glass-morphism">
                         <CardHeader className="bg-primary/5 border-b border-primary/10">
                             <CardTitle className="text-2xl">
-                                {step === 1 ? 'League Configuration' : step === 2 ? 'Scoring Rules' : 'League Manager Setup'}
+                                {step === 1 ? 'Name Your League'
+                                    : step === 2 ? 'League Settings'
+                                        : step === 3 ? 'Roster Requirements'
+                                            : step === 4 ? 'Draft Settings'
+                                                : step === 5 ? 'Scoring Rules'
+                                                    : 'League Manager Setup'}
                             </CardTitle>
                             <CardDescription>
-                                {step === 1
-                                    ? 'Set the core structure and constraints for your competition.'
-                                    : step === 2
-                                        ? 'Configure how fantasy points are awarded. You can change these later.'
-                                        : `Logged in as @${userProfile?.username || 'user'}. Choose your team name for this league.`}
+                                {step === 1 ? 'Choose a unique name for your competition.'
+                                    : step === 2 ? 'Set the core structure of your league.'
+                                        : step === 3 ? 'Configure team sizes and positional limits.'
+                                            : step === 4 ? 'Set the parameters for your live draft.'
+                                                : step === 5 ? 'Configure how fantasy points are awarded. You can change these later.'
+                                                    : `Logged in as @${userProfile?.username || 'user'}. Choose your team name for this league.`}
                             </CardDescription>
                         </CardHeader>
 
                         <CardContent className="pt-8 space-y-8">
                             {step === 1 && (
-                                <>
-                                    <div className="space-y-3">
-                                        <Label htmlFor="leagueName" className="text-base font-semibold">League Name</Label>
-                                        <Input
-                                            id="leagueName"
-                                            placeholder="E.g. Champions League 2025"
-                                            value={leagueName}
-                                            onChange={(e) => setLeagueName(e.target.value)}
-                                            className="h-12 text-lg bg-background/50 border-primary/20 focus:border-primary"
-                                        />
-                                    </div>
+                                <div className="space-y-3">
+                                    <Label htmlFor="leagueName" className="text-base font-semibold">League Name</Label>
+                                    <Input
+                                        id="leagueName"
+                                        placeholder="E.g. Champions League 2025"
+                                        value={leagueName}
+                                        onChange={(e) => setLeagueName(e.target.value)}
+                                        className="h-12 text-lg bg-background/50 border-primary/20 focus:border-primary"
+                                    />
+                                </div>
+                            )}
 
+                            {step === 2 && (
+                                <div className="space-y-8">
                                     {/* Tournament Selection */}
                                     <div className="space-y-4">
                                         <Label className="text-base font-semibold">Tournament</Label>
@@ -502,34 +512,35 @@ const CreateLeague = () => {
                                                             )}
                                                             <span className="font-semibold">{tournament.shortName}</span>
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {tournament.description}
-                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">{tournament.description}</p>
                                                     </div>
                                                 </Label>
                                             ))}
                                         </RadioGroup>
                                     </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center">
-                                                <Label className="font-semibold flex items-center gap-2">
-                                                    <Users className="w-4 h-4 text-primary" />
-                                                    Managers
-                                                </Label>
-                                                <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{managerCount}</span>
-                                            </div>
-                                            <Slider
-                                                value={[managerCount]}
-                                                min={4}
-                                                max={12}
-                                                step={2}
-                                                onValueChange={([v]) => setManagerCount(v)}
-                                            />
-                                            <p className="text-xs text-muted-foreground">Number of competing teams in the league (Even numbers 4-12).</p>
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <Label className="font-semibold flex items-center gap-2">
+                                                <Users className="w-4 h-4 text-primary" />
+                                                Managers
+                                            </Label>
+                                            <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{managerCount}</span>
                                         </div>
+                                        <Slider
+                                            value={[managerCount]}
+                                            min={4}
+                                            max={12}
+                                            step={2}
+                                            onValueChange={([v]) => setManagerCount(v)}
+                                        />
+                                        <p className="text-xs text-muted-foreground">Number of competing teams in the league (Even numbers 4-12).</p>
+                                    </div>
+                                </div>
+                            )}
 
+                            {step === 3 && (
+                                <div className="space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <Label className="font-semibold flex items-center gap-2">
@@ -564,43 +575,6 @@ const CreateLeague = () => {
                                                 onValueChange={([v]) => setBenchSize(v)}
                                             />
                                             <p className="text-xs text-muted-foreground">Reserve players kept out of the lineup (0-5).</p>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center">
-                                                <Label className="font-semibold flex items-center gap-2">
-                                                    <Timer className="w-4 h-4 text-primary" />
-                                                    Draft Timer
-                                                </Label>
-                                                <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{draftTimer}s</span>
-                                            </div>
-                                            <RadioGroup
-                                                value={String(draftTimer)}
-                                                onValueChange={(v) => setDraftTimer(Number(v))}
-                                                className="grid grid-cols-5 gap-2"
-                                            >
-                                                {[30, 60, 90, 120, 200].map((t) => (
-                                                    <div key={t}>
-                                                        <RadioGroupItem
-                                                            value={String(t)}
-                                                            id={`timer-${t}`}
-                                                            className="sr-only"
-                                                        />
-                                                        <Label
-                                                            htmlFor={`timer-${t}`}
-                                                            className={cn(
-                                                                "flex items-center justify-center p-2 rounded-md border-2 cursor-pointer transition-all text-sm font-medium",
-                                                                draftTimer === t
-                                                                    ? "border-primary bg-primary/5 text-primary"
-                                                                    : "border-border hover:border-primary/30 hover:bg-primary/5"
-                                                            )}
-                                                        >
-                                                            {t}s
-                                                        </Label>
-                                                    </div>
-                                                ))}
-                                            </RadioGroup>
-                                            <p className="text-xs text-muted-foreground">Default time limit for each pick.</p>
                                         </div>
                                     </div>
 
@@ -696,15 +670,75 @@ const CreateLeague = () => {
                                         </div>
                                     </div>
                                     <div className="pb-4"></div>
-
-                                </>
+                                </div>
                             )}
 
-                            {step === 2 && (
-                                <ScoringRulesForm rules={scoringRules} onChange={setScoringRules} />
+                            {step === 4 && (
+                                <div className="space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-4">
+                                            <Label className="font-semibold text-base">Draft Date</Label>
+                                            <Input
+                                                type="date"
+                                                value={draftDate}
+                                                onChange={(e) => setDraftDate(e.target.value)}
+                                                className="bg-background/50 border-primary/20 focus:border-primary text-lg h-12"
+                                            />
+                                        </div>
+                                        <div className="space-y-4">
+                                            <Label className="font-semibold text-base">Draft Time</Label>
+                                            <Input
+                                                type="time"
+                                                value={draftTime}
+                                                onChange={(e) => setDraftTime(e.target.value)}
+                                                className="bg-background/50 border-primary/20 focus:border-primary text-lg h-12"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <Label className="font-semibold flex items-center gap-2">
+                                                <Timer className="w-4 h-4 text-primary" />
+                                                Draft Timer
+                                            </Label>
+                                            <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{draftTimer}s</span>
+                                        </div>
+                                        <RadioGroup
+                                            value={String(draftTimer)}
+                                            onValueChange={(v) => setDraftTimer(Number(v))}
+                                            className="grid grid-cols-5 gap-2"
+                                        >
+                                            {[30, 60, 90, 120, 200].map((t) => (
+                                                <div key={t}>
+                                                    <RadioGroupItem
+                                                        value={String(t)}
+                                                        id={`timer-${t}`}
+                                                        className="sr-only"
+                                                    />
+                                                    <Label
+                                                        htmlFor={`timer-${t}`}
+                                                        className={cn(
+                                                            "flex items-center justify-center p-2 rounded-md border-2 cursor-pointer transition-all text-sm font-medium",
+                                                            draftTimer === t
+                                                                ? "border-primary bg-primary/5 text-primary"
+                                                                : "border-border hover:border-primary/30 hover:bg-primary/5"
+                                                        )}
+                                                    >
+                                                        {t}s
+                                                    </Label>
+                                                </div>
+                                            ))}
+                                        </RadioGroup>
+                                        <p className="text-xs text-muted-foreground">Default time limit for each pick.</p>
+                                    </div>
+                                </div>
                             )}
 
-                            {step === 3 && (
+                            {step === 5 && (
+                                <ScoringRulesForm rules={scoringRules} onChange={setScoringRules} showTabs={false} />
+                            )}
+
+                            {step === 6 && (
                                 <div className="space-y-6">
                                     <div className="space-y-2">
                                         <Label htmlFor="teamName" className="text-base font-semibold">Your Team Name</Label>
@@ -735,14 +769,23 @@ const CreateLeague = () => {
 
                             <Button
                                 className="flex-1 h-12 text-lg font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
-                                onClick={() => step < 3 ? setStep(step + 1) : handleCreateLeague()}
-                                disabled={loading || (step === 1 && (!leagueName || !validationResult.isValid)) || (step === 3 && !teamName)}
+                                onClick={() => step < 6 ? setStep(step + 1) : handleCreateLeague()}
+                                disabled={
+                                    loading ||
+                                    (step === 1 && !leagueName) ||
+                                    (step === 3 && !validationResult.isValid) ||
+                                    (step === 6 && !teamName)
+                                }
                             >
                                 {loading ? (
                                     'Creating League...'
-                                ) : step < 3 ? (
+                                ) : step < 6 ? (
                                     <>
-                                        {step === 1 ? 'Next: Scoring Rules' : 'Next: Team Setup'}
+                                        {step === 1 ? 'Next: General Rules'
+                                            : step === 2 ? 'Next: Roster Limits'
+                                                : step === 3 ? 'Next: Draft Settings'
+                                                    : step === 4 ? 'Next: Scoring Rules'
+                                                        : 'Next: Team Setup'}
                                         <ChevronRight className="w-5 h-5 ml-2" />
                                     </>
                                 ) : (

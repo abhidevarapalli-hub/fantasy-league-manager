@@ -102,6 +102,7 @@ export const RosterManagementDialog = ({ open, onOpenChange, player }: RosterMan
       // Small timeout to let the dialog render visually immediately close to prevent flashing, but react state is fast enough
       handleSubmit('none');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, player, selectedManagerId, mustDrop]);
 
   if (!player) return null;

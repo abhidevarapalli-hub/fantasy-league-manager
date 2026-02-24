@@ -29,6 +29,8 @@ import PointsCalculatorTest from "@/pages/PointsCalculatorTest";
 import PlatformAdmin from "@/pages/PlatformAdmin";
 
 import NotFound from "./pages/NotFound";
+import MockDraftSetup from "./pages/MockDraftSetup";
+import MockDraft from "./pages/MockDraft";
 
 
 
@@ -120,6 +122,12 @@ const AppRoutes = () => {
       } />
       <Route path="/leagues/create" element={
         <ProtectedRoute><CreateLeague /></ProtectedRoute>
+      } />
+      <Route path="/mock-draft/setup" element={
+        <ProtectedRoute><MockDraftSetup /></ProtectedRoute>
+      } />
+      <Route path="/mock-draft/:id" element={
+        <ProtectedRoute><MockDraft /></ProtectedRoute>
       } />
       <Route path="/join/:leagueId" element={
         <ProtectedRoute><JoinLeague /></ProtectedRoute>

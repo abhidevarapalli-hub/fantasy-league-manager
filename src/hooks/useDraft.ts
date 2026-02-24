@@ -99,9 +99,8 @@ export const useDraft = () => {
     const managerCount = managers.length;
     if (managerCount === 0) return null;
 
-    // In database, pick_number is global: ((round-1) * managerCount) + position
-    const globalPickNumber = ((round - 1) * managerCount) + position;
-    return draftPicks.find(p => p.round === round && p.pickNumber === globalPickNumber) || null;
+    // Inside database, pick_number is just the position within the round (1 to managerCount)
+    return draftPicks.find(p => p.round === round && p.pickNumber === position) || null;
   }, [draftPicks, managers.length]);
 
   // Get player for a pick

@@ -71,6 +71,7 @@ interface ScoringRulesFormProps {
   maxInternational?: number;
   onMaxInternationalChange?: (val: number) => void;
   disabled?: boolean;
+  showTabs?: boolean;
 }
 
 export const ScoringRulesForm = ({
@@ -92,7 +93,8 @@ export const ScoringRulesForm = ({
   onRequireWkChange,
   maxInternational = 4,
   onMaxInternationalChange,
-  disabled = false
+  disabled = false,
+  showTabs = true
 }: ScoringRulesFormProps) => {
   const updateNestedField = (category: keyof ScoringRules, field: string, value: unknown) => {
     if (disabled) return;
@@ -159,248 +161,252 @@ export const ScoringRulesForm = ({
   };
 
   return (
-    <Tabs defaultValue="general" className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-8">
-        <TabsTrigger value="general" className="gap-2">
-          <Settings className="w-4 h-4" />
-          General
-        </TabsTrigger>
-        <TabsTrigger value="scoring" className="gap-2">
-          <Trophy className="w-4 h-4" />
-          Scoring
-        </TabsTrigger>
-      </TabsList>
+    <Tabs defaultValue={showTabs ? "general" : "scoring"} className="w-full">
+      {showTabs && (
+        <TabsList className="grid w-full grid-cols-2 mb-8">
+          <TabsTrigger value="general" className="gap-2">
+            <Settings className="w-4 h-4" />
+            General
+          </TabsTrigger>
+          <TabsTrigger value="scoring" className="gap-2">
+            <Trophy className="w-4 h-4" />
+            Scoring
+          </TabsTrigger>
+        </TabsList>
+      )}
 
       {/* GENERAL TAB */}
-      <TabsContent value="general" className="space-y-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Settings className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Draft & Roster</CardTitle>
-                <CardDescription>Configure draft settings and roster requirements</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            {onDraftTimerChange && (
-              <div className="space-y-3 pb-6 border-b border-border/50">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 bg-primary/10 rounded-md">
-                    <Timer className="w-4 h-4 text-primary" />
-                  </div>
-                  <Label className="text-base font-semibold">Draft Pick Timer</Label>
+      {showTabs && (
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Settings className="w-5 h-5 text-primary" />
                 </div>
-                <RadioGroup
-                  value={draftTimerSeconds.toString()}
-                  onValueChange={(val) => onDraftTimerChange(parseInt(val))}
-                  disabled={disabled}
-                  className="grid grid-cols-3 sm:grid-cols-5 gap-3"
-                >
-                  {[30, 60, 90, 120, 200].map((seconds) => (
-                    <div key={seconds}>
-                      <RadioGroupItem
-                        value={seconds.toString()}
-                        id={`timer-form-${seconds}`}
-                        className="peer sr-only"
-                      />
-                      <Label
-                        htmlFor={`timer-form-${seconds}`}
-                        className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all h-12"
-                      >
-                        <span className="text-sm font-bold">{seconds}s</span>
-                      </Label>
+                <div>
+                  <CardTitle>Draft & Roster</CardTitle>
+                  <CardDescription>Configure draft settings and roster requirements</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {onDraftTimerChange && (
+                <div className="space-y-3 pb-6 border-b border-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-primary/10 rounded-md">
+                      <Timer className="w-4 h-4 text-primary" />
                     </div>
-                  ))}
-                </RadioGroup>
-                <p className="text-xs text-muted-foreground">Time allowed for each manager to make their pick during the draft.</p>
-              </div>
-            )}
-
-            {/* ROSTER CONFIGURATION BLOCK */}
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-primary/10 rounded-md">
-                    <Layout className="w-4 h-4 text-primary" />
+                    <Label className="text-base font-semibold">Draft Pick Timer</Label>
                   </div>
-                  <Label className="text-base font-semibold">Roster Configuration</Label>
+                  <RadioGroup
+                    value={draftTimerSeconds.toString()}
+                    onValueChange={(val) => onDraftTimerChange(parseInt(val))}
+                    disabled={disabled}
+                    className="grid grid-cols-3 sm:grid-cols-5 gap-3"
+                  >
+                    {[30, 60, 90, 120, 200].map((seconds) => (
+                      <div key={seconds}>
+                        <RadioGroupItem
+                          value={seconds.toString()}
+                          id={`timer-form-${seconds}`}
+                          className="peer sr-only"
+                        />
+                        <Label
+                          htmlFor={`timer-form-${seconds}`}
+                          className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all h-12"
+                        >
+                          <span className="text-sm font-bold">{seconds}s</span>
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                  <p className="text-xs text-muted-foreground">Time allowed for each manager to make their pick during the draft.</p>
                 </div>
-                {onActiveSizeChange && (
-                  <div className="flex flex-col items-end">
-                    <span className={cn(
-                      "text-sm font-bold px-2 py-0.5 rounded-md",
-                      !validateLeagueMinimums({
-                        activeSize,
-                        benchSize,
-                        minBatWk,
-                        minBowlers,
-                        minAllRounders,
-                        requireWk,
-                        maxBatWk: 7,
-                        maxBowlers: 6,
-                        maxAllRounders: 4,
-                        maxInternational,
-                        managerCount: 8 // dummy for validation
-                      }).isValid ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
-                    )}>
-                      Total: {minBatWk + minBowlers + minAllRounders} / {activeSize}
-                    </span>
-                  </div>
-                )}
-              </div>
+              )}
 
-              {!validateLeagueMinimums({
-                activeSize,
-                benchSize,
-                minBatWk,
-                minBowlers,
-                minAllRounders,
-                requireWk,
-                maxBatWk: 7,
-                maxBowlers: 6,
-                maxAllRounders: 4,
-                maxInternational,
-                managerCount: 8
-              }).isValid && (
-                  <Alert variant="destructive" className="py-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="text-xs">
-                      {validateLeagueMinimums({
-                        activeSize,
-                        benchSize,
-                        minBatWk,
-                        minBowlers,
-                        minAllRounders,
-                        requireWk,
-                        maxBatWk: 7,
-                        maxBowlers: 6,
-                        maxAllRounders: 4,
-                        maxInternational,
-                        managerCount: 8
-                      }).message}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-                      Active Size
-                    </Label>
-                    <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{activeSize}</span>
+              {/* ROSTER CONFIGURATION BLOCK */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-primary/10 rounded-md">
+                      <Layout className="w-4 h-4 text-primary" />
+                    </div>
+                    <Label className="text-base font-semibold">Roster Configuration</Label>
                   </div>
-                  <Slider
-                    value={[activeSize]}
-                    min={6}
-                    max={11}
-                    step={1}
-                    disabled={disabled || !onActiveSizeChange}
-                    onValueChange={([v]) => onActiveSizeChange?.(v)}
-                  />
-                  <p className="text-[10px] text-muted-foreground">Players in the starting lineup (6-11).</p>
+                  {onActiveSizeChange && (
+                    <div className="flex flex-col items-end">
+                      <span className={cn(
+                        "text-sm font-bold px-2 py-0.5 rounded-md",
+                        !validateLeagueMinimums({
+                          activeSize,
+                          benchSize,
+                          minBatWk,
+                          minBowlers,
+                          minAllRounders,
+                          requireWk,
+                          maxBatWk: 7,
+                          maxBowlers: 6,
+                          maxAllRounders: 4,
+                          maxInternational,
+                          managerCount: 8 // dummy for validation
+                        }).isValid ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
+                      )}>
+                        Total: {minBatWk + minBowlers + minAllRounders} / {activeSize}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-                      Bench Size
-                    </Label>
-                    <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{benchSize}</span>
+                {!validateLeagueMinimums({
+                  activeSize,
+                  benchSize,
+                  minBatWk,
+                  minBowlers,
+                  minAllRounders,
+                  requireWk,
+                  maxBatWk: 7,
+                  maxBowlers: 6,
+                  maxAllRounders: 4,
+                  maxInternational,
+                  managerCount: 8
+                }).isValid && (
+                    <Alert variant="destructive" className="py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        {validateLeagueMinimums({
+                          activeSize,
+                          benchSize,
+                          minBatWk,
+                          minBowlers,
+                          minAllRounders,
+                          requireWk,
+                          maxBatWk: 7,
+                          maxBowlers: 6,
+                          maxAllRounders: 4,
+                          maxInternational,
+                          managerCount: 8
+                        }).message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                        Active Size
+                      </Label>
+                      <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{activeSize}</span>
+                    </div>
+                    <Slider
+                      value={[activeSize]}
+                      min={6}
+                      max={11}
+                      step={1}
+                      disabled={disabled || !onActiveSizeChange}
+                      onValueChange={([v]) => onActiveSizeChange?.(v)}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Players in the starting lineup (6-11).</p>
                   </div>
-                  <Slider
-                    value={[benchSize]}
-                    min={0}
-                    max={5}
-                    step={1}
-                    disabled={disabled || !onBenchSizeChange}
-                    onValueChange={([v]) => onBenchSizeChange?.(v)}
-                  />
-                  <p className="text-[10px] text-muted-foreground">Reserve players (0-5).</p>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                        Bench Size
+                      </Label>
+                      <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{benchSize}</span>
+                    </div>
+                    <Slider
+                      value={[benchSize]}
+                      min={0}
+                      max={5}
+                      step={1}
+                      disabled={disabled || !onBenchSizeChange}
+                      onValueChange={([v]) => onBenchSizeChange?.(v)}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Reserve players (0-5).</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                        Max International
+                      </Label>
+                      <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{maxInternational}</span>
+                    </div>
+                    <Slider
+                      value={[maxInternational]}
+                      min={1}
+                      max={11}
+                      step={1}
+                      disabled={disabled || !onMaxInternationalChange}
+                      onValueChange={([v]) => onMaxInternationalChange?.(v)}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Limit for non-domestic players (1-11).</p>
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-                      Max International
-                    </Label>
-                    <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">{maxInternational}</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs font-medium text-muted-foreground">Min BAT/WK</Label>
+                      <span className="text-xs font-bold">{minBatWk}</span>
+                    </div>
+                    <Slider
+                      value={[minBatWk]}
+                      min={1}
+                      max={8}
+                      step={1}
+                      disabled={disabled || !onMinBatWkChange}
+                      onValueChange={([v]) => onMinBatWkChange?.(v)}
+                    />
+                    <div className="flex items-center justify-between p-2 rounded bg-muted/30 border border-border/50 mt-2">
+                      <span className="text-[10px] font-medium">Require WK</span>
+                      <Switch
+                        checked={requireWk}
+                        disabled={disabled || !onRequireWkChange}
+                        onCheckedChange={onRequireWkChange}
+                        className="scale-75"
+                      />
+                    </div>
                   </div>
-                  <Slider
-                    value={[maxInternational]}
-                    min={1}
-                    max={11}
-                    step={1}
-                    disabled={disabled || !onMaxInternationalChange}
-                    onValueChange={([v]) => onMaxInternationalChange?.(v)}
-                  />
-                  <p className="text-[10px] text-muted-foreground">Limit for non-domestic players (1-11).</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-xs font-medium text-muted-foreground">Min BAT/WK</Label>
-                    <span className="text-xs font-bold">{minBatWk}</span>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs font-medium text-muted-foreground">Min All-Rounders</Label>
+                      <span className="text-xs font-bold">{minAllRounders}</span>
+                    </div>
+                    <Slider
+                      value={[minAllRounders]}
+                      min={0}
+                      max={6}
+                      step={1}
+                      disabled={disabled || !onMinAllRoundersChange}
+                      onValueChange={([v]) => onMinAllRoundersChange?.(v)}
+                    />
                   </div>
-                  <Slider
-                    value={[minBatWk]}
-                    min={1}
-                    max={8}
-                    step={1}
-                    disabled={disabled || !onMinBatWkChange}
-                    onValueChange={([v]) => onMinBatWkChange?.(v)}
-                  />
-                  <div className="flex items-center justify-between p-2 rounded bg-muted/30 border border-border/50 mt-2">
-                    <span className="text-[10px] font-medium">Require WK</span>
-                    <Switch
-                      checked={requireWk}
-                      disabled={disabled || !onRequireWkChange}
-                      onCheckedChange={onRequireWkChange}
-                      className="scale-75"
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs font-medium text-muted-foreground">Min Bowlers</Label>
+                      <span className="text-xs font-bold">{minBowlers}</span>
+                    </div>
+                    <Slider
+                      value={[minBowlers]}
+                      min={1}
+                      max={8}
+                      step={1}
+                      disabled={disabled || !onMinBowlersChange}
+                      onValueChange={([v]) => onMinBowlersChange?.(v)}
                     />
                   </div>
                 </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-xs font-medium text-muted-foreground">Min All-Rounders</Label>
-                    <span className="text-xs font-bold">{minAllRounders}</span>
-                  </div>
-                  <Slider
-                    value={[minAllRounders]}
-                    min={0}
-                    max={6}
-                    step={1}
-                    disabled={disabled || !onMinAllRoundersChange}
-                    onValueChange={([v]) => onMinAllRoundersChange?.(v)}
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-xs font-medium text-muted-foreground">Min Bowlers</Label>
-                    <span className="text-xs font-bold">{minBowlers}</span>
-                  </div>
-                  <Slider
-                    value={[minBowlers]}
-                    min={1}
-                    max={8}
-                    step={1}
-                    disabled={disabled || !onMinBowlersChange}
-                    onValueChange={([v]) => onMinBowlersChange?.(v)}
-                  />
-                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      )}
 
       {/* SCORING TAB */}
       <TabsContent value="scoring" className="space-y-8">

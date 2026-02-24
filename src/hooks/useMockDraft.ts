@@ -1,26 +1,10 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { Player } from '@/lib/supabase-types';
 import { sortPlayersByPriority } from '@/lib/player-order';
 import { LeagueConfig } from '@/lib/roster-validation';
+import { useMockStore, MockDraft, MockDraftPick } from '@/store/useMockStore';
 
-const AUTO_PICK_DELAY = 1000; // 1 second for better UX
-
-export interface MockDraftPick {
-  round: number;
-  position: number;
-  playerId: string;
-  teamIndex: number;
-}
-
-export interface MockDraftState {
-  isActive: boolean;
-  isComplete: boolean;
-  userPosition: number | null; // 1-X, user's draft position
-  picks: MockDraftPick[];
-  currentRound: number;
-  currentPickIndex: number; // 0-(X-1) within round (for snake order)
-  teamRosters: Map<number, string[]>; // teamIndex -> player IDs
-}
+const AUTO_PICK_DELAY = 1000;
 
 interface RosterCounts {
   wicketKeepers: number;
@@ -31,28 +15,30 @@ interface RosterCounts {
   total: number;
 }
 
-export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
-  const [state, setState] = useState<MockDraftState>({
-    isActive: false,
-    isComplete: false,
-    userPosition: null,
-    picks: [],
-    currentRound: 1,
-    currentPickIndex: 0,
-    teamRosters: new Map(),
-  });
+export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
+  const draft = useMockStore(state => state.drafts[draftId]);
+  const updateDraft = useMockStore(state => state.updateDraft);
 
   const abortRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const TEAMS = config.managerCount;
-  const ROUNDS = config.activeSize + config.benchSize;
+  // If no draft found, provide a fallback to avoid crashes, though UI should handle it
+  const TEAMS = draft?.config.managerCount || 10;
+  const ROUNDS = draft ? draft.config.activeSize + draft.config.benchSize : 15;
+  const config = draft?.config;
 
-  // Sort players by priority for "top players" ordering
   const sortedPlayers = sortPlayersByPriority(allPlayers);
 
-  const getTeamRosterCounts = useCallback((teamIndex: number, rosters: Map<number, string[]>): RosterCounts => {
-    const playerIds = rosters.get(teamIndex) || [];
+  // Stop auto picks on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current = true;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [draftId]);
+
+  const getTeamRosterCounts = useCallback((teamIndex: number, rosters: Record<number, string[]>): RosterCounts => {
+    const playerIds = rosters[teamIndex] || [];
     const teamPlayers = playerIds.map(id => allPlayers.find(p => p.id === id)).filter(Boolean) as Player[];
 
     return {
@@ -65,35 +51,31 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
     };
   }, [allPlayers]);
 
-  const getNeededRoles = useCallback((counts: RosterCounts): string[] => {
+  const getNeededRoles = useCallback((counts: RosterCounts, cfg: LeagueConfig): string[] => {
     const neededRoles: string[] = [];
 
-    // Prioritize WK if required and none drafted
-    if (config.requireWk && counts.wicketKeepers < 1) {
+    if (cfg.requireWk && counts.wicketKeepers < 1) {
       neededRoles.push('Wicket Keeper');
     }
+    if (counts.allRounders < cfg.minAllRounders) neededRoles.push('All Rounder');
+    if (counts.bowlers < cfg.minBowlers) neededRoles.push('Bowler');
 
-    if (counts.allRounders < config.minAllRounders) neededRoles.push('All Rounder');
-    if (counts.bowlers < config.minBowlers) neededRoles.push('Bowler');
-
-    // Check grouped minimum for Bat+WK
     const batWkCount = counts.batsmen + counts.wicketKeepers;
-    if (batWkCount < config.minBatWk) {
+    if (batWkCount < cfg.minBatWk) {
       neededRoles.push('Batsman');
       neededRoles.push('Wicket Keeper');
     }
 
     if (neededRoles.length === 0) {
-      // If all minimums met, allow everything within caps
-      if (batWkCount < config.maxBatWk) {
+      if (batWkCount < cfg.maxBatWk) {
         neededRoles.push('Batsman', 'Wicket Keeper');
       }
-      if (counts.bowlers < config.maxBowlers) neededRoles.push('Bowler');
-      if (counts.allRounders < config.maxAllRounders) neededRoles.push('All Rounder');
+      if (counts.bowlers < cfg.maxBowlers) neededRoles.push('Bowler');
+      if (counts.allRounders < cfg.maxAllRounders) neededRoles.push('All Rounder');
     }
 
     return [...new Set(neededRoles)];
-  }, [config]);
+  }, []);
 
   const getPlayerTier = useCallback((playerIndex: number): number => {
     return Math.floor(playerIndex / 10) + 1;
@@ -121,14 +103,15 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
   const selectPlayerForTeam = useCallback((
     teamIndex: number,
     availablePlayers: Player[],
-    rosters: Map<number, string[]>
+    rosters: Record<number, string[]>,
+    cfg: LeagueConfig
   ): Player | null => {
     const counts = getTeamRosterCounts(teamIndex, rosters);
-    const totalCap = config.activeSize + config.benchSize;
+    const totalCap = cfg.activeSize + cfg.benchSize;
     if (counts.total >= totalCap) return null;
 
-    const neededRoles = getNeededRoles(counts);
-    const canAddInternational = counts.international < config.maxInternational;
+    const neededRoles = getNeededRoles(counts, cfg);
+    const canAddInternational = counts.international < cfg.maxInternational;
     const batWkCount = counts.batsmen + counts.wicketKeepers;
 
     let eligiblePlayers = availablePlayers.filter(p => {
@@ -139,122 +122,122 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
     if (eligiblePlayers.length === 0) {
       eligiblePlayers = availablePlayers.filter(p => {
         if (!canAddInternational && p.isInternational) return false;
-        if ((p.role === 'Batsman' || p.role === 'Wicket Keeper') && batWkCount >= config.maxBatWk) return false;
-        if (p.role === 'Bowler' && counts.bowlers >= config.maxBowlers) return false;
-        if (p.role === 'All Rounder' && counts.allRounders >= config.maxAllRounders) return false;
+        if ((p.role === 'Batsman' || p.role === 'Wicket Keeper') && batWkCount >= cfg.maxBatWk) return false;
+        if (p.role === 'Bowler' && counts.bowlers >= cfg.maxBowlers) return false;
+        if (p.role === 'All Rounder' && counts.allRounders >= cfg.maxAllRounders) return false;
         return true;
       });
     }
 
     if (eligiblePlayers.length === 0) return null;
     return selectPlayerWeighted(eligiblePlayers);
-  }, [getTeamRosterCounts, getNeededRoles, selectPlayerWeighted, config]);
+  }, [getTeamRosterCounts, getNeededRoles, selectPlayerWeighted]);
 
   const getTeamForPick = useCallback((round: number, pickIndex: number): number => {
     if (round % 2 === 1) return pickIndex;
     return TEAMS - 1 - pickIndex;
   }, [TEAMS]);
 
-  const startMockDraft = useCallback((userPosition: number) => {
-    abortRef.current = false;
-    setState({
-      isActive: true,
-      isComplete: false,
-      userPosition,
-      picks: [],
-      currentRound: 1,
-      currentPickIndex: 0,
-      teamRosters: new Map(),
-    });
-  }, []);
-
   const makeUserPick = useCallback((playerId: string) => {
-    setState(prev => {
-      if (!prev.isActive || prev.isComplete) return prev;
-      const teamIndex = prev.userPosition! - 1;
-      const newPick: MockDraftPick = {
-        round: prev.currentRound,
-        position: prev.currentPickIndex + 1,
-        playerId,
-        teamIndex,
-      };
-      const newRosters = new Map(prev.teamRosters);
-      const existing = newRosters.get(teamIndex) || [];
-      newRosters.set(teamIndex, [...existing, playerId]);
-      let nextRound = prev.currentRound;
-      let nextPickIndex = prev.currentPickIndex + 1;
-      if (nextPickIndex >= TEAMS) {
-        nextPickIndex = 0;
-        nextRound++;
-      }
-      return {
-        ...prev,
-        picks: [...prev.picks, newPick],
-        currentRound: nextRound,
-        currentPickIndex: nextPickIndex,
-        teamRosters: newRosters,
-        isComplete: nextRound > ROUNDS,
-      };
-    });
-  }, [TEAMS, ROUNDS]);
+    if (!draft || draft.status !== 'in_progress') return;
 
-  const processAutoPick = useCallback((
-    currentState: MockDraftState,
-    sortedPlayersList: Player[]
-  ): MockDraftState | null => {
-    if (!currentState.isActive || currentState.isComplete) return null;
-    const teamIndex = getTeamForPick(currentState.currentRound, currentState.currentPickIndex);
-    const draftedIds = new Set(currentState.picks.map(p => p.playerId));
-    const availablePlayers = sortedPlayersList.filter(p => !draftedIds.has(p.id));
-    const selectedPlayer = selectPlayerForTeam(teamIndex, availablePlayers, currentState.teamRosters);
-    if (!selectedPlayer) return null;
+    const teamIndex = draft.userPosition - 1;
     const newPick: MockDraftPick = {
-      round: currentState.currentRound,
-      position: currentState.currentPickIndex + 1,
-      playerId: selectedPlayer.id,
+      round: draft.currentRound,
+      position: draft.currentPickIndex + 1,
+      playerId,
       teamIndex,
     };
-    const newRosters = new Map(currentState.teamRosters);
-    const existing = newRosters.get(teamIndex) || [];
-    newRosters.set(teamIndex, [...existing, selectedPlayer.id]);
-    let nextRound = currentState.currentRound;
-    let nextPickIndex = currentState.currentPickIndex + 1;
+
+    const currentRoster = draft.teamRosters[teamIndex] || [];
+    const newRosters = {
+      ...draft.teamRosters,
+      [teamIndex]: [...currentRoster, playerId]
+    };
+
+    let nextRound = draft.currentRound;
+    let nextPickIndex = draft.currentPickIndex + 1;
     if (nextPickIndex >= TEAMS) {
       nextPickIndex = 0;
       nextRound++;
     }
-    return {
-      ...currentState,
-      picks: [...currentState.picks, newPick],
+
+    updateDraft(draftId, {
+      picks: [...draft.picks, newPick],
       currentRound: nextRound,
       currentPickIndex: nextPickIndex,
       teamRosters: newRosters,
-      isComplete: nextRound > ROUNDS,
+      status: nextRound > ROUNDS ? 'completed' : 'in_progress',
+    });
+  }, [draftId, draft, TEAMS, ROUNDS, updateDraft]);
+
+  const processAutoPick = useCallback((
+    currentDraft: MockDraft,
+    sortedPlayersList: Player[]
+  ): Partial<MockDraft> | null => {
+    if (currentDraft.status !== 'in_progress') return null;
+
+    const teamIndex = getTeamForPick(currentDraft.currentRound, currentDraft.currentPickIndex);
+    const draftedIds = new Set(currentDraft.picks.map(p => p.playerId));
+    const availablePlayers = sortedPlayersList.filter(p => !draftedIds.has(p.id));
+
+    const selectedPlayer = selectPlayerForTeam(teamIndex, availablePlayers, currentDraft.teamRosters, currentDraft.config);
+    if (!selectedPlayer) return null;
+
+    const newPick: MockDraftPick = {
+      round: currentDraft.currentRound,
+      position: currentDraft.currentPickIndex + 1,
+      playerId: selectedPlayer.id,
+      teamIndex,
+    };
+
+    const currentRoster = currentDraft.teamRosters[teamIndex] || [];
+    const newRosters = {
+      ...currentDraft.teamRosters,
+      [teamIndex]: [...currentRoster, selectedPlayer.id]
+    };
+
+    let nextRound = currentDraft.currentRound;
+    let nextPickIndex = currentDraft.currentPickIndex + 1;
+    if (nextPickIndex >= TEAMS) {
+      nextPickIndex = 0;
+      nextRound++;
+    }
+
+    return {
+      picks: [...currentDraft.picks, newPick],
+      currentRound: nextRound,
+      currentPickIndex: nextPickIndex,
+      teamRosters: newRosters,
+      status: nextRound > ROUNDS ? 'completed' : 'in_progress',
     };
   }, [getTeamForPick, selectPlayerForTeam, TEAMS, ROUNDS]);
 
   const runAutoPickLoop = useCallback(() => {
     if (abortRef.current) return;
-    setState(currentState => {
-      if (!currentState.isActive || currentState.isComplete) return currentState;
-      const currentTeamIndex = getTeamForPick(currentState.currentRound, currentState.currentPickIndex);
-      const userTeamIndex = (currentState.userPosition || 1) - 1;
-      if (currentTeamIndex === userTeamIndex) return currentState;
-      const newState = processAutoPick(currentState, sortedPlayers);
-      if (newState) {
-        if (!newState.isComplete) {
-          const nextTeamIndex = getTeamForPick(newState.currentRound, newState.currentPickIndex);
-          if (nextTeamIndex !== userTeamIndex) {
-            timeoutRef.current = setTimeout(() => {
-              if (!abortRef.current) runAutoPickLoop();
-            }, AUTO_PICK_DELAY);
-          }
+
+    const currentDraft = useMockStore.getState().drafts[draftId];
+    if (!currentDraft || currentDraft.status !== 'in_progress') return;
+
+    const currentTeamIndex = getTeamForPick(currentDraft.currentRound, currentDraft.currentPickIndex);
+    const userTeamIndex = currentDraft.userPosition - 1;
+
+    if (currentTeamIndex === userTeamIndex) return; // User's turn
+
+    const updates = processAutoPick(currentDraft, sortedPlayers);
+    if (updates) {
+      useMockStore.getState().updateDraft(draftId, updates);
+
+      if (updates.status !== 'completed') {
+        const nextTeamIndex = getTeamForPick(updates.currentRound!, updates.currentPickIndex!);
+        if (nextTeamIndex !== userTeamIndex) {
+          timeoutRef.current = setTimeout(() => {
+            if (!abortRef.current) runAutoPickLoop();
+          }, AUTO_PICK_DELAY);
         }
-        return newState;
       }
-      return currentState;
-    });
-  }, [getTeamForPick, processAutoPick, sortedPlayers]);
+    }
+  }, [draftId, getTeamForPick, processAutoPick, sortedPlayers]);
 
   const continueAfterUserPick = useCallback(() => {
     timeoutRef.current = setTimeout(() => {
@@ -262,30 +245,16 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
     }, AUTO_PICK_DELAY);
   }, [runAutoPickLoop]);
 
-  const resetMockDraft = useCallback(() => {
-    abortRef.current = true;
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setState({
-      isActive: false,
-      isComplete: false,
-      userPosition: null,
-      picks: [],
-      currentRound: 1,
-      currentPickIndex: 0,
-      teamRosters: new Map(),
-    });
-  }, []);
-
   const getPlayerById = useCallback((id: string): Player | null => {
     return allPlayers.find(p => p.id === id) || null;
   }, [allPlayers]);
 
-  const isUserTurnState = state.isActive && !state.isComplete && state.userPosition !== null &&
-    getTeamForPick(state.currentRound, state.currentPickIndex) === (state.userPosition - 1);
+  const isUserTurnState = draft?.status === 'in_progress' && draft?.userPosition !== undefined &&
+    getTeamForPick(draft.currentRound, draft.currentPickIndex) === (draft.userPosition - 1);
 
   const getDraftedPlayerIds = useCallback((): string[] => {
-    return state.picks.map(p => p.playerId);
-  }, [state.picks]);
+    return draft?.picks.map(p => p.playerId) || [];
+  }, [draft?.picks]);
 
   const getAvailablePlayers = useCallback((): Player[] => {
     const draftedIds = new Set(getDraftedPlayerIds());
@@ -293,8 +262,8 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
   }, [sortedPlayers, getDraftedPlayerIds]);
 
   const getPickByTeam = useCallback((round: number, teamIndex: number): MockDraftPick | null => {
-    return state.picks.find(p => p.round === round && p.teamIndex === teamIndex) || null;
-  }, [state.picks]);
+    return draft?.picks.find(p => p.round === round && p.teamIndex === teamIndex) || null;
+  }, [draft?.picks]);
 
   const getPickDisplayNumber = useCallback((round: number, teamIndex: number): string => {
     let pickOrderInRound: number;
@@ -307,19 +276,17 @@ export const useMockDraft = (allPlayers: Player[], config: LeagueConfig) => {
   }, [TEAMS]);
 
   const getUserRoster = useCallback((): Player[] => {
-    if (state.userPosition === null) return [];
-    const userTeamIndex = state.userPosition - 1;
-    const playerIds = state.teamRosters.get(userTeamIndex) || [];
+    if (!draft || draft.userPosition === undefined) return [];
+    const userTeamIndex = draft.userPosition - 1;
+    const playerIds = draft.teamRosters[userTeamIndex] || [];
     return playerIds.map(id => allPlayers.find(p => p.id === id)).filter(Boolean) as Player[];
-  }, [state.userPosition, state.teamRosters, allPlayers]);
+  }, [allPlayers, draft]);
 
   return {
-    state,
+    draft,
     isUserTurn: isUserTurnState,
-    startMockDraft,
     makeUserPick,
     continueAfterUserPick,
-    resetMockDraft,
     runAutoPickLoop,
     getPlayerById,
     getDraftedPlayerIds,

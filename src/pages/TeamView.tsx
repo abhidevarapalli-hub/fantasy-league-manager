@@ -222,17 +222,12 @@ const TeamView = () => {
       subtitle={
         <div className="flex items-center gap-2 mt-0.5 overflow-x-auto hide-scrollbar pb-1 -mb-1">
           <div className="flex items-center gap-2 bg-muted/50 px-2 py-1.5 rounded-md border border-border/50 shadow-sm whitespace-nowrap flex-shrink-0">
-            <span className="text-sm font-bold text-foreground tabular-nums">{manager.wins}W - {manager.losses}L</span>
+            <span className="text-sm font-bold text-foreground tabular-nums">{manager.wins}W - {manager.losses}L (#{standingsPosition})</span>
             <span className="text-[10px] text-muted-foreground font-bold tracking-tighter uppercase">Record</span>
           </div>
           <div className="hidden sm:flex items-center gap-2 bg-primary/5 px-2 py-1.5 rounded-md border border-primary/20 shadow-sm whitespace-nowrap flex-shrink-0">
             <span className="text-sm font-bold text-primary tabular-nums">{manager.points.toFixed(1)}</span>
             <span className="text-[10px] text-primary/70 font-bold tracking-tighter uppercase">Points</span>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 bg-amber-500/5 px-2 py-1.5 rounded-md border border-amber-500/20 shadow-sm whitespace-nowrap flex-shrink-0">
-            <Trophy className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-sm font-bold text-amber-500 tabular-nums">#{standingsPosition}</span>
-            <span className="text-[10px] text-amber-500/70 font-bold tracking-tighter uppercase">Rank</span>
           </div>
         </div>
       }
@@ -611,6 +606,17 @@ const TeamView = () => {
                         ? canSwapInActive(activePlayers, playerToSwap.player, player, player.role, config).isValid
                         : canSwapInActive(activePlayers, player, playerToSwap.player, playerToSwap.player.role, config).isValid;
 
+                      // We also need to determine the slot label the player is currently occupying
+                      // to show "Swap to WK slot" etc.
+                      const activeSlots = getActiveRosterSlots(activePlayers, config);
+                      const targetSlot = activeSlots.find(s => s.player?.id === player.id);
+                      const targetRoleLabel = targetSlot ? (
+                        targetSlot.role === 'Wicket Keeper' ? 'WK' :
+                          targetSlot.role === 'Batsman' ? 'BAT' :
+                            targetSlot.role === 'All Rounder' ? 'AR' :
+                              targetSlot.role === 'Bowler' ? 'BWL' : 'FLEX'
+                      ) : player.role;
+
                       return (
                         <button
                           key={player.id}
@@ -631,7 +637,7 @@ const TeamView = () => {
                               <p className="font-medium text-foreground">{player.name}</p>
                               <p className="text-xs text-muted-foreground">
                                 {player.role} •
-                                {isValidSwap ? " Swap to this slot" : " Position constraint"}
+                                {isValidSwap ? ` Swap to ${targetRoleLabel} slot` : " Position constraint"}
                               </p>
                             </div>
                             <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
@@ -690,7 +696,24 @@ const TeamView = () => {
                   {sortedBench.map(player => {
                     const isValidSwap = playerToSwap.from === 'bench'
                       ? canSwapInActive(activePlayers, playerToSwap.player, player, 'BENCH', config).isValid
-                      : true; // Swapping active to bench is always fine role-wise
+                      : canSwapInActive(activePlayers, player, playerToSwap.player, 'Any Position', config).isValid;
+
+                    let swapActionText = '';
+                    if (!isValidSwap) {
+                      swapActionText = 'Position constraint';
+                    } else if (playerToSwap.from === 'active') {
+                      const activeSlots = getActiveRosterSlots(activePlayers, config);
+                      const targetSlot = activeSlots.find(s => s.player?.id === playerToSwap.player.id);
+                      const label = targetSlot ? (
+                        targetSlot.role === 'Wicket Keeper' ? 'WK' :
+                          targetSlot.role === 'Batsman' ? 'BAT' :
+                            targetSlot.role === 'All Rounder' ? 'AR' :
+                              targetSlot.role === 'Bowler' ? 'BWL' : 'FLEX'
+                      ) : 'Active';
+                      swapActionText = `Swap to ${label} slot`;
+                    } else {
+                      swapActionText = 'Swap to Bench'; // since playerToSwap is bench, they're swapping onto bench
+                    }
 
                     return (
                       <button
@@ -713,7 +736,7 @@ const TeamView = () => {
                               <p className="font-medium text-foreground">{player.name}</p>
                               <Badge variant="outline" className="text-[8px] h-3.5 px-1">BN</Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground">{player.role} • {playerToSwap.from === 'active' ? 'Swap to Active' : 'Swap on Bench'}</p>
+                            <p className="text-xs text-muted-foreground">{player.role} • {swapActionText}</p>
                           </div>
                           {player.isInternational && <Plane className="w-4 h-4 text-muted-foreground" />}
                           {!isValidSwap && <Lock className="w-3 h-3 text-destructive" />}
