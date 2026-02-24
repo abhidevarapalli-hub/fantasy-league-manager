@@ -71,6 +71,7 @@ serve(async (req) => {
       try {
         const { data, error } = await supabase.rpc('enable_match_polling', {
           p_cricbuzz_match_id: match.cricbuzz_match_id,
+          p_match_id: match.match_id,
           p_initial_state: 'Upcoming',
           p_auto: true,
         });
@@ -126,10 +127,24 @@ serve(async (req) => {
       }
     }
 
+    // ── Bulk-activate polling rows for past matches that have no polling record ──
+    try {
+      const { data: bulkResult, error: bulkError } = await supabase.rpc('bulk_activate_stale_matches');
+      if (bulkError) {
+        console.warn('[Lifecycle] bulk_activate_stale_matches failed:', bulkError.message);
+        errors.push(`bulk activate: ${bulkError.message}`);
+      } else if (bulkResult?.[0]?.rows_inserted > 0) {
+        console.log(`[Lifecycle] Bulk-activated ${bulkResult[0].rows_inserted} stale match(es) into live_match_polling`);
+      }
+    } catch (err) {
+      console.error('[Lifecycle] Error in bulk activation:', (err as Error).message);
+      errors.push(`bulk activate: ${(err as Error).message}`);
+    }
+
     // ── Backfill stats for completed matches that were never polled ──
     try {
       const { data: backfillMatches, error: backfillQueryError } = await supabase
-        .rpc('get_matches_needing_backfill', { p_max_results: 3 });
+        .rpc('get_matches_needing_backfill', { p_max_results: 10 });
 
       if (backfillQueryError) {
         console.warn('[Lifecycle] get_matches_needing_backfill failed:', backfillQueryError.message);
