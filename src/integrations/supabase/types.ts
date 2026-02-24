@@ -1946,6 +1946,12 @@ export type Database = {
         Args: { p_cricbuzz_match_id: number; p_lock_duration_seconds?: number }
         Returns: boolean
       }
+      auto_link_league_matches: {
+        Args: never
+        Returns: {
+          rows_inserted: number
+        }[]
+      }
       batch_update_league_scores: { Args: { p_updates: Json }; Returns: number }
       check_auto_draft: { Args: { p_league_id: string }; Returns: Json }
       disable_match_polling: {
