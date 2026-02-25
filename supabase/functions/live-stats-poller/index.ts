@@ -548,6 +548,68 @@ serve(async (req) => {
     // Extract Man of Match if match is complete
     const manOfMatch = isMatchComplete ? extractManOfMatch(scorecard) : null;
 
+    // Update cricket_matches state and result BEFORE league processing
+    // This ensures state is always updated even if league processing fails
+    {
+      const { data: currentMatch } = await supabase
+        .from('cricket_matches')
+        .select('id, team1_short, team2_short')
+        .eq('cricbuzz_match_id', cricbuzz_match_id)
+        .single();
+
+      if (currentMatch) {
+        // Resolve TBC team names if needed
+        let teamUpdate: Record<string, unknown> = {};
+        if (currentMatch.team1_short === 'TBC' || currentMatch.team2_short === 'TBC') {
+          const infoUrl = `https://${RAPIDAPI_HOST}/mcenter/v1/${cricbuzz_match_id}`;
+          const infoResp = await fetch(infoUrl, {
+            headers: { 'X-RapidAPI-Key': rapidApiKey, 'X-RapidAPI-Host': RAPIDAPI_HOST },
+          });
+          if (infoResp.ok) {
+            const info = await infoResp.json();
+            if (currentMatch.team1_short === 'TBC' && info.team1?.teamsname && info.team1.teamsname !== 'TBC') {
+              teamUpdate.team1_id = info.team1.teamid;
+              teamUpdate.team1_name = info.team1.teamname;
+              teamUpdate.team1_short = info.team1.teamsname;
+              console.log(`Resolved TBC team1 -> ${info.team1.teamsname} for match ${cricbuzz_match_id}`);
+            }
+            if (currentMatch.team2_short === 'TBC' && info.team2?.teamsname && info.team2.teamsname !== 'TBC') {
+              teamUpdate.team2_id = info.team2.teamid;
+              teamUpdate.team2_name = info.team2.teamname;
+              teamUpdate.team2_short = info.team2.teamsname;
+              console.log(`Resolved TBC team2 -> ${info.team2.teamsname} for match ${cricbuzz_match_id}`);
+            }
+          } else {
+            console.warn(`Failed to fetch match info for TBC resolution: ${infoResp.status}`);
+          }
+        }
+
+        // Update match state and result
+        const updatePayload: Record<string, unknown> = {
+          result: scorecard.status,
+          state: matchState,
+          ...teamUpdate,
+        };
+        if (isMatchComplete && manOfMatch) {
+          updatePayload.man_of_match_id = manOfMatch.id?.toString() || null;
+          updatePayload.man_of_match_name = manOfMatch.name || null;
+        }
+
+        const { error: stateUpdateError } = await supabase
+          .from('cricket_matches')
+          .update(updatePayload)
+          .eq('id', currentMatch.id);
+
+        if (stateUpdateError) {
+          console.error(`Failed to update cricket_matches state for ${cricbuzz_match_id}:`, stateUpdateError);
+        } else {
+          console.log(`Updated cricket_matches state to '${matchState}' for match ${cricbuzz_match_id}`);
+        }
+      } else {
+        console.warn(`No cricket_matches row found for cricbuzz_match_id ${cricbuzz_match_id}`);
+      }
+    }
+
     // Find all leagues that have this match
     const { data: leagues, error: leaguesError } = await supabase
       .rpc('get_leagues_for_cricbuzz_match', { p_cricbuzz_match_id: cricbuzz_match_id });
@@ -753,53 +815,8 @@ serve(async (req) => {
         }
       }
 
-      // Resolve TBC team names from match info endpoint if needed
-      const { data: currentMatch } = await supabase
-        .from('cricket_matches')
-        .select('team1_short, team2_short')
-        .eq('id', match_id)
-        .single();
-
-      let teamUpdate: Record<string, unknown> = {};
-
-      if (currentMatch?.team1_short === 'TBC' || currentMatch?.team2_short === 'TBC') {
-        const infoUrl = `https://${RAPIDAPI_HOST}/mcenter/v1/${cricbuzz_match_id}`;
-        const infoResp = await fetch(infoUrl, {
-          headers: { 'X-RapidAPI-Key': rapidApiKey, 'X-RapidAPI-Host': RAPIDAPI_HOST },
-        });
-        if (infoResp.ok) {
-          const info = await infoResp.json();
-          if (currentMatch.team1_short === 'TBC' && info.team1?.teamsname && info.team1.teamsname !== 'TBC') {
-            teamUpdate.team1_id = info.team1.teamid;
-            teamUpdate.team1_name = info.team1.teamname;
-            teamUpdate.team1_short = info.team1.teamsname;
-            console.log(`Resolved TBC team1 -> ${info.team1.teamsname} for match ${cricbuzz_match_id}`);
-          }
-          if (currentMatch.team2_short === 'TBC' && info.team2?.teamsname && info.team2.teamsname !== 'TBC') {
-            teamUpdate.team2_id = info.team2.teamid;
-            teamUpdate.team2_name = info.team2.teamname;
-            teamUpdate.team2_short = info.team2.teamsname;
-            console.log(`Resolved TBC team2 -> ${info.team2.teamsname} for match ${cricbuzz_match_id}`);
-          }
-        } else {
-          console.warn(`Failed to fetch match info for TBC resolution: ${infoResp.status}`);
-        }
-      }
-
-      // Update cricket_matches result (shared data) — match_state is now on live_match_polling
+      // Update league_matches when match is complete (league-specific data)
       if (isMatchComplete) {
-        await supabase
-          .from('cricket_matches')
-          .update({
-            man_of_match_id: manOfMatch?.id?.toString() || null,
-            man_of_match_name: manOfMatch?.name || null,
-            result: scorecard.status,
-            state: 'Complete',
-            ...teamUpdate,
-          })
-          .eq('id', match_id);
-
-        // Update league_matches (league-specific data)
         await supabase
           .from('league_matches')
           .update({
@@ -808,16 +825,6 @@ serve(async (req) => {
           })
           .eq('league_id', league_id)
           .eq('match_id', match_id);
-      } else {
-        // Update result only (match_state handled via live_match_polling)
-        await supabase
-          .from('cricket_matches')
-          .update({
-            result: scorecard.status,
-            state: 'Live',
-            ...teamUpdate,
-          })
-          .eq('id', match_id);
       }
     }
 

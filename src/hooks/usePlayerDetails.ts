@@ -355,7 +355,7 @@ export function useSeriesMatches(seriesId: number | null) {
       return extractSeriesMatches(response);
     },
     enabled: !!seriesId && (seriesId === 11253 || isApiConfigured()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minute - match states change during live games
     retry: 2,
   });
 }
@@ -422,7 +422,9 @@ export function usePlayerSchedule(
       const opponent = isTeam1 ? matchInfo.team2.teamName : matchInfo.team1.teamName;
       const opponentShort = isTeam1 ? matchInfo.team2.teamSName : matchInfo.team1.teamSName;
       const matchDate = new Date(parseInt(matchInfo.startDate, 10));
-      const isUpcoming = matchInfo.state === 'Upcoming' || matchInfo.state === 'Preview';
+      // A match is upcoming only if the DB state says so AND the match hasn't started yet.
+      // This prevents stale DB state from showing a live match as "Upcoming".
+      const isUpcoming = (matchInfo.state === 'Upcoming' || matchInfo.state === 'Preview') && matchDate > new Date();
 
       return {
         matchId: matchInfo.matchId,
@@ -553,7 +555,7 @@ export function usePlayerMatchStats(
       return mergedMap;
     },
     enabled: !!playerId && !!leagueId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minute - stats update frequently during live matches
   });
 }
 

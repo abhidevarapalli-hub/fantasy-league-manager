@@ -481,7 +481,7 @@ export function PlayerDetailSheet({
                                     <Clock className="w-2.5 h-2.5 mr-1" />
                                     Upcoming
                                   </Badge>
-                                ) : match.matchState === 'Live' ? (
+                                ) : match.matchState === 'Live' && !(match.result && /\bwon\b/i.test(match.result)) ? (
                                   <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-500 border-red-500/30 animate-pulse">
                                     Live
                                   </Badge>
