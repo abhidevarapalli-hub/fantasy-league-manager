@@ -252,15 +252,26 @@ function parseScorecard(
   }
 
   const allStats = Array.from(playerStatsMap.values());
-  for (const stats of allStats) {
-    for (const [fielderName, credits] of fieldingCredits.entries()) {
-      if (nameMatches(stats.playerName, fielderName)) {
-        stats.catches += credits.catches;
-        stats.stumpings += credits.stumpings;
-        stats.runOuts += credits.runOuts;
-        fieldingCredits.delete(fielderName);
-        break;
-      }
+
+  // Assign fielding credits in two passes: exact matches first, then fuzzy
+  // This prevents "Kusal Mendis" from stealing "Kamindu Mendis" catch via last-name match
+  for (const [fielderName, credits] of fieldingCredits.entries()) {
+    const exactMatch = allStats.find(s => s.playerName.toLowerCase().trim() === fielderName.toLowerCase().trim());
+    if (exactMatch) {
+      exactMatch.catches += credits.catches;
+      exactMatch.stumpings += credits.stumpings;
+      exactMatch.runOuts += credits.runOuts;
+      fieldingCredits.delete(fielderName);
+    }
+  }
+  // Second pass: fuzzy match remaining unmatched credits
+  for (const [fielderName, credits] of fieldingCredits.entries()) {
+    const fuzzyMatch = allStats.find(s => nameMatches(s.playerName, fielderName));
+    if (fuzzyMatch) {
+      fuzzyMatch.catches += credits.catches;
+      fuzzyMatch.stumpings += credits.stumpings;
+      fuzzyMatch.runOuts += credits.runOuts;
+      fieldingCredits.delete(fielderName);
     }
   }
 
@@ -286,34 +297,46 @@ function parseScorecard(
   return allStats;
 }
 
+// Points breakdown returned by calculateFantasyPoints
+interface PointsBreakdown {
+  common: { total: number; starting11: number; matchWinningTeam: number; manOfTheMatch: number };
+  batting: { total: number; runs: number; fours: number; sixes: number; milestone: number; dismissal: number; strikeRate: number };
+  bowling: { total: number; wickets: number; milestone: number; dots: number; lbwBowled: number; maidens: number; economy: number };
+  fielding: { total: number; catches: number; stumpings: number; runOuts: number; multiCatchBonus: number };
+}
+
 // Calculate fantasy points for a player
-function calculateFantasyPoints(stats: ParsedPlayerStats, rules: ScoringRules, isManOfMatch: boolean): number {
-  let total = 0;
+function calculateFantasyPoints(stats: ParsedPlayerStats, rules: ScoringRules, isManOfMatch: boolean): PointsBreakdown {
+  const breakdown: PointsBreakdown = {
+    common: { total: 0, starting11: 0, matchWinningTeam: 0, manOfTheMatch: 0 },
+    batting: { total: 0, runs: 0, fours: 0, sixes: 0, milestone: 0, dismissal: 0, strikeRate: 0 },
+    bowling: { total: 0, wickets: 0, milestone: 0, dots: 0, lbwBowled: 0, maidens: 0, economy: 0 },
+    fielding: { total: 0, catches: 0, stumpings: 0, runOuts: 0, multiCatchBonus: 0 },
+  };
 
   // Common points
-  if (stats.isInPlaying11) total += rules.common.starting11;
-  if (stats.teamWon) total += rules.common.matchWinningTeam;
-  if (isManOfMatch) total += rules.common.manOfTheMatch;
+  if (stats.isInPlaying11) breakdown.common.starting11 = rules.common.starting11;
+  if (stats.teamWon) breakdown.common.matchWinningTeam = rules.common.matchWinningTeam;
+  if (isManOfMatch) breakdown.common.manOfTheMatch = rules.common.manOfTheMatch;
+  breakdown.common.total = breakdown.common.starting11 + breakdown.common.matchWinningTeam + breakdown.common.manOfTheMatch;
 
   // Batting points
-  total += stats.runs * rules.batting.runs;
-  total += stats.fours * rules.batting.four;
-  total += stats.sixes * rules.batting.six;
+  breakdown.batting.runs = stats.runs * rules.batting.runs;
+  breakdown.batting.fours = stats.fours * rules.batting.four;
+  breakdown.batting.sixes = stats.sixes * rules.batting.six;
 
   // Batting milestones — apply only the highest qualifying milestone
-  let milestoneBonus = 0;
   for (const milestone of rules.batting.milestones) {
     if (stats.runs >= milestone.runs) {
-      milestoneBonus = milestone.points;
+      breakdown.batting.milestone = milestone.points;
     }
   }
-  total += milestoneBonus;
 
   // Duck penalty
   if (stats.runs === 0 && stats.isOut) {
-    total += rules.batting.duckDismissal;
+    breakdown.batting.dismissal = rules.batting.duckDismissal;
   } else if (stats.runs > 0 && stats.runs <= 5 && stats.isOut) {
-    total += rules.batting.lowScoreDismissal;
+    breakdown.batting.dismissal = rules.batting.lowScoreDismissal;
   }
 
   // Strike rate bonus/penalty
@@ -323,27 +346,27 @@ function calculateFantasyPoints(stats: ParsedPlayerStats, rules: ScoringRules, i
       const meetsMinBalls = !srBonus.minBalls || stats.ballsFaced >= srBonus.minBalls;
       const meetsMinRuns = !srBonus.minRuns || stats.runs >= srBonus.minRuns;
       if (strikeRate >= srBonus.minSR && strikeRate <= srBonus.maxSR && meetsMinBalls && meetsMinRuns) {
-        total += srBonus.points;
+        breakdown.batting.strikeRate = srBonus.points;
         break;
       }
     }
   }
+  breakdown.batting.total = breakdown.batting.runs + breakdown.batting.fours + breakdown.batting.sixes
+    + breakdown.batting.milestone + breakdown.batting.dismissal + breakdown.batting.strikeRate;
 
   // Bowling points
-  total += stats.wickets * rules.bowling.wickets;
+  breakdown.bowling.wickets = stats.wickets * rules.bowling.wickets;
 
   // Bowling milestones
-  let wicketMilestoneBonus = 0;
   for (const milestone of rules.bowling.milestones) {
     if (stats.wickets >= milestone.wickets) {
-      wicketMilestoneBonus = milestone.points;
+      breakdown.bowling.milestone = milestone.points;
     }
   }
-  total += wicketMilestoneBonus;
 
-  total += stats.dots * rules.bowling.dotBall;
-  total += stats.lbwBowledCount * rules.bowling.lbwOrBowledBonus;
-  total += stats.maidens * rules.bowling.maidenOver;
+  breakdown.bowling.dots = stats.dots * rules.bowling.dotBall;
+  breakdown.bowling.lbwBowled = stats.lbwBowledCount * rules.bowling.lbwOrBowledBonus;
+  breakdown.bowling.maidens = stats.maidens * rules.bowling.maidenOver;
 
   // Economy rate bonus/penalty
   if (stats.overs >= 1) {
@@ -351,22 +374,26 @@ function calculateFantasyPoints(stats: ParsedPlayerStats, rules: ScoringRules, i
     for (const erBonus of rules.bowling.economyRateBonuses) {
       const meetsMinOvers = !erBonus.minOvers || stats.overs >= erBonus.minOvers;
       if (economy >= erBonus.minER && economy <= erBonus.maxER && meetsMinOvers) {
-        total += erBonus.points;
+        breakdown.bowling.economy = erBonus.points;
         break;
       }
     }
   }
+  breakdown.bowling.total = breakdown.bowling.wickets + breakdown.bowling.milestone + breakdown.bowling.dots
+    + breakdown.bowling.lbwBowled + breakdown.bowling.maidens + breakdown.bowling.economy;
 
   // Fielding points
-  total += stats.catches * rules.fielding.catch;
-  total += stats.stumpings * rules.fielding.stumping;
-  total += stats.runOuts * rules.fielding.runOut;
+  breakdown.fielding.catches = stats.catches * rules.fielding.catch;
+  breakdown.fielding.stumpings = stats.stumpings * rules.fielding.stumping;
+  breakdown.fielding.runOuts = stats.runOuts * rules.fielding.runOut;
 
   if (stats.catches >= rules.fielding.multiCatchBonus.count) {
-    total += rules.fielding.multiCatchBonus.points;
+    breakdown.fielding.multiCatchBonus = rules.fielding.multiCatchBonus.points;
   }
+  breakdown.fielding.total = breakdown.fielding.catches + breakdown.fielding.stumpings
+    + breakdown.fielding.runOuts + breakdown.fielding.multiCatchBonus;
 
-  return total;
+  return breakdown;
 }
 
 // Extract Man of Match from scorecard response
@@ -748,7 +775,8 @@ serve(async (req) => {
           const leaguePlayer = cricbuzzToPlayer.get(cricbuzzId)!;
           const ownership = playerToManager.get(leaguePlayer.playerId);
           const isManOfMatch = manOfMatch?.id === s.cricbuzzPlayerId;
-          const fantasyPoints = calculateFantasyPoints(s, rules, isManOfMatch);
+          const breakdown = calculateFantasyPoints(s, rules, isManOfMatch);
+          const totalPoints = breakdown.common.total + breakdown.batting.total + breakdown.bowling.total + breakdown.fielding.total;
 
           return {
             league_id,
@@ -758,7 +786,8 @@ serve(async (req) => {
             manager_id: ownership?.managerId || null,
             was_in_active_roster: ownership?.isActive ?? false,
             week,
-            total_points: fantasyPoints,
+            points_breakdown: breakdown,
+            total_points: totalPoints,
             is_live: !isMatchComplete,
             finalized_at: isMatchComplete ? new Date().toISOString() : null,
           };
