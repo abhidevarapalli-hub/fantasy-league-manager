@@ -559,7 +559,7 @@ serve(async (req) => {
 
       if (currentMatch) {
         // Resolve TBC team names if needed
-        let teamUpdate: Record<string, unknown> = {};
+        const teamUpdate: Record<string, unknown> = {};
         if (currentMatch.team1_short === 'TBC' || currentMatch.team2_short === 'TBC') {
           const infoUrl = `https://${RAPIDAPI_HOST}/mcenter/v1/${cricbuzz_match_id}`;
           const infoResp = await fetch(infoUrl, {
