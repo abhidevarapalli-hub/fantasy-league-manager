@@ -49,7 +49,33 @@ interface PlayerDetailDialogProps {
     draftTimerProps?: DraftTimerProps;
 }
 
-import { calculateFantasyPoints } from '@/lib/scoring-utils';
+import { calculateFantasyPoints, PlayerStats } from '@/lib/fantasy-points-calculator';
+
+// Helper to coerce a partial scorecard to the PlayerStats format required for calculation
+const getPlayerStatsForCalc = (stats: PlayerMatchPerformance | undefined | null): PlayerStats => {
+    return {
+        runs: stats?.runs || 0,
+        ballsFaced: stats?.ballsFaced || 0,
+        fours: stats?.fours || 0,
+        sixes: stats?.sixes || 0,
+        isOut: stats?.isNotOut !== undefined ? !stats.isNotOut : false,
+        overs: stats?.overs || 0,
+        maidens: stats?.maidens || 0,
+        runsConceded: stats?.runsConceded || 0,
+        wickets: stats?.wickets || 0,
+        dots: stats?.dots || 0,
+        wides: stats?.wides || 0,
+        noBalls: stats?.noBalls || 0,
+        lbwBowledCount: stats?.lbwBowledCount || 0,
+        catches: stats?.catches || 0,
+        stumpings: stats?.stumpings || 0,
+        runOuts: stats?.runOuts || 0,
+        isInPlaying11: stats?.isInPlaying11 ?? true,
+        isImpactPlayer: stats?.isImpactPlayer ?? false,
+        isManOfMatch: stats?.isManOfMatch ?? false,
+        teamWon: stats?.teamWon ?? false,
+    };
+};
 
 export function PlayerDetailDialog({
     open,
@@ -233,22 +259,57 @@ export function PlayerDetailDialog({
         return schedule.map(match => {
             const dbStats = playerStatsMap.get(match.matchId);
             if (!dbStats) return match;
-            return { ...match, ...dbStats, matchId: match.matchId, matchDate: match.matchDate, opponent: match.opponent, opponentShort: match.opponentShort, venue: match.venue, result: match.result, isUpcoming: match.isUpcoming, week: (match as UnifiedMatchData).week };
+            return {
+                ...match,
+                ...dbStats,
+                matchId: match.matchId,
+                matchDate: match.matchDate,
+                opponent: match.opponent,
+                opponentShort: match.opponentShort,
+                venue: match.venue,
+                result: match.result,
+                isUpcoming: match.isUpcoming,
+                week: (match as UnifiedMatchData).week,
+                matchState: dbStats.matchState || match.matchState,
+                isLiveStats: dbStats.isLiveStats || false
+            };
         });
     }, [playerSchedule, matchStats, playerStatsMap]);
+
+    // Local state for the selected match to show breakdown
+    const [selectedMatch, setSelectedMatch] = React.useState<UnifiedMatchData | null>(null);
+
+    // Reset selected match when dialog closes or player changes
+    React.useEffect(() => {
+        if (!open) {
+            setSelectedMatch(null);
+        }
+    }, [open, player?.id]);
+
+    const breakdownData = useMemo(() => {
+        if (!selectedMatch) return null;
+        // Verify we actually have stats to calculate
+        const hasStats = selectedMatch.runs !== undefined || selectedMatch.wickets !== undefined;
+        if (!hasStats) return null;
+
+        // Ensure we pass a complete rules object.
+        // If a specific league has different rules, they should be pulled and passed here.
+        // For now, defaulting to DEFAULT_SCORING_RULES.
+        return calculateFantasyPoints(getPlayerStatsForCalc(selectedMatch), DEFAULT_SCORING_RULES);
+    }, [selectedMatch]);
 
     if (!player) return null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
-                className="max-w-4xl p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90vh] z-[100] flex flex-col md:flex-row rounded-2xl"
+                className="max-w-4xl w-[95vw] sm:w-[90vw] md:w-full p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90svh] z-[100] flex flex-col md:flex-row rounded-2xl"
                 onInteractOutside={(e) => {
                     // Only prevent default if we're dealing with something specific, otherwise allow the interact outside to close it
                     if (onOpenChange) onOpenChange(false);
                 }}
             >
-                <div className="relative flex flex-col w-full h-full max-h-[90vh] bg-background md:bg-[#0f1014] rounded-2xl overflow-hidden border border-border/50 shadow-2xl">
+                <div className="relative flex flex-col w-full max-h-[90svh] h-[90svh] md:h-auto md:max-h-[85vh] bg-background md:bg-[#0f1014] rounded-2xl overflow-hidden border border-border/50 shadow-2xl">
 
                     {/* Visual Close Button for Mobile Accessibility */}
                     <button
@@ -304,7 +365,7 @@ export function PlayerDetailDialog({
                                     )}
                                 </DialogTitle>
 
-                                <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3 mt-3">
+                                <div className="flex flex-row flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 mt-3">
                                     {/* Team & International Badge */}
                                     <div className={cn(
                                         "text-[10px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] opacity-90 flex items-center justify-center gap-1.5 md:gap-2 bg-black/30 md:bg-black/20 px-3 py-1.5 md:px-3 md:py-1 rounded-full backdrop-blur-md border border-white/10",
@@ -351,34 +412,6 @@ export function PlayerDetailDialog({
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Metadata Grid */}
-                            <div className="grid grid-cols-4 gap-2 md:gap-6 border-t border-white/10 pt-4 mt-2">
-                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                                    <span className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5 md:mb-1">Born</span>
-                                    <span className="text-xs md:text-sm font-bold text-white tracking-tight">
-                                        {player.dateOfBirth || extendedData?.dob || '-'}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                                    <span className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5 md:mb-1">Batting</span>
-                                    <span className="text-xs md:text-sm font-bold text-white tracking-tight">
-                                        {player.battingStyle || extendedData?.battingStyle || '-'}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                                    <span className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5 md:mb-1">Bowling</span>
-                                    <span className="text-xs md:text-sm font-bold text-white tracking-tight truncate w-full">
-                                        {player.bowlingStyle || extendedData?.bowlingStyle || '-'}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                                    <span className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5 md:mb-1">Height</span>
-                                    <span className="text-xs md:text-sm font-bold text-white tracking-tight">
-                                        {player.height || extendedData?.height || '-'}
-                                    </span>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -386,176 +419,387 @@ export function PlayerDetailDialog({
                     <div className="bg-background flex-1 flex flex-col min-h-0 overflow-hidden relative z-30">
                         {/* Section Header */}
                         <div className="flex items-center px-4 md:px-6 pt-4 border-b border-border/40 flex-shrink-0">
-                            <div className="px-4 pb-3 border-b-2 border-primary font-bold text-xs md:text-sm tracking-wide text-foreground uppercase">
-                                Game Log
-                            </div>
+                            {selectedMatch ? (
+                                <div className="flex items-center gap-3 w-full pb-3">
+                                    <button
+                                        onClick={() => setSelectedMatch(null)}
+                                        className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
+                                    </button>
+                                    <div className="font-bold text-xs md:text-sm tracking-wide text-foreground uppercase border-b-2 border-primary">
+                                        Points Breakdown vs {selectedMatch.opponentShort}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="px-4 pb-3 border-b-2 border-primary font-bold text-xs md:text-sm tracking-wide text-foreground uppercase">
+                                    Game Log
+                                </div>
+                            )}
                         </div>
 
                         <ScrollArea className="flex-1 min-h-0 w-full bg-background/50">
-                            <div className="p-0">
-                                <div className="min-w-[700px] md:min-w-full pb-4">
-                                    {/* Year/Filter header */}
-                                    <div className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/10">
-                                        2025 Regular Season
+                            {selectedMatch && breakdownData ? (
+                                /* Points Breakdown View */
+                                <div className="p-4 md:p-6 space-y-6">
+                                    <div className="flex items-center justify-between bg-muted/20 p-4 rounded-xl border border-border/50">
+                                        <div className="text-sm font-semibold text-muted-foreground">TOTAL FANTASY POINTS</div>
+                                        <div className="text-3xl font-black text-primary">{breakdownData.total.toFixed(1)}</div>
                                     </div>
 
-                                    {/* Unified Grid Table */}
-                                    <div className="grid text-xs text-center border-b border-border/50">
-                                        {/* Header Row 1 - Groups */}
-                                        <div className="flex w-full min-w-[700px] md:min-w-full bg-muted/30 font-bold text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
-                                            <div className="w-[180px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-background/95 backdrop-blur-sm">MATCH</div>
-                                            <div className="w-[80px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-indigo-500/10 text-indigo-400">FANTASY</div>
-
-                                            {sections.map(section => (
-                                                <div
-                                                    key={section.id}
-                                                    className={cn("h-8 flex items-center justify-center border-r border-border/50 last:border-r-0", section.color)}
-                                                    style={{ flex: `${section.width} 1 0%`, minWidth: `${section.width}px` }}
-                                                >
-                                                    {section.label}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Batting Breakdown */}
+                                        {breakdownData.batting.total !== 0 && (
+                                            <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl overflow-hidden">
+                                                <div className="bg-emerald-500/10 px-4 py-2 font-bold text-xs uppercase tracking-wider text-emerald-600 flex justify-between items-center">
+                                                    <span>Batting</span>
+                                                    <span>{breakdownData.batting.total.toFixed(1)} pts</span>
                                                 </div>
-                                            ))}
-                                        </div>
-
-                                        {/* Header Row 2 - Columns */}
-                                        <div className="flex w-full min-w-[700px] md:min-w-full bg-background/95 backdrop-blur-sm font-bold border-b border-border/50 sticky top-[32px] z-10 shadow-sm text-[10px] md:text-xs">
-                                            {/* Match Columns */}
-                                            <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 text-muted-foreground flex items-center justify-center">WK</div>
-                                            <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 text-muted-foreground flex items-center">OPP</div>
-
-                                            {/* Fantasy Columns */}
-                                            <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 text-indigo-400 bg-indigo-500/5 flex items-center justify-center">FPTS</div>
-
-                                            {/* Dynamic Section Columns */}
-                                            {sections.map(section => (
-                                                <React.Fragment key={`${section.id}-cols`}>
-                                                    {section.cols.map(col => (
-                                                        <div
-                                                            key={col.key}
-                                                            className={cn("py-2 border-r border-border/50 last:border-r-0 flex items-center justify-center", section.color)}
-                                                            style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
-                                                        >
-                                                            {col.label}
+                                                <div className="p-4 space-y-3 text-sm">
+                                                    {breakdownData.batting.runs !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Runs ({selectedMatch.runs || 0})</span>
+                                                            <span className="font-medium text-emerald-500">+{breakdownData.batting.runs}</span>
                                                         </div>
-                                                    ))}
-                                                </React.Fragment>
-                                            ))}
-                                        </div>
-
-                                        {/* Data Rows */}
-                                        {unifiedMatches.length > 0 ? unifiedMatches.map((matchItem, index) => {
-                                            // Stats are merged directly into matchItem from player_match_stats
-                                            const hasStats = matchItem.runs !== undefined || matchItem.wickets !== undefined;
-                                            const stats = hasStats ? matchItem : undefined;
-
-                                            // Use DB fantasy_points if available, otherwise calculate
-                                            const fpts = hasStats
-                                                ? (matchItem.fantasyPoints ?? calculateFantasyPoints(stats as PlayerMatchPerformance))
-                                                : 0;
-
-                                            const matchDate = matchItem.matchDate;
-                                            const opponentShort = matchItem.opponentShort;
-                                            // If we have stats, the match is not upcoming.
-                                            // If no stats but match is in the past or state is Complete, treat as DNP (not upcoming).
-                                            const isUpcoming = hasStats
-                                                ? false
-                                                : matchItem.isUpcoming && matchItem.matchDate > new Date() && matchItem.matchState !== 'Complete';
-                                            const result = matchItem.result;
-
-                                            // Week number
-                                            const weekNum = matchItem.week || index + 1;
-
-                                            return (
-                                                <div
-                                                    key={matchItem.matchId || index}
-                                                    className={cn(
-                                                        "flex w-full min-w-[700px] md:min-w-full hover:bg-muted/50 transition-colors border-b border-border/30",
-                                                        index % 2 === 0 ? "bg-background" : "bg-muted/10", // Alternating rows
-                                                        isUpcoming && "opacity-70 bg-muted/5"
                                                     )}
-                                                >
-                                                    {/* Match Info */}
-                                                    <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 items-center justify-center flex text-muted-foreground font-mono text-[10px]">
-                                                        {weekNum}
-                                                    </div>
-                                                    <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 flex flex-col justify-center">
-                                                        <span className="font-semibold text-foreground flex items-center justify-between">
-                                                            <span>vs {opponentShort}</span>
-                                                            {isUpcoming && (
-                                                                <span className="text-[9px] uppercase tracking-wider text-muted-foreground border px-1 rounded">Upcoming</span>
-                                                            )}
-                                                        </span>
-                                                        <span className="text-[10px] text-muted-foreground truncate">
-                                                            {isUpcoming ? (
-                                                                matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-                                                            ) : (
-                                                                result || matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                                            )}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Fantasy Points */}
-                                                    <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 bg-muted/20 font-bold text-primary flex items-center justify-center text-sm">
-                                                        {hasStats ? fpts.toFixed(1) : (isUpcoming ? '' : 'DNP')}
-                                                    </div>
-
-                                                    {/* Dynamic Data Columns */}
-                                                    {sections.map(section => (
-                                                        <React.Fragment key={section.id}>
-                                                            {section.cols.map(col => {
-                                                                // Extract value safely
-                                                                let val: string | number | undefined = '-';
-                                                                if (hasStats && stats) {
-                                                                    val = (stats as unknown as Record<string, string | number | undefined>)[col.key];
-
-                                                                    // Formatting
-                                                                    if (val === undefined || val === null) val = '-';
-                                                                    else if (col.key === 'strikeRate' || col.key === 'economy') val = (val as number).toFixed(1);
-                                                                    else if (col.key === 'runs' && section.id === 'batting' && (val as number) >= 30) {
-                                                                        // Highlight high runs
-                                                                        return (
-                                                                            <div key={col.key} className="py-2 border-r border-border/50 flex items-center justify-center" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
-                                                                                <span className="text-foreground font-semibold">{val}</span>
-                                                                            </div>
-                                                                        );
-                                                                    }
-                                                                    else if (col.key === 'wickets' && (val as number) >= 2) {
-                                                                        // Highlight high wickets
-                                                                        return (
-                                                                            <div key={col.key} className="py-2 border-r border-border/50 flex items-center justify-center" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
-                                                                                <span className="text-foreground font-semibold">{val}</span>
-                                                                            </div>
-                                                                        );
-                                                                    }
-                                                                    else if (col.key === 'overs' && !val) {
-                                                                        val = '-';
-                                                                    }
-                                                                }
-
-                                                                return (
-                                                                    <div
-                                                                        key={col.key}
-                                                                        className="py-2 border-r border-border/50 flex items-center justify-center text-muted-foreground"
-                                                                        style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
-                                                                    >
-                                                                        {isUpcoming ? '' : (hasStats ? val : 'DNP')}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </React.Fragment>
-                                                    ))}
+                                                    {breakdownData.batting.fours !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Fours ({selectedMatch.fours || 0})</span>
+                                                            <span className="font-medium text-emerald-500">+{breakdownData.batting.fours}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.batting.sixes !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Sixes ({selectedMatch.sixes || 0})</span>
+                                                            <span className="font-medium text-emerald-500">+{breakdownData.batting.sixes}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.batting.milestoneBonus !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Milestone Bonus</span>
+                                                            <span className="font-medium text-emerald-500">+{breakdownData.batting.milestoneBonus}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.batting.strikeRateBonus !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Strike Rate Bonus</span>
+                                                            <span className={cn("font-medium", breakdownData.batting.strikeRateBonus > 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                                {breakdownData.batting.strikeRateBonus > 0 ? '+' : ''}{breakdownData.batting.strikeRateBonus}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.batting.duckPenalty !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Duck Penalty</span>
+                                                            <span className="font-medium text-rose-500">{breakdownData.batting.duckPenalty}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            );
-                                        }) : (
-                                            <div className="flex flex-col items-center justify-center py-20 text-center">
-                                                <Clock className="h-12 w-12 text-muted-foreground/20 mb-3" />
-                                                <p className="text-muted-foreground font-medium">No played matches yet</p>
-                                                <p className="text-xs text-muted-foreground/60 mt-1">Season has not started or player played no games</p>
+                                            </div>
+                                        )}
+
+                                        {/* Bowling Breakdown */}
+                                        {breakdownData.bowling.total !== 0 && (
+                                            <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl overflow-hidden">
+                                                <div className="bg-rose-500/10 px-4 py-2 font-bold text-xs uppercase tracking-wider text-rose-600 flex justify-between items-center">
+                                                    <span>Bowling</span>
+                                                    <span>{breakdownData.bowling.total.toFixed(1)} pts</span>
+                                                </div>
+                                                <div className="p-4 space-y-3 text-sm">
+                                                    {breakdownData.bowling.wickets !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Wickets ({selectedMatch.wickets || 0})</span>
+                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.wickets}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.bowling.milestoneBonus !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Milestone Bonus</span>
+                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.milestoneBonus}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.bowling.dots !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Dot Balls ({selectedMatch.dots || 0})</span>
+                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.dots}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.bowling.maidens !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Maidens ({selectedMatch.maidens || 0})</span>
+                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.maidens}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.bowling.economyBonus !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Economy Bonus</span>
+                                                            <span className={cn("font-medium", breakdownData.bowling.economyBonus > 0 ? "text-rose-500" : "text-amber-500")}>
+                                                                {breakdownData.bowling.economyBonus > 0 ? '+' : ''}{breakdownData.bowling.economyBonus}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.bowling.lbwBowledBonus !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">LBW/Bowled Bonus</span>
+                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.lbwBowledBonus}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Fielding Breakdown */}
+                                        {breakdownData.fielding.total !== 0 && (
+                                            <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl overflow-hidden">
+                                                <div className="bg-amber-500/10 px-4 py-2 font-bold text-xs uppercase tracking-wider text-amber-600 flex justify-between items-center">
+                                                    <span>Fielding</span>
+                                                    <span>{breakdownData.fielding.total.toFixed(1)} pts</span>
+                                                </div>
+                                                <div className="p-4 space-y-3 text-sm">
+                                                    {breakdownData.fielding.catches !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Catches ({selectedMatch.catches || 0})</span>
+                                                            <span className="font-medium text-amber-500">+{breakdownData.fielding.catches}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.fielding.runOuts !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Run Outs ({selectedMatch.runOuts || 0})</span>
+                                                            <span className="font-medium text-amber-500">+{breakdownData.fielding.runOuts}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.fielding.stumpings !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Stumpings ({selectedMatch.stumpings || 0})</span>
+                                                            <span className="font-medium text-amber-500">+{breakdownData.fielding.stumpings}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.fielding.multiCatchBonus !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Multi-Catch Bonus</span>
+                                                            <span className="font-medium text-amber-500">+{breakdownData.fielding.multiCatchBonus}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Common / Bonuses */}
+                                        {breakdownData.common.total !== 0 && (
+                                            <div className="bg-primary/5 border border-primary/10 rounded-xl overflow-hidden">
+                                                <div className="bg-primary/10 px-4 py-2 font-bold text-xs uppercase tracking-wider text-primary flex justify-between items-center">
+                                                    <span>Common / Match Bonus</span>
+                                                    <span>{breakdownData.common.total.toFixed(1)} pts</span>
+                                                </div>
+                                                <div className="p-4 space-y-3 text-sm">
+                                                    {breakdownData.common.starting11 !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Starting XI</span>
+                                                            <span className="font-medium text-primary">+{breakdownData.common.starting11}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.common.matchWinningTeam !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Winning Team Bonus</span>
+                                                            <span className="font-medium text-primary">+{breakdownData.common.matchWinningTeam}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.common.impactPlayer !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Impact Player</span>
+                                                            <span className="font-medium text-primary">+{breakdownData.common.impactPlayer}</span>
+                                                        </div>
+                                                    )}
+                                                    {breakdownData.common.manOfTheMatch !== 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Man of the Match</span>
+                                                            <span className="font-medium text-primary">+{breakdownData.common.manOfTheMatch}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                /* Existing Game Log View */
+                                <div className="p-0">
+                                    <div className="min-w-[700px] md:min-w-full pb-4">
+                                        {/* Year/Filter header */}
+                                        <div className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/10">
+                                            2025 Regular Season
+                                        </div>
+
+                                        {/* Unified Grid Table */}
+                                        <div className="grid text-xs text-center border-b border-border/50">
+                                            {/* Header Row 1 - Groups */}
+                                            <div className="flex w-full min-w-[700px] md:min-w-full bg-muted/30 font-bold text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
+                                                <div className="w-[180px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-background/95 backdrop-blur-sm">MATCH</div>
+                                                <div className="w-[80px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-indigo-500/10 text-indigo-400">FANTASY</div>
+
+                                                {sections.map(section => (
+                                                    <div
+                                                        key={section.id}
+                                                        className={cn("h-8 flex items-center justify-center border-r border-border/50 last:border-r-0", section.color)}
+                                                        style={{ flex: `${section.width} 1 0%`, minWidth: `${section.width}px` }}
+                                                    >
+                                                        {section.label}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Header Row 2 - Columns */}
+                                            <div className="flex w-full min-w-[700px] md:min-w-full bg-background/95 backdrop-blur-sm font-bold border-b border-border/50 sticky top-[32px] z-10 shadow-sm text-[10px] md:text-xs">
+                                                {/* Match Columns */}
+                                                <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 text-muted-foreground flex items-center justify-center">WK</div>
+                                                <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 text-muted-foreground flex items-center">OPP</div>
+
+                                                {/* Fantasy Columns */}
+                                                <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 text-indigo-400 bg-indigo-500/5 flex items-center justify-center">FPTS</div>
+
+                                                {/* Dynamic Section Columns */}
+                                                {sections.map(section => (
+                                                    <React.Fragment key={`${section.id}-cols`}>
+                                                        {section.cols.map(col => (
+                                                            <div
+                                                                key={col.key}
+                                                                className={cn("py-2 border-r border-border/50 last:border-r-0 flex items-center justify-center", section.color)}
+                                                                style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
+                                                            >
+                                                                {col.label}
+                                                            </div>
+                                                        ))}
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+
+                                            {/* Data Rows */}
+                                            {unifiedMatches.length > 0 ? unifiedMatches.map((matchItem, index) => {
+                                                // Stats are merged directly into matchItem from player_match_stats
+                                                const hasStats = matchItem.runs !== undefined || matchItem.wickets !== undefined;
+                                                const stats = hasStats ? matchItem : undefined;
+
+                                                // Use DB fantasy_points if available, otherwise calculate
+                                                const fpts = hasStats
+                                                    ? (matchItem.fantasyPoints ?? calculateFantasyPoints(getPlayerStatsForCalc(stats), DEFAULT_SCORING_RULES).total)
+                                                    : 0;
+
+                                                const matchDate = matchItem.matchDate;
+                                                const opponentShort = matchItem.opponentShort;
+                                                // If we have stats, the match is not upcoming.
+                                                // If no stats but match is in the past or state is Complete, treat as DNP (not upcoming).
+                                                const isUpcoming = hasStats
+                                                    ? false
+                                                    : matchItem.isUpcoming && matchItem.matchDate > new Date() && matchItem.matchState !== 'Complete';
+                                                const result = matchItem.result;
+
+                                                // Week number
+                                                const weekNum = matchItem.week || index + 1;
+
+                                                return (
+                                                    <div
+                                                        key={matchItem.matchId || index}
+                                                        onClick={() => {
+                                                            if (hasStats) {
+                                                                setSelectedMatch(matchItem);
+                                                            }
+                                                        }}
+                                                        className={cn(
+                                                            "flex w-full min-w-[700px] md:min-w-full transition-colors border-b border-border/30",
+                                                            index % 2 === 0 ? "bg-background" : "bg-muted/10", // Alternating rows
+                                                            isUpcoming && "opacity-70 bg-muted/5",
+                                                            hasStats ? "cursor-pointer hover:bg-muted/60" : "cursor-default"
+                                                        )}
+                                                    >
+                                                        {/* Match Info */}
+                                                        <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 items-center justify-center flex text-muted-foreground font-mono text-[10px]">
+                                                            {weekNum}
+                                                        </div>
+                                                        <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 flex flex-col justify-center relative">
+                                                            <span className="font-semibold text-foreground flex items-center justify-between">
+                                                                <span>vs {opponentShort}</span>
+                                                                {isUpcoming && (
+                                                                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground border px-1 rounded">Upcoming</span>
+                                                                )}
+                                                                {(matchItem.matchState?.toLowerCase().includes('live') || matchItem.matchState?.toLowerCase().includes('progress') || matchItem.isLiveStats) && (
+                                                                    <span className="flex items-center gap-1.5 bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded border border-rose-500/20 text-[9px] font-bold animate-pulse">
+                                                                        <span className="w-1 h-1 rounded-full bg-rose-500" />
+                                                                        LIVE
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            <span className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                                                                {isUpcoming ? (
+                                                                    matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                                                ) : (
+                                                                    result || matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                                                )}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Fantasy Points */}
+                                                        <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 bg-muted/20 font-bold text-primary flex items-center justify-center text-sm">
+                                                            {hasStats ? fpts.toFixed(1) : (isUpcoming ? '' : 'DNP')}
+                                                        </div>
+
+                                                        {/* Dynamic Data Columns */}
+                                                        {sections.map(section => (
+                                                            <React.Fragment key={section.id}>
+                                                                {section.cols.map(col => {
+                                                                    // Extract value safely
+                                                                    let val: string | number | undefined = '-';
+                                                                    if (hasStats && stats) {
+                                                                        val = (stats as unknown as Record<string, string | number | undefined>)[col.key];
+
+                                                                        // Formatting
+                                                                        if (val === undefined || val === null) val = '-';
+                                                                        else if (col.key === 'strikeRate' || col.key === 'economy') val = (val as number).toFixed(1);
+                                                                        else if (col.key === 'runs' && section.id === 'batting' && (val as number) >= 30) {
+                                                                            // Highlight high runs
+                                                                            return (
+                                                                                <div key={col.key} className="py-2 border-r border-border/50 flex items-center justify-center" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
+                                                                                    <span className="text-foreground font-semibold">{val}</span>
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        else if (col.key === 'wickets' && (val as number) >= 2) {
+                                                                            // Highlight high wickets
+                                                                            return (
+                                                                                <div key={col.key} className="py-2 border-r border-border/50 flex items-center justify-center" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
+                                                                                    <span className="text-foreground font-semibold">{val}</span>
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        else if (col.key === 'overs' && !val) {
+                                                                            val = '-';
+                                                                        }
+                                                                    }
+
+                                                                    return (
+                                                                        <div
+                                                                            key={col.key}
+                                                                            className="py-2 border-r border-border/50 flex items-center justify-center text-muted-foreground"
+                                                                            style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
+                                                                        >
+                                                                            {isUpcoming ? '' : (hasStats ? val : 'DNP')}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            }) : (
+                                                <div className="flex flex-col items-center justify-center py-20 text-center">
+                                                    <Clock className="h-12 w-12 text-muted-foreground/20 mb-3" />
+                                                    <p className="text-muted-foreground font-medium">No played matches yet</p>
+                                                    <p className="text-xs text-muted-foreground/60 mt-1">Season has not started or player played no games</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <ScrollBar orientation="horizontal" />
                             <ScrollBar orientation="vertical" />

@@ -1,19 +1,8 @@
 import { Tables } from '@/integrations/supabase/types';
-import { Player, Manager, Match, Activity, PlayerTransaction } from '@/lib/supabase-types';
+import { Player, Manager, Match, Activity, PlayerTransaction, PlayerMatchStats, CricketMatch } from '@/lib/supabase-types';
 import { DraftPick, DraftOrder, DraftState, DbDraftPick, DbDraftOrder, DbDraftState } from '@/lib/draft-types';
 
-// Type for manager_roster junction table entries
-export interface ManagerRosterEntry {
-  id: string;
-  manager_id: string;
-  player_id: string;
-  league_id: string;
-  slot_type: 'active' | 'bench';
-  position: number;
-  week: number;
-  is_captain: boolean;
-  is_vice_captain: boolean;
-}
+import { ManagerRosterEntry } from './types';
 
 // Maps data from league_players view (which joins master_players + league_player_pool)
 export const mapDbPlayer = (db: Tables<"league_players">): Player => ({
@@ -142,3 +131,68 @@ export const mapDbDraftState = (db: DbDraftState | Tables<"draft_state"> | Recor
     isFinalized: row.status === 'completed',
   };
 };
+
+export const mapDbCricketMatch = (db: Tables<'cricket_matches'>): CricketMatch => ({
+  id: db.id,
+  cricbuzzMatchId: db.cricbuzz_match_id,
+  seriesId: db.series_id,
+  matchDescription: db.match_description,
+  matchFormat: db.match_format,
+  matchDate: db.match_date ? new Date(db.match_date) : null,
+  team1: {
+    id: db.team1_id,
+    name: db.team1_name,
+    shortName: db.team1_short,
+    score: db.team1_score,
+  },
+  team2: {
+    id: db.team2_id,
+    name: db.team2_name,
+    shortName: db.team2_short,
+    score: db.team2_score,
+  },
+  result: db.result,
+  winnerTeamId: db.winner_team_id,
+  venue: db.venue,
+  city: db.city,
+  state: db.state,
+  week: db.match_week,
+  matchState: db.match_state,
+});
+
+export const mapDbPlayerMatchStats = (db: Tables<'player_match_stats'>): PlayerMatchStats => ({
+  id: db.id ?? '',
+  playerId: db.player_id,
+  matchId: db.match_id,
+  cricbuzzPlayerId: db.cricbuzz_player_id ?? '',
+  runs: db.runs ?? 0,
+  ballsFaced: db.balls_faced ?? 0,
+  fours: db.fours ?? 0,
+  sixes: db.sixes ?? 0,
+  strikeRate: db.strike_rate ?? null,
+  isOut: db.is_out ?? false,
+  dismissalType: db.dismissal_type,
+  battingPosition: db.batting_position ?? null,
+  overs: db.overs ?? 0,
+  maidens: db.maidens ?? 0,
+  runsConceded: db.runs_conceded ?? 0,
+  wickets: db.wickets ?? 0,
+  economy: db.economy ?? null,
+  dots: db.dots ?? 0,
+  wides: db.wides ?? 0,
+  noBalls: db.no_balls ?? 0,
+  lbwBowledCount: db.lbw_bowled_count ?? 0,
+  catches: db.catches ?? 0,
+  stumpings: db.stumpings ?? 0,
+  runOuts: db.run_outs ?? 0,
+  managerId: db.manager_id,
+  wasInActiveRoster: db.was_in_active_roster ?? false,
+  week: db.week,
+  isInPlaying11: db.is_in_playing_11 ?? false,
+  isImpactPlayer: db.is_impact_player ?? false,
+  isManOfMatch: db.is_man_of_match ?? false,
+  teamWon: db.team_won ?? false,
+  fantasyPoints: db.fantasy_points,
+  leagueId: db.league_id,
+  isLiveStats: db.is_live_stats ?? false,
+});

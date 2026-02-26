@@ -1,4 +1,4 @@
-import { Player, Manager, Match, Activity } from '@/lib/supabase-types';
+import { Player, Manager, Match, Activity, PlayerMatchStats, CricketMatch } from '@/lib/supabase-types';
 import { LeagueConfig } from '@/lib/roster-validation';
 import { ScoringRules } from '@/lib/scoring-types';
 import { DraftPick, DraftOrder, DraftState } from '@/lib/draft-types';
@@ -11,6 +11,19 @@ export interface RosterMoveResult {
 export interface ScoringRulesResult {
   success: boolean;
   error?: string;
+}
+
+// Type for manager_roster junction table entries
+export interface ManagerRosterEntry {
+  id: string;
+  manager_id: string;
+  player_id: string;
+  league_id: string;
+  slot_type: 'active' | 'bench';
+  position: number;
+  week: number;
+  is_captain: boolean;
+  is_vice_captain: boolean;
 }
 
 export interface GameState {
@@ -38,6 +51,9 @@ export interface GameState {
   isTradesInitialized: boolean;
   isLeaguesInitialized: boolean;
   selectedRosterWeek: number;
+  weeklyStats: Record<number, PlayerMatchStats[]>;
+  weeklyMatches: Record<number, CricketMatch[]>;
+  weeklyRosters: Record<number, ManagerRosterEntry[]>;
 
   // Setters (used internally and by real-time subscriptions)
   setPlayers: (players: Player[]) => void;
@@ -104,6 +120,7 @@ export interface GameState {
   // Data fetching
   fetchAllData: (leagueId: string) => Promise<void>;
   fetchRosterForWeek: (leagueId: string, week: number) => Promise<void>;
+  fetchWeeklyData: (leagueId: string, week: number) => Promise<void>;
 
   // Real-time subscriptions
   subscribeToRealtime: (leagueId: string) => () => void;

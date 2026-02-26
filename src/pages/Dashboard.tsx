@@ -40,8 +40,17 @@ const Dashboard = () => {
   // Initialize selected week when currentWeek loads
   useEffect(() => {
     // Week 0 = pre-season, no matchups — default to showing Week 1
-    setSelectedWeek(currentWeek === 0 ? 1 : currentWeek);
+    const weekToSet = currentWeek === 0 ? 1 : currentWeek;
+    setSelectedWeek(weekToSet);
   }, [currentWeek]);
+
+  // Sync store with selected week roster and stats
+  const fetchRosterForWeek = useGameStore(state => state.fetchRosterForWeek);
+  useEffect(() => {
+    if (leagueId && selectedWeek > 0) {
+      fetchRosterForWeek(leagueId, selectedWeek);
+    }
+  }, [leagueId, selectedWeek, fetchRosterForWeek]);
 
   // Find the logged-in user's manager ID
   const loggedInManagerId = managerProfile?.id;

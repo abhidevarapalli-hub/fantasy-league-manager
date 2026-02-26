@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Player, Manager, CricketMatch, PlayerMatchStats, mapDbCricketMatch, mapDbPlayerMatchStats } from '@/lib/supabase-types';
+import { useEffect, useState, useMemo } from 'react';
+import { calculateFantasyPoints } from '@/lib/fantasy-points-calculator';
+import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
+import { TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
+import { useGameStore } from '@/store/useGameStore';
+import { ManagerRosterEntry } from '@/store/gameStore/types';
+import { Player, CricketMatch, PlayerMatchStats, Manager } from '@/lib/supabase-types';
 import { Tables } from '@/integrations/supabase/types';
 
 export interface PlayerWithMatches {
@@ -18,11 +22,13 @@ export interface MatchupData {
     awayRoster: PlayerWithMatches[];
     homeScore: number;
     awayScore: number;
+}
+
+export interface MatchupState {
+    data: MatchupData | null;
     loading: boolean;
     error: string | null;
 }
-
-import { calculateFantasyPoints } from '@/lib/scoring-utils';
 
 export function useMatchupData(
     week: number,
@@ -30,219 +36,131 @@ export function useMatchupData(
     awayManager: Manager | undefined,
     players: Player[],
     leagueId: string | null
-): MatchupData {
-    const [data, setData] = useState<MatchupData>({
-        homeRoster: [],
-        awayRoster: [],
-        homeScore: 0,
-        awayScore: 0,
-        loading: true,
-        error: null,
-    });
+): MatchupState {
+    const weeklyStats = useGameStore(state => state.weeklyStats);
+    const weeklyMatches = useGameStore(state => state.weeklyMatches);
+    const weeklyRosters = useGameStore(state => state.weeklyRosters);
+    const fetchWeeklyData = useGameStore(state => state.fetchWeeklyData);
+    const [fetching, setFetching] = useState(false);
 
+    // Trigger fetch if data is missing for this week
     useEffect(() => {
-        if (!homeManager || !awayManager || !leagueId) {
-            setData(prev => ({ ...prev, loading: false }));
-            return;
+        if (leagueId && (!weeklyStats[week] || !weeklyMatches[week] || !weeklyRosters[week])) {
+            setFetching(true);
+            fetchWeeklyData(leagueId, week).finally(() => setFetching(false));
+        }
+    }, [leagueId, week, weeklyStats, weeklyMatches, weeklyRosters, fetchWeeklyData]);
+
+    const data = useMemo(() => {
+        if (!leagueId || !homeManager || !awayManager || !players.length) return null;
+
+        const statsData = weeklyStats[week];
+        const matchesData = weeklyMatches[week];
+        const rostersData = weeklyRosters[week];
+
+        if (!statsData || !matchesData || !rostersData) return null;
+
+        const homeEntries = rostersData.filter(e => e.manager_id === homeManager.id);
+        const awayEntries = rostersData.filter(e => e.manager_id === awayManager.id);
+
+        if (homeEntries.length === 0 && awayEntries.length === 0) {
+            return {
+                homeRoster: [],
+                awayRoster: [],
+                homeScore: 0,
+                awayScore: 0,
+            };
         }
 
-        const fetchMatchupData = async () => {
-            try {
-                setData(prev => ({ ...prev, loading: true, error: null }));
+        const getCountry = (t: string) => TEAM_SHORT_TO_COUNTRY[t] || t;
 
-                // Fetch per-week roster entries directly from DB for both managers
-                const { data: rosterData, error: rosterError } = await supabase
-                    .from('manager_roster')
-                    .select('*')
-                    .eq('league_id', leagueId)
-                    .eq('week', week)
-                    .in('manager_id', [homeManager.id, awayManager.id]);
+        const buildRoster = (managerEntries: ManagerRosterEntry[]) => {
+            const rosterIds = managerEntries.map(e => e.player_id);
+            const activeIds = managerEntries.filter(e => e.slot_type === 'active').map(e => e.player_id);
+            const captainId = managerEntries.find(e => e.is_captain)?.player_id;
+            const vcId = managerEntries.find(e => e.is_vice_captain)?.player_id;
 
-                if (rosterError) throw rosterError;
+            return rosterIds
+                .map(playerId => {
+                    const player = players.find(p => p.id === playerId);
+                    if (!player) return null;
 
-                const rosterEntries = rosterData || [];
-                const homeEntries = rosterEntries.filter(e => e.manager_id === homeManager.id);
-                const awayEntries = rosterEntries.filter(e => e.manager_id === awayManager.id);
+                    const playerStats = statsData.filter(s => s.playerId === playerId);
 
-                const homeActiveIds = homeEntries.filter(e => e.slot_type === 'active').map(e => e.player_id);
-                const homeBenchIds = homeEntries.filter(e => e.slot_type === 'bench').map(e => e.player_id);
-                const awayActiveIds = awayEntries.filter(e => e.slot_type === 'active').map(e => e.player_id);
-                const awayBenchIds = awayEntries.filter(e => e.slot_type === 'bench').map(e => e.player_id);
+                    // Map stats with on-the-fly point calculation to match useWeeklyScores
+                    const statsWithPoints = playerStats.map(stat => {
+                        const ptsRaw = calculateFantasyPoints({
+                            runs: stat.runs || 0,
+                            ballsFaced: stat.ballsFaced || 0,
+                            fours: stat.fours || 0,
+                            sixes: stat.sixes || 0,
+                            isOut: stat.isOut,
+                            isInPlaying11: stat.isInPlaying11,
+                            isImpactPlayer: stat.isImpactPlayer,
+                            isManOfMatch: stat.isManOfMatch,
+                            teamWon: stat.teamWon,
+                            wickets: stat.wickets || 0,
+                            overs: stat.overs || 0,
+                            maidens: stat.maidens || 0,
+                            runsConceded: stat.runsConceded || 0,
+                            dots: stat.dots || 0,
+                            wides: stat.wides || 0,
+                            noBalls: stat.noBalls || 0,
+                            lbwBowledCount: stat.lbwBowledCount || 0,
+                            catches: stat.catches || 0,
+                            stumpings: stat.stumpings || 0,
+                            runOuts: stat.runOuts || 0,
+                        }, DEFAULT_SCORING_RULES).total;
 
-                // Captain/VC lookups
-                const homeCaptainId = homeEntries.find(e => e.is_captain)?.player_id ?? null;
-                const homeVcId = homeEntries.find(e => e.is_vice_captain)?.player_id ?? null;
-                const awayCaptainId = awayEntries.find(e => e.is_captain)?.player_id ?? null;
-                const awayVcId = awayEntries.find(e => e.is_vice_captain)?.player_id ?? null;
-
-                const homePlayerIds = [...homeActiveIds, ...homeBenchIds];
-                const awayPlayerIds = [...awayActiveIds, ...awayBenchIds];
-                const allPlayerIds = [...homePlayerIds, ...awayPlayerIds];
-
-                if (allPlayerIds.length === 0) {
-                    setData({
-                        homeRoster: [],
-                        awayRoster: [],
-                        homeScore: 0,
-                        awayScore: 0,
-                        loading: false,
-                        error: null,
+                        return { ...stat, fantasyPoints: ptsRaw };
                     });
-                    return;
-                }
 
-                // 1. Get league details to find tournament_id
-                const { data: leagueData, error: leagueError } = await supabase
-                    .from('leagues')
-                    .select('tournament_id')
-                    .eq('id', leagueId)
-                    .single();
+                    // Total points calculation (including Captain/VC multipliers)
+                    const totalPointsRaw = statsWithPoints.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
+                    const isActive = activeIds.includes(playerId);
+                    const isCaptain = playerId === captainId;
+                    const isViceCaptain = playerId === vcId;
+                    const totalPoints = isCaptain ? totalPointsRaw * 2 : isViceCaptain ? totalPointsRaw * 1.5 : totalPointsRaw;
 
-                if (leagueError) throw leagueError;
-                const tournamentId = leagueData.tournament_id;
+                    const pCountry = getCountry(player.team);
 
-                // 2. Fetch cricket matches for this week and tournament
-                const { data: matchesData, error: matchesError } = await supabase
-                    .from('cricket_matches')
-                    .select('*')
-                    .eq('series_id', tournamentId)
-                    .eq('match_week', week);
+                    const playerMatches = matchesData.filter(
+                        m =>
+                            getCountry(m.team1.name || '') === pCountry ||
+                            getCountry(m.team1.shortName || '') === pCountry ||
+                            getCountry(m.team2.name || '') === pCountry ||
+                            getCountry(m.team2.shortName || '') === pCountry ||
+                            statsWithPoints.some(s => s.matchId === m.id)
+                    );
 
-                if (matchesError) throw matchesError;
-
-                const cricketMatches = (matchesData || []).map(mapDbCricketMatch);
-
-                // Fetch player stats for this week
-                // Join with cricket_matches to filter by the match's official week
-                const { data: statsData, error: statsError } = await supabase
-                    .from('player_match_stats_compat')
-                    .select(`
-                        *,
-                        match:cricket_matches!inner(match_week)
-                    `)
-                    .eq('league_id', leagueId)
-                    .eq('match.match_week', week)
-                    .in('player_id', allPlayerIds);
-
-                if (statsError) throw statsError;
-
-                const allStats = (statsData || []).map(mapDbPlayerMatchStats);
-
-                // Helper to get points (DB or Calculated)
-                const getPoints = (stat: PlayerMatchStats) => {
-                    if (stat.fantasyPoints != null && stat.fantasyPoints !== 0) return stat.fantasyPoints;
-                    // Fallback to calculation
-                    return calculateFantasyPoints(stat);
-                };
-
-                // Build roster data for home manager
-                const homeRoster: PlayerWithMatches[] = homePlayerIds
-                    .map(playerId => {
-                        const player = players.find(p => p.id === playerId);
-                        if (!player) return null;
-
-                        const playerStats = allStats.filter(s => s.playerId === playerId);
-                        // Update stats with calculated points if needed
-                        playerStats.forEach(s => {
-                            if (!s.fantasyPoints) s.fantasyPoints = getPoints(s);
-                        });
-
-                        const totalPointsRaw = playerStats.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
-                        const isActive = homeActiveIds.includes(playerId);
-                        const isCaptain = playerId === homeCaptainId;
-                        const isViceCaptain = playerId === homeVcId;
-                        // Apply multipliers: 2× for captain, 1.5× for VC
-                        const totalPoints = isCaptain ? totalPointsRaw * 2 : isViceCaptain ? totalPointsRaw * 1.5 : totalPointsRaw;
-
-                        // Get cricket matches for this player's team
-                        const playerMatches = cricketMatches.filter(
-                            m =>
-                                m.team1.name === player.team ||
-                                m.team1.shortName === player.team ||
-                                m.team2.name === player.team ||
-                                m.team2.shortName === player.team
-                        );
-
-                        return {
-                            player,
-                            cricketMatches: playerMatches,
-                            stats: playerStats,
-                            totalPoints,
-                            isActive,
-                            isCaptain,
-                            isViceCaptain,
-                        };
-                    })
-                    .filter((item): item is PlayerWithMatches => item !== null);
-
-                // Build roster data for away manager
-                const awayRoster: PlayerWithMatches[] = awayPlayerIds
-                    .map(playerId => {
-                        const player = players.find(p => p.id === playerId);
-                        if (!player) return null;
-
-                        const playerStats = allStats.filter(s => s.playerId === playerId);
-                        // Update stats with calculated points if needed
-                        playerStats.forEach(s => {
-                            if (!s.fantasyPoints) s.fantasyPoints = getPoints(s);
-                        });
-
-                        const totalPointsRaw = playerStats.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
-                        const isActive = awayActiveIds.includes(playerId);
-                        const isCaptain = playerId === awayCaptainId;
-                        const isViceCaptain = playerId === awayVcId;
-                        const totalPoints = isCaptain ? totalPointsRaw * 2 : isViceCaptain ? totalPointsRaw * 1.5 : totalPointsRaw;
-
-                        // Get cricket matches for this player's team
-                        const playerMatches = cricketMatches.filter(
-                            m =>
-                                m.team1.name === player.team ||
-                                m.team1.shortName === player.team ||
-                                m.team2.name === player.team ||
-                                m.team2.shortName === player.team
-                        );
-
-                        return {
-                            player,
-                            cricketMatches: playerMatches,
-                            stats: playerStats,
-                            totalPoints,
-                            isActive,
-                            isCaptain,
-                            isViceCaptain,
-                        };
-                    })
-                    .filter((item): item is PlayerWithMatches => item !== null);
-
-                // Calculate total scores (only active roster counts)
-                const homeScore = homeRoster
-                    .filter(r => r.isActive)
-                    .reduce((sum, r) => sum + r.totalPoints, 0);
-
-                const awayScore = awayRoster
-                    .filter(r => r.isActive)
-                    .reduce((sum, r) => sum + r.totalPoints, 0);
-
-                setData({
-                    homeRoster,
-                    awayRoster,
-                    homeScore,
-                    awayScore,
-                    loading: false,
-                    error: null,
-                });
-            } catch (error) {
-                console.error('Error fetching matchup data:', error);
-                setData(prev => ({
-                    ...prev,
-                    loading: false,
-                    error: error instanceof Error ? error.message : 'Failed to load matchup data',
-                }));
-            }
+                    return {
+                        player,
+                        cricketMatches: playerMatches,
+                        stats: statsWithPoints,
+                        totalPoints,
+                        isActive,
+                        isCaptain,
+                        isViceCaptain,
+                    };
+                })
+                .filter((item): item is PlayerWithMatches => item !== null);
         };
 
-        fetchMatchupData();
-    }, [week, homeManager, awayManager, players, leagueId]);
+        const homeRoster = buildRoster(homeEntries);
+        const awayRoster = buildRoster(awayEntries);
 
-    return data;
+        const homeScore = homeRoster.filter(r => r.isActive).reduce((sum, r) => sum + r.totalPoints, 0);
+        const awayScore = awayRoster.filter(r => r.isActive).reduce((sum, r) => sum + r.totalPoints, 0);
+
+        return {
+            homeRoster,
+            awayRoster,
+            homeScore,
+            awayScore,
+        };
+    }, [week, homeManager, awayManager, players, leagueId, weeklyStats, weeklyMatches, weeklyRosters]);
+
+    const isLoading = fetching || !data;
+
+    return { data, loading: isLoading, error: null };
 }

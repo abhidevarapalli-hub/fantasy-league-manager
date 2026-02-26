@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Manager, Match } from "@/lib/supabase-types";
-import { useGameStore } from "@/store/useGameStore";
-import { useMatchupData, PlayerWithMatches } from "@/hooks/useMatchupData";
+import { useGameStore } from '@/store/useGameStore';
+import { PlayerWithMatches, useMatchupData } from '@/hooks/useMatchupData';
+// calculateFantasyPoints removed as it is now handled in the hook
+import { TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
 import {
     Dialog,
     DialogContent,
@@ -57,6 +59,7 @@ const PlayerCard = ({
     onClick: (playerId: string) => void;
 }) => {
     const { player, cricketMatches, stats, totalPoints } = playerData;
+    const isPlaying = stats.some(s => s.isLiveStats);
 
     return (
         <div
@@ -66,12 +69,17 @@ const PlayerCard = ({
             {/* Player Header */}
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <LazyPlayerAvatar
-                        name={player.name}
-                        imageId={player.imageId}
-                        cachedUrl={player.cachedUrl}
-                        className="w-10 h-10 border border-border"
-                    />
+                    <div className="relative">
+                        <LazyPlayerAvatar
+                            name={player.name}
+                            imageId={player.imageId}
+                            cachedUrl={player.cachedUrl}
+                            className="w-10 h-10 border border-border"
+                        />
+                        {isPlaying && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background bg-green-500 animate-pulse" title="Playing Now" />
+                        )}
+                    </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                             <RoleBadge role={player.role} />
@@ -182,76 +190,93 @@ const MatchupRow = ({
 }) => {
     // Helper to render a single player side
     const renderPlayerSide = (playerData: PlayerWithMatches | null | undefined, align: 'left' | 'right') => {
-        if (!playerData) return <div className="flex-1 flex items-center min-w-0" />;
+        if (!playerData) return <div className="flex-1 min-w-0 min-h-[46px]" />;
 
         const { player, totalPoints, cricketMatches } = playerData;
-        const now = new Date();
-        // Playing: Match started (date is past) but no result yet
-        const isPlaying = cricketMatches.some(m => !m.result && m.matchDate && new Date(m.matchDate) <= now);
-        // Completed: Result exists
-        const hasPlayed = cricketMatches.some(m => !!m.result);
+        // Playing: stats indicate live tracking
+        const isPlaying = playerData.stats.some(s => s.isLiveStats);
+        // Completed: All matches for this player this week have a result
+        const hasPlayed = cricketMatches.length > 0 && cricketMatches.every(m => !!m.result);
 
         return (
             <div
                 className={cn(
-                    "flex-1 flex items-center gap-2 min-w-0 cursor-pointer active:opacity-70 transition-all rounded-md p-1 -mx-1",
+                    "w-full flex items-center gap-1.5 cursor-pointer active:opacity-70 transition-all rounded-md p-1 min-h-[46px]",
                     align === 'right' ? "flex-row-reverse text-right" : "flex-row text-left",
-                    playerData.isCaptain && (align === 'left' ? "bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/20" : "bg-gradient-to-l from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/20"),
-                    playerData.isViceCaptain && (align === 'left' ? "bg-gradient-to-r from-slate-400/15 via-slate-400/5 to-transparent border border-slate-400/20" : "bg-gradient-to-l from-slate-400/15 via-slate-400/5 to-transparent border border-slate-400/20"),
+                    playerData.isCaptain && (align === 'left' ? "bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border-l-[3px] border-amber-500/80" : "bg-gradient-to-l from-amber-500/15 via-amber-500/5 to-transparent border-r-[3px] border-amber-500/80"),
+                    playerData.isViceCaptain && (align === 'left' ? "bg-gradient-to-r from-slate-400/15 via-slate-400/5 to-transparent border-l-[3px] border-slate-400/80" : "bg-gradient-to-l from-slate-400/15 via-slate-400/5 to-transparent border-r-[3px] border-slate-400/80"),
                     !playerData.isCaptain && !playerData.isViceCaptain && "hover:bg-muted/30"
                 )}
                 onClick={() => onPlayerClick(player.id)}
             >
                 {/* Avatar */}
-                <div className="relative shrink-0">
-                    <LazyPlayerAvatar
-                        name={player.name}
-                        imageId={player.imageId}
-                        cachedUrl={player.cachedUrl}
-                        className="w-9 h-9 border border-border/50"
-                    />
-                    {/* Status Dot */}
-                    {(isPlaying || hasPlayed) && (
-                        <div className={cn(
-                            "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background",
-                            isPlaying ? "bg-green-500 animate-pulse" : "bg-muted-foreground"
-                        )} />
-                    )}
+                <div className="relative shrink-0 flex flex-col items-center gap-1">
+                    <div className="relative">
+                        <LazyPlayerAvatar
+                            name={player.name}
+                            imageId={player.imageId}
+                            cachedUrl={player.cachedUrl}
+                            className="w-8 h-8 sm:w-9 sm:h-9 border border-border/50"
+                        />
+                        {/* Status Dot: Green Pulsing = Currently playing */}
+                        {isPlaying && (
+                            <div className={cn(
+                                "absolute -bottom-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border-[1.5px] sm:border-2 border-background bg-green-500 animate-pulse"
+                            )} title="Playing Now" />
+                        )}
+                    </div>
+                    {/* Country Code under image for mobile */}
+                    <span className="text-[8px] sm:hidden font-medium text-muted-foreground leading-none">
+                        {player.team}
+                    </span>
                 </div>
 
                 {/* Info */}
-                <div className="flex-col overflow-hidden">
-                    <p className="text-[11px] font-bold leading-tight truncate text-foreground/90">
+                <div className="flex flex-col overflow-hidden min-w-0 flex-1">
+                    <p className="text-[10.5px] sm:text-[11px] font-bold leading-tight truncate text-foreground/90">
                         {player.name.split(' ').length > 1 ? `${player.name.charAt(0)}. ${player.name.split(' ').slice(1).join(' ')}` : player.name}
-                        {playerData.isCaptain && (
-                            <span className="ml-1 px-1 py-0.5 text-[8px] font-black rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/50 leading-none">C</span>
-                        )}
-                        {playerData.isViceCaptain && (
-                            <span className="ml-1 px-1 py-0.5 text-[8px] font-black rounded-full bg-slate-400/30 text-slate-300 border border-slate-400/50 leading-none">VC</span>
-                        )}
-                        {' '}<span className="text-[9px] font-normal text-muted-foreground opacity-70">({player.team})</span>
+                        {' '}<span className="hidden sm:inline text-[8.5px] sm:text-[9px] font-normal text-muted-foreground opacity-70">({player.team})</span>
                     </p>
                     <div className={cn(
-                        "flex items-baseline gap-1 mt-0.5",
-                        align === 'right' && "justify-end"
+                        "flex flex-col gap-y-[1px] text-[8.5px] sm:text-[9px] text-muted-foreground mt-0.5",
+                        align === 'right' ? "items-end" : "items-start"
                     )}>
-                        <span className={cn(
-                            "text-xs font-black font-mono",
-                            totalPoints > 0 ? "text-primary" : "text-muted-foreground"
-                        )}>
-                            {totalPoints.toFixed(1)}
-                            {playerData.isCaptain && <span className="text-[8px] text-amber-400 ml-0.5">×2</span>}
-                            {playerData.isViceCaptain && <span className="text-[8px] text-slate-400 ml-0.5">×1.5</span>}
-                        </span>
-                        {cricketMatches.length > 0 && (
-                            <span className="text-[9px] text-muted-foreground truncate max-w-[60px]">
-                                vs {align === 'right'
-                                    ? (cricketMatches[0]?.team1.name === player.team ? cricketMatches[0]?.team2.shortName : cricketMatches[0]?.team1.shortName)
-                                    : (cricketMatches[0]?.team1.name === player.team ? cricketMatches[0]?.team2.shortName : cricketMatches[0]?.team1.shortName)
-                                }
-                            </span>
+                        {cricketMatches.length > 0 ? cricketMatches.map(m => {
+                            const getCountry = (t: string) => TEAM_SHORT_TO_COUNTRY[t] || t;
+                            const pCountry = getCountry(player.team);
+                            const isTeam1 = getCountry(m.team1?.name || '') === pCountry ||
+                                getCountry(m.team1?.shortName || '') === pCountry;
+                            const opp = isTeam1
+                                ? (m.team2?.shortName || m.team2?.name || 'Unknown')
+                                : (m.team1?.shortName || m.team1?.name || 'Unknown');
+
+                            const matchStat = playerData.stats.find(s => s.matchId === m.id);
+                            const pts = matchStat?.fantasyPoints;
+                            const isMatchLive = m.matchState === 'Live';
+                            return (
+                                <div key={m.id} className="flex items-center gap-1 leading-none truncate max-w-full">
+                                    <span>vs {opp} <span className="font-bold text-foreground/80">{pts != null ? pts.toFixed(1) : '-'}</span></span>
+                                    {isMatchLive && (
+                                        <span className="shrink-0 px-1 py-0.5 rounded-[2px] bg-green-500/20 text-[7px] font-black text-green-500 border border-green-500/30 uppercase tracking-tighter animate-pulse">LIVE</span>
+                                    )}
+                                </div>
+                            );
+                        }) : (
+                            <span>No matches</span>
                         )}
                     </div>
+                </div>
+
+                {/* Total Points (Center) */}
+                <div className="shrink-0 flex flex-col items-center justify-center min-w-[28px] sm:min-w-[32px] px-0.5 sm:px-1">
+                    <span className={cn(
+                        "text-[13px] sm:text-sm font-black",
+                        totalPoints > 0 ? "text-primary" : "text-muted-foreground"
+                    )}>
+                        {(totalPoints ?? 0).toFixed(1)}
+                    </span>
+                    {playerData.isCaptain && <span className="text-[7px] sm:text-[8px] text-amber-500 font-bold leading-none mt-0.5">C ×2</span>}
+                    {playerData.isViceCaptain && <span className="text-[7px] sm:text-[8px] text-slate-400 font-bold leading-none mt-0.5">VC ×1.5</span>}
                 </div>
             </div>
         );
@@ -265,14 +290,16 @@ const MatchupRow = ({
     }
 
     return (
-        <div className="flex items-center justify-between py-2 border-b border-border/30 last:border-0 relative">
+        <div className="flex items-stretch justify-between py-1.5 border-b border-border/30 last:border-0 w-full overflow-hidden">
             {/* Left: Home Player */}
-            {renderPlayerSide(homePlayer, 'left')}
+            <div className="flex-1 w-0 flex justify-start">
+                {renderPlayerSide(homePlayer, 'left')}
+            </div>
 
             {/* Center: Position Badge */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+            <div className="w-[36px] shrink-0 flex items-center justify-center z-10 px-0.5 sm:px-1">
                 <div className={cn(
-                    "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter border shadow-sm min-w-[32px] text-center",
+                    "px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter border shadow-sm w-full text-center truncate",
                     displayRoleLabel === 'BAT' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
                     displayRoleLabel === 'BWL' && "bg-red-500/10 text-red-500 border-red-500/20",
                     displayRoleLabel === 'AR' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
@@ -285,7 +312,9 @@ const MatchupRow = ({
             </div>
 
             {/* Right: Away Player */}
-            {renderPlayerSide(awayPlayer, 'right')}
+            <div className="flex-1 w-0 flex justify-end">
+                {renderPlayerSide(awayPlayer, 'right')}
+            </div>
         </div>
     );
 };
@@ -368,10 +397,9 @@ const HeadToHeadSection = ({
 
     return (
         <div className="bg-card/30 rounded-xl border border-border/50 overflow-hidden">
-            <div className="bg-muted/40 px-3 py-1.5 border-b border-border/50 flex justify-between items-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</span>
-                <span className="text-[10px] font-mono text-muted-foreground opacity-60">
-                    {title === 'Starters' ? 'Starting XI' : 'Reserve'}
+            <div className="bg-muted-foreground/10 px-3 py-1 text-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-foreground/70">
+                    {title === 'Starters' ? 'Starting Roster' : 'Bench'}
                 </span>
             </div>
             <div className="px-2">
@@ -411,23 +439,31 @@ export function MatchupDetail({
         currentLeagueId
     );
 
+    console.log('[MatchupDetail] matchupData state:', {
+        loading: matchupData.loading,
+        hasData: !!matchupData.data,
+        error: matchupData.error,
+        homeManagerId: homeManager?.id,
+        awayManagerId: awayManager?.id
+    });
+
     // Helper: sort C first, VC second, then by role
     const captainFirst = (a: PlayerWithMatches, b: PlayerWithMatches) => {
         const aP = a.isCaptain ? -2 : a.isViceCaptain ? -1 : 0;
         const bP = b.isCaptain ? -2 : b.isViceCaptain ? -1 : 0;
         return aP - bP;
     };
-    const homeStarters = matchupData.homeRoster.filter(r => r.isActive).sort(captainFirst);
-    const homeBench = matchupData.homeRoster.filter(r => !r.isActive);
-    const awayStarters = matchupData.awayRoster.filter(r => r.isActive).sort(captainFirst);
-    const awayBench = matchupData.awayRoster.filter(r => !r.isActive);
+    const homeStarters = matchupData.data?.homeRoster.filter(r => r.isActive).sort(captainFirst) || [];
+    const homeBench = matchupData.data?.homeRoster.filter(r => !r.isActive) || [];
+    const awayStarters = matchupData.data?.awayRoster.filter(r => r.isActive).sort(captainFirst) || [];
+    const awayBench = matchupData.data?.awayRoster.filter(r => !r.isActive) || [];
 
     const selectedPlayer = players.find(p => p.id === selectedPlayerId) || null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader className="border-b border-border pb-4">
+            <DialogContent className="w-screen h-[100dvh] max-w-none max-h-none border-0 p-0 sm:p-6 rounded-none sm:w-full sm:h-auto sm:max-w-4xl sm:max-h-[90vh] sm:border sm:rounded-lg overflow-y-auto">
+                <DialogHeader className="border-b border-border p-4 sm:px-0 sm:pt-0 sm:pb-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                         <Calendar className="w-4 h-4" />
                         <span>Week {match.week} Matchup</span>
@@ -452,7 +488,7 @@ export function MatchupDetail({
                             <p className="text-sm text-muted-foreground truncate">{homeManager?.name || "-"}</p>
                             <div className="flex items-baseline gap-2 mt-1">
                                 <span className="text-3xl font-bold">
-                                    {matchupData.loading ? "-" : matchupData.homeScore.toFixed(1)}
+                                    {matchupData.loading ? "-" : (matchupData.data?.homeScore || 0).toFixed(1)}
                                 </span>
                                 {homeManager && (
                                     <span className="text-xs text-muted-foreground">
@@ -493,7 +529,7 @@ export function MatchupDetail({
                                     </span>
                                 )}
                                 <span className="text-3xl font-bold">
-                                    {matchupData.loading ? "-" : matchupData.awayScore.toFixed(1)}
+                                    {matchupData.loading ? "-" : (matchupData.data?.awayScore || 0).toFixed(1)}
                                 </span>
                             </div>
                         </div>
@@ -515,8 +551,8 @@ export function MatchupDetail({
                 )}
 
                 {/* Roster Display */}
-                {!matchupData.loading && !matchupData.error && (
-                    <div className="space-y-6 pt-4">
+                {(!matchupData.loading || !!matchupData.data) && !matchupData.error && (
+                    <div className="flex flex-col gap-4 p-2 sm:p-0">
                         <HeadToHeadSection
                             title="Starters"
                             homePlayers={homeStarters}
@@ -524,6 +560,7 @@ export function MatchupDetail({
                             onPlayerClick={setSelectedPlayerId}
                             useSlots={true}
                         />
+
                         <HeadToHeadSection
                             title="Bench"
                             homePlayers={homeBench}

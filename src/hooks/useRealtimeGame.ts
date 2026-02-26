@@ -11,7 +11,8 @@ import {
 } from "@/lib/roster-validation";
 import { ScoringRules, DEFAULT_SCORING_RULES, mergeScoringRules } from "@/lib/scoring-types";
 import { recomputeLeaguePoints } from "@/lib/scoring-recompute";
-import { ManagerRosterEntry, mapDbManagerWithRoster } from "@/store/gameStore/mappers";
+import { ManagerRosterEntry } from "@/store/gameStore/types";
+import { mapDbManagerWithRoster } from "@/store/gameStore/mappers";
 
 // Helper to map DB rows to frontend types
 // Uses league_players view which joins master_players + league_player_pool

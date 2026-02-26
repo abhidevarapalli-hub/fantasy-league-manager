@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, Json } from '@/integrations/supabase/types';
-import { Player, Manager, Activity, PlayerTransaction } from '@/lib/supabase-types';
+import { Player, Manager, Activity, PlayerTransaction, PlayerMatchStats, CricketMatch } from '@/lib/supabase-types';
 import { DEFAULT_LEAGUE_CONFIG, canAddToActive, buildOptimalActive11 } from '@/lib/roster-validation';
 import { DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
 import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
@@ -17,8 +17,10 @@ import {
   mapDbDraftPick,
   mapDbDraftOrder,
   mapDbDraftState,
-  ManagerRosterEntry
+  mapDbCricketMatch,
+  mapDbPlayerMatchStats
 } from './gameStore/mappers';
+import { ManagerRosterEntry } from './gameStore/types';
 
 export const useGameStore = create<GameState>()(
   devtools(
@@ -47,6 +49,9 @@ export const useGameStore = create<GameState>()(
       isTradesInitialized: false,
       isLeaguesInitialized: false,
       selectedRosterWeek: 1,
+      weeklyStats: {},
+      weeklyMatches: {},
+      weeklyRosters: {},
 
       // Setters
       setPlayers: (players) => set({ players }),
@@ -1001,8 +1006,9 @@ export const useGameStore = create<GameState>()(
           const leagueConfigDuration = performance.now() - leagueConfigStart;
           // console.log(`[useGameStore] ⚙️  League config fetched in ${leagueConfigDuration.toFixed(2)}ms`);
 
+          let dbCurrentWeek = 0;
           if (leagueData) {
-            const dbCurrentWeek = (leagueData.current_week as number) ?? 0;
+            dbCurrentWeek = (leagueData.current_week as number) ?? 0;
             set({
               leagueName: leagueData.name as string,
               leagueOwnerId: leagueData.league_manager_id as string,
@@ -1090,6 +1096,9 @@ export const useGameStore = create<GameState>()(
 
           const totalFetchDuration = performance.now() - fetchStartTime;
           // console.log(`[useGameStore] 🎉 fetchAllData completed in ${totalFetchDuration.toFixed(2)}ms (Config: ${leagueConfigDuration.toFixed(2)}ms, Fetch: ${parallelFetchDuration.toFixed(2)}ms, Mapping: ${mappingDuration.toFixed(2)}ms)`);
+
+          // Also pre-fetch current week's stats/matches
+          await get().fetchWeeklyData(leagueId, dbCurrentWeek);
         } catch (error) {
           console.error('[useGameStore] ❌ Error in fetchAllData:', error);
           throw error;
@@ -1102,6 +1111,9 @@ export const useGameStore = create<GameState>()(
       fetchRosterForWeek: async (leagueId, week) => {
         try {
           set({ selectedRosterWeek: week });
+
+          // Also fetch weekly stats/matches context
+          await get().fetchWeeklyData(leagueId, week);
 
           // Fetch roster entries for the specified week
           const { data: rosterData } = await supabase
@@ -1123,6 +1135,53 @@ export const useGameStore = create<GameState>()(
           set({ managers });
         } catch (error) {
           console.error('[useGameStore] ❌ Error fetching roster for week:', error);
+        }
+      },
+
+      // Fetch weekly stats and matches
+      fetchWeeklyData: async (leagueId, week) => {
+        const { weeklyStats, weeklyMatches, weeklyRosters } = get();
+
+        // If already cached, don't refetch
+        if (weeklyStats[week] && weeklyMatches[week] && weeklyRosters[week]) return;
+
+        try {
+          const [statsRes, matchesRes, rostersRes] = await Promise.all([
+            supabase
+              .from('player_match_stats_compat')
+              .select(`
+                *,
+                match:cricket_matches!inner(match_week)
+              `)
+              .eq('league_id', leagueId)
+              .eq('match.match_week', week),
+            supabase
+              .from('league_cricket_matches')
+              .select('*')
+              .eq('league_id', leagueId)
+              .eq('week', week),
+            supabase
+              .from('manager_roster')
+              .select('*')
+              .eq('league_id', leagueId)
+              .eq('week', week)
+          ]);
+
+          if (statsRes.error) throw statsRes.error;
+          if (matchesRes.error) throw matchesRes.error;
+          if (rostersRes.error) throw rostersRes.error;
+
+          const stats = (statsRes.data || []).map(mapDbPlayerMatchStats);
+          const matches = (matchesRes.data || []).map(m => mapDbCricketMatch(m as unknown as Tables<'cricket_matches'>));
+          const rosters = (rostersRes.data as unknown as ManagerRosterEntry[] || []);
+
+          set((state) => ({
+            weeklyStats: { ...state.weeklyStats, [week]: stats },
+            weeklyMatches: { ...state.weeklyMatches, [week]: matches },
+            weeklyRosters: { ...state.weeklyRosters, [week]: rosters }
+          }));
+        } catch (error) {
+          console.error('[useGameStore] ❌ Error fetching weekly data:', error);
         }
       },
 

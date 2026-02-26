@@ -374,6 +374,8 @@ export interface PlayerMatchPerformance {
   isUpcoming?: boolean;
   /** Match state from API (Complete, Upcoming, Live, etc) */
   matchState?: string;
+  /** Whether these are live real-time stats */
+  isLiveStats?: boolean;
   // Batting
   runs?: number;
   ballsFaced?: number;
@@ -389,10 +391,19 @@ export interface PlayerMatchPerformance {
   runsConceded?: number;
   wickets?: number;
   economy?: number;
+  dots?: number;
+  wides?: number;
+  noBalls?: number;
+  lbwBowledCount?: number;
   // Fielding
   catches?: number;
   stumpings?: number;
   runOuts?: number;
+  // Playing status
+  isInPlaying11?: boolean;
+  isImpactPlayer?: boolean;
+  isManOfMatch?: boolean;
+  teamWon?: boolean;
   // Fantasy
   fantasyPoints?: number;
 }
@@ -484,6 +495,8 @@ export function usePlayerMatchStats(
           stumpings?: number | null;
           run_outs?: number | null;
           fantasy_points?: number | string | null;
+          match_state?: string | null;
+          is_live_stats?: boolean | null;
         }>
       ) {
         const statsMap = new Map<number, PlayerMatchPerformance>();
@@ -512,6 +525,8 @@ export function usePlayerMatchStats(
             stumpings: row.stumpings ?? undefined,
             runOuts: row.run_outs ?? undefined,
             fantasyPoints: row.fantasy_points != null ? Number(row.fantasy_points) : undefined,
+            matchState: row.match_state ?? undefined,
+            isLiveStats: row.is_live_stats ?? false,
           });
         }
         return statsMap;

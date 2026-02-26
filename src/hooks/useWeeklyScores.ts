@@ -1,103 +1,81 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { calculateFantasyPoints } from '@/lib/scoring-utils';
+import { useEffect, useState, useMemo } from 'react';
+import { calculateFantasyPoints } from '@/lib/fantasy-points-calculator';
+import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
 import { Manager } from '@/lib/supabase-types';
-
-interface PlayerStatRow {
-    fantasy_points: number | null;
-    player_id: string;
-    manager_id: string;
-    runs: number;
-    fours: number;
-    sixes: number;
-    is_out: boolean;
-    wickets: number;
-    overs: number;
-    economy: number | null;
-    maidens: number;
-    catches: number;
-    stumpings: number;
-    run_outs: number;
-    dismissal_type: string | null;
-}
+import { useGameStore } from '@/store/useGameStore';
 
 export function useWeeklyScores(leagueId: string | null, week: number, managers: Manager[]) {
-    const [scores, setScores] = useState<Record<string, number>>({});
-    const [loading, setLoading] = useState(true);
+    const weeklyStats = useGameStore(state => state.weeklyStats);
+    const weeklyRosters = useGameStore(state => state.weeklyRosters);
+    const fetchWeeklyData = useGameStore(state => state.fetchWeeklyData);
+    const [loading, setLoading] = useState(false);
 
+    // Fetch data if not present
     useEffect(() => {
-        if (!leagueId || managers.length === 0) return;
-
-        const fetchScores = async () => {
+        if (leagueId && (!weeklyStats[week] || !weeklyRosters[week])) {
             setLoading(true);
-            try {
-                // 1. Fetch all player stats for this week and league
-                // We need to join with cricket_matches to filter by match_week
-                const { data: statsData, error: statsError } = await supabase
-                    .from('player_match_stats_compat')
-                    .select(`
-                        fantasy_points,
-                        player_id,
-                        manager_id,
-                        runs, fours, sixes, is_out, wickets, overs, economy, maidens, catches, stumpings, run_outs, dismissal_type,
-                        match:cricket_matches!inner(match_week)
-                    `)
-                    .eq('league_id', leagueId)
-                    .eq('match.match_week', week);
+            fetchWeeklyData(leagueId, week).finally(() => setLoading(false));
+        }
+    }, [leagueId, week, weeklyStats, weeklyRosters, fetchWeeklyData]);
 
-                if (statsError) throw statsError;
+    const scores = useMemo(() => {
+        if (!leagueId || managers.length === 0) return {};
 
-                const managerScores: Record<string, number> = {};
+        const statsData = weeklyStats[week];
+        const rostersData = weeklyRosters[week];
+        if (!statsData || !rostersData) return {};
 
-                console.log(`[useWeeklyScores] Managers: ${managers.length}, Stats Found: ${statsData?.length}`);
+        const managerScores: Record<string, number> = {};
 
-                // Iterate over managers to calculate their scores based on their CURRENT active roster
-                managers.forEach(manager => {
-                    let managerTotal = 0;
+        // Iterate over managers to calculate their scores based on their active roster for this week
+        managers.forEach(manager => {
+            let managerTotal = 0;
+            const managerActiveRoster = rostersData.filter(e => e.manager_id === manager.id && e.slot_type === 'active');
 
-                    manager.activeRoster.forEach(playerId => {
-                        // Find all stats for this player (could be multiple if multiple matches in a week?)
-                        // Typically one per match.
-                        const playerStats = statsData?.filter((s) => s.player_id === playerId);
+            managerActiveRoster.forEach(entry => {
+                const playerId = entry.player_id;
+                const isCaptain = entry.is_captain;
+                const isViceCaptain = entry.is_vice_captain;
 
-                        if (playerStats && playerStats.length > 0) {
-                            playerStats.forEach((stat) => {
-                                // Always calculate points on client to ensure consistency with current rules
-                                // and avoid stale DB values (e.g. old rules where Wicket=25 instead of 30)
-                                const points = calculateFantasyPoints({
-                                    runs: stat.runs,
-                                    fours: stat.fours,
-                                    sixes: stat.sixes,
-                                    isNotOut: !stat.is_out,
-                                    wickets: stat.wickets,
-                                    overs: stat.overs,
-                                    economy: stat.economy,
-                                    maidens: stat.maidens,
-                                    catches: stat.catches,
-                                    stumpings: stat.stumpings,
-                                    runOuts: stat.run_outs,
-                                    dismissalType: stat.dismissal_type
-                                });
-                                // console.log(`[useWeeklyScores] Calculated points for ${playerId}: ${points}`);
-                                managerTotal += points;
-                            });
-                        }
+                const playerStats = statsData.filter((s) => s.playerId === playerId);
+
+                if (playerStats && playerStats.length > 0) {
+                    playerStats.forEach((stat) => {
+                        const pointsRaw = calculateFantasyPoints({
+                            runs: stat.runs || 0,
+                            ballsFaced: stat.ballsFaced || 0,
+                            fours: stat.fours || 0,
+                            sixes: stat.sixes || 0,
+                            isOut: stat.isOut,
+                            isInPlaying11: stat.isInPlaying11,
+                            isImpactPlayer: stat.isImpactPlayer,
+                            isManOfMatch: stat.isManOfMatch,
+                            teamWon: stat.teamWon,
+                            wickets: stat.wickets || 0,
+                            overs: stat.overs || 0,
+                            maidens: stat.maidens || 0,
+                            runsConceded: stat.runsConceded || 0,
+                            dots: stat.dots || 0,
+                            wides: stat.wides || 0,
+                            noBalls: stat.noBalls || 0,
+                            lbwBowledCount: stat.lbwBowledCount || 0,
+                            catches: stat.catches || 0,
+                            stumpings: stat.stumpings || 0,
+                            runOuts: stat.runOuts || 0,
+                        }, DEFAULT_SCORING_RULES).total;
+
+                        const points = isCaptain ? pointsRaw * 2 : isViceCaptain ? pointsRaw * 1.5 : pointsRaw;
+                        managerTotal += points;
                     });
+                }
+            });
 
-                    managerScores[manager.id] = managerTotal;
-                });
+            managerScores[manager.id] = managerTotal;
+        });
 
-                console.log("[useWeeklyScores] Calculated Scores:", managerScores);
-                setScores(managerScores);
-            } catch (error) {
-                console.error("Error fetching weekly scores:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+        return managerScores;
+    }, [leagueId, week, managers, weeklyStats, weeklyRosters]);
 
-        fetchScores();
-    }, [leagueId, week, managers]); // Added managers to dependency array
-
-    return { scores, loading };
+    return { scores, loading: loading || !weeklyStats[week] };
 }
+

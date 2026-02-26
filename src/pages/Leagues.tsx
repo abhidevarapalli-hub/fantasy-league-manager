@@ -152,23 +152,34 @@ const Leagues = () => {
                     </h1>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 cursor-pointer group px-3 py-1.5 rounded-full hover:bg-white/5 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
-                            <UserCircle className="w-5 h-5" />
-                        </div>
-                        <div className="hidden sm:block text-sm font-bold tracking-tight text-white/90">
-                            @{userProfile?.username || 'user'}
-                        </div>
-                    </div>
-                    {isPlatformAdmin && (
-                        <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-muted-foreground hover:text-white hover:bg-white/10 rounded-full px-3 h-10 gap-2">
-                            <Shield className="w-4 h-4" />
-                            <span className="hidden sm:inline">Admin</span>
+                    {user ? (
+                        <>
+                            <div className="flex items-center gap-2 cursor-pointer group px-3 py-1.5 rounded-full hover:bg-white/5 transition-colors">
+                                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+                                    <UserCircle className="w-5 h-5" />
+                                </div>
+                                <div className="hidden sm:block text-sm font-bold tracking-tight text-white/90">
+                                    @{userProfile?.username || 'user'}
+                                </div>
+                            </div>
+                            {isPlatformAdmin && (
+                                <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-muted-foreground hover:text-white hover:bg-white/10 rounded-full px-3 h-10 gap-2">
+                                    <Shield className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Admin</span>
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-muted-foreground hover:text-white hover:bg-white/10 rounded-full h-10 w-10">
+                                <LogOut className="w-4 h-4" />
+                            </Button>
+                        </>
+                    ) : (
+                        <Button
+                            onClick={() => navigate('/login')}
+                            className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/50 font-bold tracking-wide rounded-full px-6 transition-all"
+                        >
+                            Sign In
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-muted-foreground hover:text-white hover:bg-white/10 rounded-full h-10 w-10">
-                        <LogOut className="w-4 h-4" />
-                    </Button>
                 </div>
             </div>
 
@@ -188,43 +199,60 @@ const Leagues = () => {
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-primary-foreground to-secondary drop-shadow-[0_0_15px_rgba(34,211,238,0.5)] pr-2">DRAFT IS HERE</span>
                             </h2>
 
-                            {/* "Friend League Lobby" Floating Card */}
-                            <div className="relative bg-white/5 border border-white/20 backdrop-blur-xl rounded-2xl p-4 sm:p-5 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] flex flex-col gap-3 w-full sm:w-72 transform md:-rotate-2 md:hover:rotate-0 transition-transform duration-500">
-                                <div className="flex justify-between items-center">
-                                    <h4 className="text-white text-sm font-bold tracking-wide">Friend League Lobby</h4>
-                                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_10px_rgba(74,222,128,1)]"></div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <div className="flex -space-x-3">
-                                        <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">JD</div>
-                                        <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">SP</div>
-                                        <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">RK</div>
-                                        <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">ML</div>
-                                        <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-white/10 flex items-center justify-center text-white/50 backdrop-blur-md hover:bg-white/20 transition-colors shadow-lg cursor-pointer">
-                                            <UserCircle className="w-4 h-4" />
+                            {/* "Friend League Lobby" Floating Card OR empty space for unauthenticated */}
+                            {user && (
+                                <div className="relative bg-white/5 border border-white/20 backdrop-blur-xl rounded-2xl p-4 sm:p-5 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] flex flex-col gap-3 w-full sm:w-72 transform md:-rotate-2 md:hover:rotate-0 transition-transform duration-500">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="text-white text-sm font-bold tracking-wide">Friend League Lobby</h4>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_10px_rgba(74,222,128,1)]"></div>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex -space-x-3">
+                                            <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">JD</div>
+                                            <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">SP</div>
+                                            <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">RK</div>
+                                            <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">ML</div>
+                                            <div className="w-8 h-8 rounded-full border-2 border-[#051A25] bg-white/10 flex items-center justify-center text-white/50 backdrop-blur-md hover:bg-white/20 transition-colors shadow-lg cursor-pointer">
+                                                <UserCircle className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xl sm:text-2xl font-black text-secondary drop-shadow-[0_0_5px_rgba(34,211,238,0.8)]">4<span className="text-white/40 text-sm sm:text-lg">/10</span></div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-xl sm:text-2xl font-black text-secondary drop-shadow-[0_0_5px_rgba(34,211,238,0.8)]">4<span className="text-white/40 text-sm sm:text-lg">/10</span></div>
+                                    <div className="space-y-1.5 mt-1">
+                                        <div className="flex justify-end text-[9px] uppercase font-bold text-white/50 tracking-widest">
+                                            Slots Filled
+                                        </div>
+                                        <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                                            <div className="h-full w-[40%] bg-gradient-to-r from-primary to-secondary shadow-[0_0_10px_rgba(139,92,246,0.8)] rounded-full"></div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-1.5 mt-1">
-                                    <div className="flex justify-end text-[9px] uppercase font-bold text-white/50 tracking-widest">
-                                        Slots Filled
-                                    </div>
-                                    <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-                                        <div className="h-full w-[40%] bg-gradient-to-r from-primary to-secondary shadow-[0_0_10px_rgba(139,92,246,0.8)] rounded-full"></div>
-                                    </div>
-                                </div>
-                            </div>
+                            )}
 
                             <div className="space-y-4 pt-1 w-full flex flex-col items-center md:items-start">
-                                <Button
-                                    onClick={() => navigate('/leagues/create')}
-                                    className="relative group bg-gradient-to-r from-primary to-[#a855f7] hover:from-primary hover:to-[#9333ea] text-white font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] rounded-full px-6 py-6 sm:px-8 sm:py-6 text-xs sm:text-sm border border-white/20 shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:shadow-[0_0_40px_rgba(139,92,246,0.8)] transition-all active:scale-95 overflow-hidden w-full sm:w-auto hover:animate-pulse"
-                                >
-                                    <span className="relative z-10 drop-shadow-md">Create Private League</span>
-                                </Button>
+                                {user ? (
+                                    <Button
+                                        onClick={() => navigate('/leagues/create')}
+                                        className="relative group bg-gradient-to-r from-primary to-[#a855f7] hover:from-primary hover:to-[#9333ea] text-white font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] rounded-full px-6 py-6 sm:px-8 sm:py-6 text-xs sm:text-sm border border-white/20 shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:shadow-[0_0_40px_rgba(139,92,246,0.8)] transition-all active:scale-95 overflow-hidden w-full sm:w-auto hover:animate-pulse"
+                                    >
+                                        <span className="relative z-10 drop-shadow-md">Create Private League</span>
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        onClick={() => navigate('/login')}
+                                        className="relative group bg-gradient-to-r from-primary to-[#a855f7] hover:from-primary hover:to-[#9333ea] text-white font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] rounded-full px-6 py-6 sm:px-8 sm:py-6 text-xs sm:text-sm border border-white/20 shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:shadow-[0_0_40px_rgba(139,92,246,0.8)] transition-all overflow-hidden w-full sm:w-auto flex items-center justify-center gap-3"
+                                    >
+                                        <svg className="w-5 h-5 bg-white rounded-full p-0.5 shrink-0 relative z-10" viewBox="0 0 24 24">
+                                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                                        </svg>
+                                        <span className="relative z-10 drop-shadow-md">Sign In to Create League</span>
+                                    </Button>
+                                )}
                                 <p className="text-xs sm:text-sm lg:text-base text-white/70 font-semibold tracking-wide max-w-sm text-center md:text-left">
                                     NFL-style draft. <span className="text-white/90">No duplicate players.</span> Beat your friends.
                                 </p>
@@ -270,93 +298,101 @@ const Leagues = () => {
 
 
                 {/* Section 2: Your Leagues (Horizontal Scroll) */}
-                <section className="space-y-5">
-                    <div className="flex items-center justify-between px-2">
-                        <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-white uppercase italic">Your Leagues</h3>
-                        {/* Pagination dots indicator could go here */}
-                        <div className="flex gap-1">
-                            <div className="w-4 h-1 bg-primary rounded-full"></div>
-                            <div className="w-2 h-1 bg-white/20 rounded-full"></div>
-                            <div className="w-2 h-1 bg-white/20 rounded-full"></div>
-                        </div>
-                    </div>
-
-                    <div className="flex overflow-x-auto gap-4 sm:gap-6 pb-6 pt-2 snap-x px-2 scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0">
-                        {/* Create New League Card */}
-                        <div
-                            onClick={() => navigate('/leagues/create')}
-                            className="snap-start shrink-0 w-64 h-72 rounded-3xl bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-white/10 backdrop-blur-md flex flex-col items-center justify-center gap-4 cursor-pointer transition-all group"
-                        >
-                            <div className="w-16 h-16 rounded-full border-2 border-dashed border-primary/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors group-hover:scale-110 duration-300">
-                                <PlusCircle className="w-8 h-8 text-primary group-hover:text-primary-foreground" />
-                            </div>
-                            <div className="text-center">
-                                <p className="font-bold text-lg text-white tracking-wide uppercase">New League</p>
-                                <p className="text-sm text-white/50">Create & invite</p>
+                {user && (
+                    <section className="space-y-5">
+                        <div className="flex items-center justify-between px-2">
+                            <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-white uppercase italic">Your Leagues</h3>
+                            {/* Pagination dots indicator could go here */}
+                            <div className="flex gap-1">
+                                <div className="w-4 h-1 bg-primary rounded-full"></div>
+                                <div className="w-2 h-1 bg-white/20 rounded-full"></div>
+                                <div className="w-2 h-1 bg-white/20 rounded-full"></div>
                             </div>
                         </div>
 
-                        {/* Existing Leagues List */}
-                        {loading ? (
-                            <div className="shrink-0 w-64 h-72 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center">
-                                <Loader2 className="w-8 h-8 animate-spin text-primary/50" />
+                        <div className="flex overflow-x-auto gap-4 sm:gap-6 pb-6 pt-2 snap-x px-2 scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0">
+                            {/* Create New League Card */}
+                            <div
+                                onClick={() => navigate(user ? '/leagues/create' : '/login')}
+                                className="snap-start shrink-0 w-64 h-72 rounded-3xl bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-white/10 backdrop-blur-md flex flex-col items-center justify-center gap-4 cursor-pointer transition-all group"
+                            >
+                                <div className="w-16 h-16 rounded-full border-2 border-dashed border-primary/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors group-hover:scale-110 duration-300">
+                                    <PlusCircle className="w-8 h-8 text-primary group-hover:text-primary-foreground" />
+                                </div>
+                                <div className="text-center">
+                                    <p className="font-bold text-lg text-white tracking-wide uppercase">New League</p>
+                                    {user ? (
+                                        <p className="text-sm text-white/50">Create & invite</p>
+                                    ) : (
+                                        <Button variant="outline" size="sm" className="mt-3 bg-transparent border-primary/50 text-white hover:bg-primary/20 hover:text-white rounded-full text-xs h-8 px-4 transition-colors">
+                                            Sign In to Create
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
-                        ) : (
-                            leagues.map((league) => {
-                                const fillPercentage = Math.min(((league.active_player_count ?? 1) / league.manager_count) * 100, 100);
-                                return (
-                                    <div
-                                        key={league.id}
-                                        onClick={() => navigate(`/${league.id}`)}
-                                        className="snap-start shrink-0 w-64 h-72 rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.08] to-transparent backdrop-blur-md hover:border-primary/60 hover:-translate-y-2 transition-all cursor-pointer flex flex-col p-6 group relative overflow-hidden"
-                                    >
-                                        {/* Colored glow effect on hover */}
-                                        <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors pointer-events-none"></div>
 
-                                        <div className="flex justify-between items-start mb-6 z-10">
-                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-900 border border-white/20 flex items-center justify-center shadow-lg pt-1">
-                                                {/* Placeholder for vibrant icon */}
-                                                <span className="text-2xl font-black italic">{league.name.charAt(0)}</span>
-                                            </div>
-                                            {user?.id === league.league_manager_id && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-white/30 hover:text-red-400 hover:bg-red-400/10 rounded-full"
-                                                    onClick={(e) => handleDeleteLeague(e, league.id)}
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            )}
-                                        </div>
+                            {/* Existing Leagues List */}
+                            {loading ? (
+                                <div className="shrink-0 w-64 h-72 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary/50" />
+                                </div>
+                            ) : (
+                                leagues.map((league) => {
+                                    const fillPercentage = Math.min(((league.active_player_count ?? 1) / league.manager_count) * 100, 100);
+                                    return (
+                                        <div
+                                            key={league.id}
+                                            onClick={() => navigate(`/${league.id}`)}
+                                            className="snap-start shrink-0 w-64 h-72 rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.08] to-transparent backdrop-blur-md hover:border-primary/60 hover:-translate-y-2 transition-all cursor-pointer flex flex-col p-6 group relative overflow-hidden"
+                                        >
+                                            {/* Colored glow effect on hover */}
+                                            <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors pointer-events-none"></div>
 
-                                        <div className="mt-auto space-y-4 z-10">
-                                            <div>
-                                                <h4 className="font-bold text-xl text-white tracking-tight line-clamp-1">{league.name}</h4>
-                                                {league.tournament_name && (
-                                                    <p className="text-xs text-primary font-semibold uppercase tracking-wider mt-1">{league.tournament_name}</p>
+                                            <div className="flex justify-between items-start mb-6 z-10">
+                                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-900 border border-white/20 flex items-center justify-center shadow-lg pt-1">
+                                                    {/* Placeholder for vibrant icon */}
+                                                    <span className="text-2xl font-black italic">{league.name.charAt(0)}</span>
+                                                </div>
+                                                {user?.id === league.league_manager_id && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-white/30 hover:text-red-400 hover:bg-red-400/10 rounded-full"
+                                                        onClick={(e) => handleDeleteLeague(e, league.id)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
                                                 )}
                                             </div>
 
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between text-xs font-bold text-white/80">
-                                                    <span>{league.active_player_count ?? 1}/{league.manager_count} JOINED</span>
-                                                    <span className="text-white/50">{Math.round(fillPercentage)}%</span>
+                                            <div className="mt-auto space-y-4 z-10">
+                                                <div>
+                                                    <h4 className="font-bold text-xl text-white tracking-tight line-clamp-1">{league.name}</h4>
+                                                    {league.tournament_name && (
+                                                        <p className="text-xs text-primary font-semibold uppercase tracking-wider mt-1">{league.tournament_name}</p>
+                                                    )}
                                                 </div>
-                                                <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-gradient-to-r from-primary to-[#b182ff] rounded-full"
-                                                        style={{ width: `${fillPercentage}%` }}
-                                                    ></div>
+
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-xs font-bold text-white/80">
+                                                        <span>{league.active_player_count ?? 1}/{league.manager_count} JOINED</span>
+                                                        <span className="text-white/50">{Math.round(fillPercentage)}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-gradient-to-r from-primary to-[#b182ff] rounded-full"
+                                                            style={{ width: `${fillPercentage}%` }}
+                                                        ></div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </section>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </section>
+                )}
 
                 {/* Section 2: Draft Academy Hero Banner */}
                 <section className="relative overflow-hidden rounded-3xl p-[1px] bg-gradient-to-r from-primary/50 to-secondary/50 shadow-[0_10px_40px_-10px_rgba(139,92,246,0.3)]">

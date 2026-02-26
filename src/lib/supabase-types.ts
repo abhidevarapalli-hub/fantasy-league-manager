@@ -234,6 +234,7 @@ export interface CricketMatch {
   state: string | null;
   // leagueId: string | null; // Removed
   week: number | null;
+  matchState?: string;
 }
 
 export interface PlayerMatchStats {
@@ -275,6 +276,7 @@ export interface PlayerMatchStats {
   // Calculated
   fantasyPoints: number | null;
   leagueId: string | null;
+  isLiveStats?: boolean;
 }
 
 export interface FantasyWeeklySummary {

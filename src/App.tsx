@@ -117,9 +117,7 @@ const AppRoutes = () => {
       <Route path="/leagues/setup" element={
         <ProtectedRoute><ProfileSetup /></ProtectedRoute>
       } />
-      <Route path="/leagues" element={
-        <ProtectedRoute><Leagues /></ProtectedRoute>
-      } />
+      <Route path="/leagues" element={<Leagues />} />
       <Route path="/leagues/create" element={
         <ProtectedRoute><CreateLeague /></ProtectedRoute>
       } />
