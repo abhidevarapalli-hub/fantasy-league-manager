@@ -28,6 +28,7 @@ const createStats = (overrides: Partial<PlayerStats> = {}): PlayerStats => ({
   isImpactPlayer: false,
   isManOfMatch: false,
   teamWon: false,
+  playerRole: undefined,
   ...overrides,
 });
 
@@ -375,6 +376,95 @@ describe('Fantasy Points Calculator', () => {
       expect(result.common.manOfTheMatch).toBe(50);
       // Total should include the MoM bonus
       expect(result.total).toBeGreaterThan(200);
+    });
+
+    it('exempts bowlers from duck penalty', () => {
+      const stats = createStats({
+        runs: 0,
+        ballsFaced: 3,
+        isOut: true,
+        isInPlaying11: true,
+        teamWon: false,
+        playerRole: 'Bowler',
+      });
+      const result = calculateFantasyPoints(stats, DEFAULT_SCORING_RULES);
+
+      // Bowler should NOT get duck penalty
+      expect(result.batting.duckPenalty).toBe(0);
+      // Only common points (playing XI)
+      expect(result.total).toBe(5);
+    });
+
+    it('exempts bowlers from low score penalty', () => {
+      const stats = createStats({
+        runs: 3,
+        ballsFaced: 5,
+        isOut: true,
+        isInPlaying11: true,
+        teamWon: false,
+        playerRole: 'Bowler',
+      });
+      const result = calculateFantasyPoints(stats, DEFAULT_SCORING_RULES);
+
+      // Bowler should NOT get low score penalty
+      expect(result.batting.lowScorePenalty).toBe(0);
+      expect(result.batting.runs).toBe(3);
+    });
+
+    it('applies duck penalty to batsmen', () => {
+      const stats = createStats({
+        runs: 0,
+        ballsFaced: 3,
+        isOut: true,
+        isInPlaying11: true,
+        teamWon: false,
+        playerRole: 'Batsman',
+      });
+      const result = calculateFantasyPoints(stats, DEFAULT_SCORING_RULES);
+
+      expect(result.batting.duckPenalty).toBe(-10);
+    });
+
+    it('applies duck penalty to all-rounders', () => {
+      const stats = createStats({
+        runs: 0,
+        ballsFaced: 3,
+        isOut: true,
+        isInPlaying11: true,
+        teamWon: false,
+        playerRole: 'All Rounder',
+      });
+      const result = calculateFantasyPoints(stats, DEFAULT_SCORING_RULES);
+
+      expect(result.batting.duckPenalty).toBe(-10);
+    });
+
+    it('applies duck penalty to wicket keepers', () => {
+      const stats = createStats({
+        runs: 0,
+        ballsFaced: 3,
+        isOut: true,
+        isInPlaying11: true,
+        teamWon: false,
+        playerRole: 'Wicket Keeper',
+      });
+      const result = calculateFantasyPoints(stats, DEFAULT_SCORING_RULES);
+
+      expect(result.batting.duckPenalty).toBe(-10);
+    });
+
+    it('applies duck penalty when playerRole is undefined (safe default)', () => {
+      const stats = createStats({
+        runs: 0,
+        ballsFaced: 3,
+        isOut: true,
+        isInPlaying11: true,
+        teamWon: false,
+        // playerRole intentionally omitted
+      });
+      const result = calculateFantasyPoints(stats, DEFAULT_SCORING_RULES);
+
+      expect(result.batting.duckPenalty).toBe(-10);
     });
   });
 

@@ -32,6 +32,8 @@ export interface PlayerStats {
   isImpactPlayer: boolean;
   isManOfMatch: boolean;
   teamWon: boolean;
+  // Player role context
+  playerRole?: string; // 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper'
 }
 
 // Detailed breakdown of points
@@ -118,12 +120,15 @@ function calculateBattingPoints(
     }
   }
 
-  // Duck penalty (0 runs and out)
-  const duckPenalty = stats.runs === 0 && stats.isOut ? rules.duckDismissal : 0;
+  // Role-based penalty exemption: bowlers don't get duck/low-score penalties
+  const isBowler = stats.playerRole === 'Bowler';
 
-  // Low score penalty (1-5 runs and out, but not a duck)
+  // Duck penalty (0 runs and out) — exempt bowlers
+  const duckPenalty = stats.runs === 0 && stats.isOut && !isBowler ? rules.duckDismissal : 0;
+
+  // Low score penalty (1-5 runs and out, but not a duck) — exempt bowlers
   const lowScorePenalty =
-    stats.runs > 0 && stats.runs <= 5 && stats.isOut ? rules.lowScoreDismissal : 0;
+    stats.runs > 0 && stats.runs <= 5 && stats.isOut && !isBowler ? rules.lowScoreDismissal : 0;
 
   // Strike rate bonus/penalty
   let strikeRateBonus = 0;
