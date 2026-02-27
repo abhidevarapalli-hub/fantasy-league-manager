@@ -103,7 +103,7 @@ export const useRealtimeGame = (leagueId?: string) => {
           maxBowlers: leagueData.max_bowlers,
           minAllRounders: leagueData.min_all_rounders,
           maxAllRounders: leagueData.max_all_rounders,
-          maxInternational: leagueData.max_international, // Should strictly be 4 but keeping for schema compatibility
+          maxInternational: leagueData.max_international,
           maxFromTeam: leagueData.max_from_team,
         });
       }

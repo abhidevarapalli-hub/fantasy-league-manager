@@ -57,6 +57,11 @@ const CreateLeague = () => {
         setRequireWk(true);
     }, [activeSize]);
 
+    // Tournament Selection (default to IPL)
+    const [selectedTournament, setSelectedTournament] = useState<Tournament>(
+        SUPPORTED_TOURNAMENTS.find(t => t.type === 'league') || SUPPORTED_TOURNAMENTS[0]
+    );
+
     // Validation
     const leagueConfigForValidation: LeagueConfig = {
         managerCount,
@@ -68,16 +73,10 @@ const CreateLeague = () => {
         maxBowlers: 6, // Default
         minAllRounders,
         maxAllRounders: 4, // Default
-        maxInternational: 4,
+        maxInternational: selectedTournament.type === 'international' ? 11 : 4,
         requireWk
     };
     const validationResult = validateLeagueMinimums(leagueConfigForValidation);
-
-
-    // Tournament Selection (default to IPL)
-    const [selectedTournament, setSelectedTournament] = useState<Tournament>(
-        SUPPORTED_TOURNAMENTS.find(t => t.type === 'league') || SUPPORTED_TOURNAMENTS[0]
-    );
 
     // Scoring Rules
     const [scoringRules, setScoringRules] = useState<ScoringRulesType>(DEFAULT_SCORING_RULES);

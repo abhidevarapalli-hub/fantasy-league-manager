@@ -37,8 +37,8 @@ describe('buildOptimalActive11', () => {
             createPlayer('8', 'Bowler'),
             createPlayer('9', 'Bowler'),
             createPlayer('10', 'Batsman'), // Flex
-            createPlayer('11', 'Bowler'), // Flex
-            createPlayer('12', 'All Rounder'), // Bench
+            createPlayer('12', 'All Rounder'), // Flex
+            createPlayer('11', 'Bowler'), // Bench
         ];
 
         const { active, bench } = buildOptimalActive11(players, DEFAULT_CONFIG);

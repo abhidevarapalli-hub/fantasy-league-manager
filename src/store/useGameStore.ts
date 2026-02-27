@@ -3,7 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, Json } from '@/integrations/supabase/types';
 import { Player, Manager, Activity, PlayerTransaction, PlayerMatchStats, CricketMatch } from '@/lib/supabase-types';
-import { DEFAULT_LEAGUE_CONFIG, canAddToActive, buildOptimalActive11 } from '@/lib/roster-validation';
+import { DEFAULT_LEAGUE_CONFIG, canAddToActive, buildOptimalActive11, isRoleCompatible, getActiveRosterSlots, PlayerRole } from '@/lib/roster-validation';
 import { DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
 import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
 import { toast } from 'sonner';
@@ -148,56 +148,119 @@ export const useGameStore = create<GameState>()(
         const rosterCount = manager.activeRoster.length + manager.bench.length;
         if (rosterCount >= ROSTER_CAP && !dropPlayerId) return;
 
-        // Calculate new roster state to determine slot_type
-        let newActiveCount = manager.activeRoster.length;
-        let newBenchCount = manager.bench.length;
+        // Calculate new roster state based on the user's "simple logic"
+        const { currentWeek } = get();
+        const targetWeek = currentWeek + 1;
+
+        let slotType: 'active' | 'bench' = 'bench';
+        let position = 0;
 
         if (dropPlayerId) {
-          if (manager.activeRoster.includes(dropPlayerId)) newActiveCount--;
-          if (manager.bench.includes(dropPlayerId)) newBenchCount--;
-          // Delete from junction table
-          // Drop from all future weeks (currentWeek + 1 onward)
-          const { currentWeek } = get();
-          const { error: deleteErrorResult } = await supabase.from("manager_roster").delete().eq("player_id", dropPlayerId).eq("league_id", currentLeagueId).gte("week", currentWeek + 1);
+          // 1. Determine the slot of the dropped player in targetWeek
+          const { data: droppedEntry } = await supabase
+            .from("manager_roster")
+            .select("slot_type, position")
+            .eq("player_id", dropPlayerId)
+            .eq("league_id", currentLeagueId)
+            .eq("week", targetWeek)
+            .maybeSingle();
+
+          console.log(`[AddFreeAgent] 🔍 Dropped player (${dropPlayerId}) entry in week ${targetWeek}:`, droppedEntry);
+
+          if (droppedEntry) {
+            if (droppedEntry.slot_type === 'bench') {
+              slotType = 'bench';
+              position = manager.bench.length;
+            } else {
+              // Dropped player was active. Check compatibility.
+              // Fetch full roster (active + bench) for targetWeek to accurately determine roles
+              const { data: weekRoster } = await supabase
+                .from("manager_roster")
+                .select("player_id, slot_type, position")
+                .eq("manager_id", managerId)
+                .eq("league_id", currentLeagueId)
+                .eq("week", targetWeek);
+
+              const activeEntries = (weekRoster || [])
+                .filter(e => e.slot_type === 'active')
+                .sort((a, b) => a.position - b.position);
+
+              const activePlayers = activeEntries
+                .map(r => players.find(p => p.id === r.player_id))
+                .filter(Boolean) as Player[];
+
+              // Important: We need the roles as they were assigned in that specific week.
+              // getActiveRosterSlots rebuilds the slots from the player list based on priority.
+              const slots = getActiveRosterSlots(activePlayers, config);
+
+              // 2. Find which slot the dropped player was actually occupying in this layout
+              const occupiedSlotIdx = slots.findIndex(s => s.player?.id === dropPlayerId);
+              const targetSlot = occupiedSlotIdx !== -1 ? slots[occupiedSlotIdx] : null;
+              const isCompatible = targetSlot && isRoleCompatible(player.role as PlayerRole, targetSlot.role);
+
+              console.log(`[AddFreeAgent] 🎯 Dropped Player: ${dropPlayer?.name}, Found at Slot Index: ${occupiedSlotIdx}, Slot Role: ${targetSlot?.role}, New Player Role: ${player.role}, Compatible: ${isCompatible}`);
+
+              if (isCompatible) {
+                slotType = 'active';
+                // Inherit the exact DB position of the dropped player to replace them in the UI
+                position = droppedEntry.position;
+              } else {
+                slotType = 'bench';
+                position = manager.bench.length;
+              }
+            }
+          }
+
+          // Delete from junction table for all future weeks
+          const { error: deleteErrorResult } = await supabase
+            .from("manager_roster")
+            .delete()
+            .eq("player_id", dropPlayerId)
+            .eq("league_id", currentLeagueId)
+            .gte("week", targetWeek);
+
           if (deleteErrorResult) {
-            toast.error(`Add/Drop: Error dropping player: ${deleteErrorResult.message}`);
+            toast.error(`Error dropping player: ${deleteErrorResult.message}`);
+            return;
+          }
+        } else {
+          // No drop player, append to available space
+          if (manager.activeRoster.length < config.activeSize) {
+            slotType = 'active';
+            position = manager.activeRoster.length;
+          } else {
+            slotType = 'bench';
+            position = manager.bench.length;
           }
         }
 
-        const activeNotFull = newActiveCount < config.activeSize;
-        const benchNotFull = newBenchCount < config.benchSize;
-        let slotType: 'active' | 'bench';
-
-        if (activeNotFull) {
-          slotType = 'active';
-        } else if (benchNotFull) {
-          slotType = 'bench';
-        } else {
-          toast.error(`Cannot add ${player.name} - roster is full`);
-          return;
-        }
-
-        // Insert into junction table for all future weeks
-        const { currentWeek: cw } = get();
+        // Insert added player for all future weeks
         const MAX_WEEK = 7;
         const insertRows = [];
-        for (let w = cw + 1; w <= MAX_WEEK; w++) {
+        for (let w = targetWeek; w <= MAX_WEEK; w++) {
           insertRows.push({
             manager_id: managerId,
             player_id: playerId,
             league_id: currentLeagueId,
             slot_type: slotType,
-            position: slotType === 'active' ? newActiveCount : newBenchCount,
+            position: position,
             week: w,
+            // Preserve captain/VC status? Usually newly added players are not C/VC.
+            is_captain: false,
+            is_vice_captain: false,
           });
         }
-        const { error } = insertRows.length > 0
-          ? await supabase.from("manager_roster").insert(insertRows)
-          : { error: null };
 
+        if (insertRows.length > 0) {
+          const { error: insertError } = await supabase.from("manager_roster").insert(insertRows);
+          if (insertError) {
+            toast.error(`Error adding player: ${insertError.message}`);
+            return;
+          }
+        }
 
-        // Re-optimize rosters after add/drop
-        await get().finalizeRosters(currentLeagueId);
+        // Re-fetch data to sync store state
+        await get().fetchAllData(currentLeagueId);
 
         toast.success(dropPlayerId ? 'Player added and dropped successfully' : 'Player added successfully');
         const playerTransactions: PlayerTransaction[] = [];
@@ -278,6 +341,8 @@ export const useGameStore = create<GameState>()(
           players: playersTx as unknown as Json,
           league_id: currentLeagueId,
         });
+
+        await get().fetchAllData(currentLeagueId);
 
         toast.success(`Dropped ${player.name}`);
       },
@@ -905,12 +970,34 @@ export const useGameStore = create<GameState>()(
           // 3. Process all managers in parallel
           const processingPromises = managersData.map(async (manager) => {
             // Get all unique players this manager has across all weeks
-            const baselineWeek = Math.max(1, currentWeek);
-            const playerIds = Array.from(new Set(
+            let playerIds = Array.from(new Set(
               (allRosterEntries as Tables<'manager_roster'>[])
-                .filter(e => e.manager_id === manager.id && (e.week === baselineWeek || e.week === 1))
+                .filter(e => e.manager_id === manager.id && (e.week === Math.max(1, currentWeek) || e.week === 1))
                 .map(e => e.player_id)
             ));
+
+            // FALLBACK: If roster is empty (e.g. just finished draft), use draft_picks
+            if (playerIds.length === 0) {
+              playerIds = draftPicks
+                .filter(dp => dp.managerId === manager.id)
+                .map(dp => dp.playerId);
+
+              console.log(`[useGameStore] 📥 Using ${playerIds.length} draft picks for ${manager.team_name} fallback (Draft Order priority)`);
+            } else {
+              // Even if not a fallback, sort by draft pick order to ensure consistent tie-breaking based on pick sequence
+              const draftOrderMap = new Map<string, number>();
+              draftPicks
+                .filter(dp => dp.managerId === manager.id)
+                .forEach((dp, index) => {
+                  draftOrderMap.set(dp.playerId, index);
+                });
+
+              playerIds.sort((a, b) => {
+                const orderA = draftOrderMap.get(a) ?? 999;
+                const orderB = draftOrderMap.get(b) ?? 999;
+                return orderA - orderB;
+              });
+            }
 
             const managerPlayers = playerIds
               .map(id => players.find(p => p.id === id))

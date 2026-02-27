@@ -1,7 +1,7 @@
 import { Plus, Minus, ArrowUp, ArrowDown, Plane, ArrowUpDown, Repeat, Crown, Shield } from 'lucide-react';
 import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { cn } from '@/lib/utils';
-import { Player } from '@/lib/supabase-types';
+import { Player, CricketMatch } from '@/lib/supabase-types';
 import { Button } from '@/components/ui/button';
 import { getTeamColors } from '@/lib/team-colors';
 
@@ -21,6 +21,9 @@ interface PlayerCardProps {
   showActions?: boolean;
   variant?: 'compact' | 'full';
   captainBadge?: 'C' | 'VC' | null;
+  points?: number;
+  hasStats?: boolean;
+  matches?: CricketMatch[];
 }
 
 // Team colors are now centralized in src/lib/team-colors.ts
@@ -48,6 +51,9 @@ export const PlayerCard = ({
   showActions = true,
   variant = 'full',
   captainBadge,
+  points,
+  hasStats,
+  matches,
   managerName
 }: PlayerCardProps & { managerName?: string }) => {
   const handleCardClick = (e: React.MouseEvent) => {
@@ -148,7 +154,42 @@ export const PlayerCard = ({
             teamColors.text
           )}>{player.role}</span>
         </div>
+
+        {/* Match Scores / Schedule */}
+        {matches && matches.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-white/10">
+            {matches.map((m, idx) => (
+              <div
+                key={idx}
+                className={cn(
+                  "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter transition-all",
+                  "bg-black/30 border border-white/5",
+                  teamColors.text
+                )}
+                title={m.matchState}
+              >
+                vs {m.team1.shortName === player.team ? m.team2.shortName : m.team1.shortName}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Points Display */}
+      {(points !== undefined || hasStats) && (
+        <div className="flex flex-col items-end shrink-0 z-10 px-1">
+          <p className={cn(
+            "text-base font-black leading-none",
+            teamColors.text
+          )}>
+            {(points || 0).toFixed(1)}
+          </p>
+          <p className={cn(
+            "text-[8px] font-bold tracking-widest opacity-60 uppercase",
+            teamColors.text
+          )}>pts</p>
+        </div>
+      )}
 
       {/* Ownership / Action Area */}
       <div className="flex items-center gap-2 z-10">

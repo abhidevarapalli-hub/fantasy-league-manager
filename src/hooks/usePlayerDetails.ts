@@ -4,6 +4,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Tables } from '@/integrations/supabase/types';
 import {
   fetchPlayerInfo,
@@ -409,6 +410,25 @@ export interface PlayerMatchPerformance {
 }
 
 /**
+ * Normalize team codes for consistent comparison
+ */
+function normalizeTeamCode(code: string | undefined): string {
+  if (!code) return '';
+  const c = code.toUpperCase().trim();
+  const map: Record<string, string> = {
+    'US': 'USA',
+    'RSA': 'SA',
+    'OMAN': 'OMN',
+    'CAN': 'CAN', // Canada
+    'NED': 'NED', // Netherlands
+    'IRE': 'IRE', // Ireland
+    'SCO': 'SCO', // Scotland
+    'PNG': 'PNG', // Papua New Guinea
+  };
+  return map[c] || c;
+}
+
+/**
  * Hook to get player's schedule (upcoming + past matches) for a series
  * Filters matches by player's team
  */
@@ -419,40 +439,62 @@ export function usePlayerSchedule(
   const { data: seriesMatches, isLoading, error } = useSeriesMatches(seriesId);
 
   // Filter matches for the player's team and sort by date
-  const playerMatches = seriesMatches
-    ?.filter(match => {
-      const { matchInfo } = match;
-      return (
-        matchInfo.team1.teamSName === playerTeamShort ||
-        matchInfo.team2.teamSName === playerTeamShort
-      );
-    })
-    .map(match => {
-      const { matchInfo, matchScore } = match;
-      const isTeam1 = matchInfo.team1.teamSName === playerTeamShort;
-      const opponent = isTeam1 ? matchInfo.team2.teamName : matchInfo.team1.teamName;
-      const opponentShort = isTeam1 ? matchInfo.team2.teamSName : matchInfo.team1.teamSName;
-      const matchDate = new Date(parseInt(matchInfo.startDate, 10));
-      // A match is upcoming only if the DB state says so AND the match hasn't started yet.
-      // This prevents stale DB state from showing a live match as "Upcoming".
-      const isUpcoming = (matchInfo.state === 'Upcoming' || matchInfo.state === 'Preview') && matchDate > new Date();
+  const playerMatches = useMemo(() => {
+    if (!seriesMatches || !playerTeamShort) return [];
 
-      return {
-        matchId: matchInfo.matchId,
-        matchDate,
-        opponent,
-        opponentShort,
-        venue: matchInfo.venueInfo?.ground,
-        result: matchInfo.status,
-        isUpcoming,
-        matchState: matchInfo.state,
-        week: matchInfo.week,
-        // Score summary for completed matches
-        teamScore: isTeam1 ? matchScore?.team1Score : matchScore?.team2Score,
-        opponentScore: isTeam1 ? matchScore?.team2Score : matchScore?.team1Score,
-      };
-    })
-    .sort((a, b) => a.matchDate.getTime() - b.matchDate.getTime()) || [];
+    const normalizedPlayerTeam = normalizeTeamCode(playerTeamShort);
+
+    console.log(`[usePlayerSchedule] 🔍 Filtering matches for ${playerTeamShort} (Normalized: ${normalizedPlayerTeam})`);
+
+    const filtered = seriesMatches
+      ?.filter(match => {
+        const { matchInfo } = match;
+        const t1Normalized = normalizeTeamCode(matchInfo.team1.teamSName);
+        const t2Normalized = normalizeTeamCode(matchInfo.team2.teamSName);
+
+        const isMatch = (
+          t1Normalized === normalizedPlayerTeam ||
+          t2Normalized === normalizedPlayerTeam
+        );
+
+        if (isMatch) {
+          console.log(`[usePlayerSchedule] ✅ Match Found: ${matchInfo.team1.teamSName} vs ${matchInfo.team2.teamSName} (ID: ${matchInfo.matchId})`);
+        }
+
+        return isMatch;
+      });
+
+    console.log(`[usePlayerSchedule] 📊 Found ${filtered?.length || 0} matches for ${playerTeamShort}`);
+
+    return filtered
+      ?.map(match => {
+        const { matchInfo, matchScore } = match;
+        const t1Normalized = normalizeTeamCode(matchInfo.team1.teamSName);
+        const isTeam1 = t1Normalized === normalizedPlayerTeam;
+        const opponent = isTeam1 ? matchInfo.team2.teamName : matchInfo.team1.teamName;
+        const opponentShort = isTeam1 ? matchInfo.team2.teamSName : matchInfo.team1.teamSName;
+        const matchDate = new Date(parseInt(matchInfo.startDate, 10));
+        // A match is upcoming only if the DB state says so AND the match hasn't started yet.
+        // This prevents stale DB state from showing a live match as "Upcoming".
+        const isUpcoming = (matchInfo.state === 'Upcoming' || matchInfo.state === 'Preview') && matchDate > new Date();
+
+        return {
+          matchId: matchInfo.matchId,
+          matchDate,
+          opponent,
+          opponentShort,
+          venue: matchInfo.venueInfo?.ground,
+          result: matchInfo.status,
+          isUpcoming,
+          matchState: matchInfo.state,
+          week: matchInfo.week,
+          // Score summary for completed matches
+          teamScore: isTeam1 ? matchScore?.team1Score : matchScore?.team2Score,
+          opponentScore: isTeam1 ? matchScore?.team2Score : matchScore?.team1Score,
+        };
+      })
+      .sort((a, b) => a.matchDate.getTime() - b.matchDate.getTime()) || [];
+  }, [seriesMatches, playerTeamShort]);
 
   return {
     data: playerMatches,

@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
 import { calculateFantasyPoints } from '@/lib/fantasy-points-calculator';
-import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
 import { TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
 import { useGameStore } from '@/store/useGameStore';
 import { ManagerRosterEntry } from '@/store/gameStore/types';
@@ -40,6 +39,7 @@ export function useMatchupData(
     const weeklyStats = useGameStore(state => state.weeklyStats);
     const weeklyMatches = useGameStore(state => state.weeklyMatches);
     const weeklyRosters = useGameStore(state => state.weeklyRosters);
+    const scoringRules = useGameStore(state => state.scoringRules);
     const fetchWeeklyData = useGameStore(state => state.fetchWeeklyData);
     const [fetching, setFetching] = useState(false);
 
@@ -110,7 +110,7 @@ export function useMatchupData(
                             catches: stat.catches || 0,
                             stumpings: stat.stumpings || 0,
                             runOuts: stat.runOuts || 0,
-                        }, DEFAULT_SCORING_RULES).total;
+                        }, scoringRules).total;
 
                         return { ...stat, fantasyPoints: ptsRaw };
                     });
@@ -158,7 +158,7 @@ export function useMatchupData(
             homeScore,
             awayScore,
         };
-    }, [week, homeManager, awayManager, players, leagueId, weeklyStats, weeklyMatches, weeklyRosters]);
+    }, [week, homeManager, awayManager, players, leagueId, weeklyStats, weeklyMatches, weeklyRosters, scoringRules]);
 
     const isLoading = fetching || !data;
 

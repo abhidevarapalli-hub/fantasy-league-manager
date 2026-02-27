@@ -17,7 +17,6 @@ import { getTournamentById, SUPPORTED_TOURNAMENTS } from '@/lib/tournaments';
 import { usePlayerSchedule, useExtendedPlayer, usePlayerMatchStats, PlayerMatchPerformance } from '@/hooks/usePlayerDetails';
 import { getPlayerAvatarUrl, getPlayerTeamForTournament, TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
 import { getTeamColors } from '@/lib/team-colors';
-import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { DraftTimer, DraftTimerProps } from '@/components/DraftTimer';
@@ -144,12 +143,14 @@ export function PlayerDetailDialog({
 
     const playerTeamShort = useMemo(() => {
         if (!player) return undefined;
-        return getPlayerTeamForTournament(
+        const resolved = getPlayerTeamForTournament(
             player.team,
             player.isInternational,
             tournamentType,
             undefined
         );
+        console.log(`[PlayerDetailDialog] 🏢 Resolved playerTeamShort for ${player.name}:`, resolved);
+        return resolved;
     }, [player, tournamentType]);
 
     const { data: playerSchedule } = usePlayerSchedule(
@@ -157,7 +158,7 @@ export function PlayerDetailDialog({
         playerTeamShort
     );
 
-    const { currentLeagueId, draftState, draftPicks } = useGameStore();
+    const { currentLeagueId, draftState, draftPicks, scoringRules } = useGameStore();
     const { data: playerStatsMap } = usePlayerMatchStats(player?.id, currentLeagueId);
 
     const teamColors = getTeamColors(player?.team || 'OTHER');
@@ -252,11 +253,17 @@ export function PlayerDetailDialog({
 
     // Combine schedule with actual stats from player_match_stats DB table
     const unifiedMatches: UnifiedMatchData[] = useMemo(() => {
+        if (!player) return [];
         const schedule = playerSchedule && playerSchedule.length > 0 ? playerSchedule : matchStats;
+        console.log(`[PlayerDetailDialog] 🔎 UnifiedMatches processing for ${player?.name}:`, {
+            scheduleCount: schedule.length,
+            playerStatsMapSize: playerStatsMap?.size || 0
+        });
+
         if (!playerStatsMap || playerStatsMap.size === 0) return schedule as UnifiedMatchData[];
 
         // Merge DB stats into each schedule entry by cricbuzz_match_id
-        return schedule.map(match => {
+        const merged = schedule.map(match => {
             const dbStats = playerStatsMap.get(match.matchId);
             if (!dbStats) return match;
             return {
@@ -274,7 +281,9 @@ export function PlayerDetailDialog({
                 isLiveStats: dbStats.isLiveStats || false
             };
         });
-    }, [playerSchedule, matchStats, playerStatsMap]);
+        console.log(`[PlayerDetailDialog] ✅ UnifiedMatches Result for ${player?.name}:`, merged);
+        return merged;
+    }, [playerSchedule, matchStats, playerStatsMap, player]);
 
     // Local state for the selected match to show breakdown
     const [selectedMatch, setSelectedMatch] = React.useState<UnifiedMatchData | null>(null);
@@ -295,8 +304,8 @@ export function PlayerDetailDialog({
         // Ensure we pass a complete rules object.
         // If a specific league has different rules, they should be pulled and passed here.
         // For now, defaulting to DEFAULT_SCORING_RULES.
-        return calculateFantasyPoints(getPlayerStatsForCalc(selectedMatch), DEFAULT_SCORING_RULES);
-    }, [selectedMatch]);
+        return calculateFantasyPoints(getPlayerStatsForCalc(selectedMatch), scoringRules);
+    }, [selectedMatch, scoringRules]);
 
     if (!player) return null;
 
@@ -681,7 +690,7 @@ export function PlayerDetailDialog({
 
                                                 // Use DB fantasy_points if available, otherwise calculate
                                                 const fpts = hasStats
-                                                    ? (matchItem.fantasyPoints ?? calculateFantasyPoints(getPlayerStatsForCalc(stats), DEFAULT_SCORING_RULES).total)
+                                                    ? (matchItem.fantasyPoints ?? calculateFantasyPoints(getPlayerStatsForCalc(stats), scoringRules).total)
                                                     : 0;
 
                                                 const matchDate = matchItem.matchDate;

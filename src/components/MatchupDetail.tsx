@@ -297,7 +297,7 @@ const MatchupRow = ({
             </div>
 
             {/* Center: Position Badge */}
-            <div className="w-[36px] shrink-0 flex items-center justify-center z-10 px-0.5 sm:px-1">
+            <div className="w-[44px] shrink-0 flex items-center justify-center z-10 px-0.5 sm:px-1">
                 <div className={cn(
                     "px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter border shadow-sm w-full text-center truncate",
                     displayRoleLabel === 'BAT' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
@@ -306,6 +306,7 @@ const MatchupRow = ({
                     displayRoleLabel === 'WK' && "bg-green-500/10 text-green-500 border-green-500/20",
                     displayRoleLabel === 'FLEX' && "bg-amber-500/10 text-amber-500 border-amber-500/20",
                     displayRoleLabel === 'UNSET' && "bg-muted text-muted-foreground border-border",
+                    displayRoleLabel === 'BNCH' && "bg-muted text-muted-foreground border-border", // Added BNCH styling
                 )}>
                     {displayRoleLabel}
                 </div>
@@ -382,8 +383,7 @@ const HeadToHeadSection = ({
         for (let i = 0; i < maxCount; i++) {
             let label = 'UNSET';
             if (sortedHome[i] || sortedAway[i]) {
-                const r = sortedHome[i]?.player.role || sortedAway[i]?.player.role;
-                label = r === 'Batsman' ? 'BAT' : r === 'Bowler' ? 'BWL' : r === 'All Rounder' ? 'AR' : r === 'Wicket Keeper' ? 'WK' : 'UNSET';
+                label = 'BNCH';
             }
             rows.push({
                 home: sortedHome[i] || null,
@@ -408,7 +408,7 @@ const HeadToHeadSection = ({
                         key={i}
                         homePlayer={row.home || undefined}
                         awayPlayer={row.away || undefined}
-                        assignedRoleLabel={useSlots ? row.label : undefined}
+                        assignedRoleLabel={row.label}
                         onPlayerClick={onPlayerClick}
                     />
                 ))}

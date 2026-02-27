@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowUpDown, Trophy, Lock, Info, Plus, Shield } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
@@ -15,6 +15,7 @@ import {
   canSwapInActive,
   canAddToActive,
   canRemoveFromActive,
+  isRoleCompatible,
   PlayerRole,
   SlotRequirement,
 } from '@/lib/roster-validation';
@@ -22,6 +23,8 @@ import {
 import { Player } from '@/lib/supabase-types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { calculateFantasyPoints } from '@/lib/fantasy-points-calculator';
+import { TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
 import {
   Dialog,
   DialogContent,
@@ -63,22 +66,36 @@ const TeamView = () => {
   const [slotToFill, setSlotToFill] = useState<SlotRequirement | null>(null);
   const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
 
+  // Roster fetching hooks
+  const fetchRosterForWeek = useGameStore(state => state.fetchRosterForWeek);
+  const currentLeagueId = useGameStore(state => state.currentLeagueId);
+  const weeklyStats = useGameStore(state => state.weeklyStats);
+  const weeklyMatches = useGameStore(state => state.weeklyMatches);
+  const scoringRules = useGameStore(state => state.scoringRules);
+  const fetchWeeklyData = useGameStore(state => state.fetchWeeklyData);
+
   // Compute if team is locked (current week is the last week)
   const lastWeek = useMemo(() => {
     const weeks = schedule.map(m => m.week);
     return weeks.length > 0 ? Math.max(...weeks) : 7;
   }, [schedule]);
 
+  // Check if current user can edit this team
+  const canEditBase = canEditTeam(teamId || '');
   const editingWeek = currentWeek + 1;
   const isTeamLocked = currentWeek >= lastWeek;
+  const isEditableWeek = selectedRosterWeek === editingWeek;
+  const canEdit = canEditBase && !isTeamLocked && isEditableWeek;
 
   const manager = managers.find(m => m.id === teamId);
 
-  // Check if current user can edit this team (also respects team lock)
-  const canEditBase = canEditTeam(teamId || '');
-  const canEdit = canEditBase && !isTeamLocked;
+  const handleWeekChange = (week: number) => {
+    if (currentLeagueId) {
+      fetchRosterForWeek(currentLeagueId, week);
+    }
+  };
 
-  // Calculate standings position
+  // Standings position calc
   const standingsPosition = useMemo(() => {
     if (!manager) return 0;
     const sortedManagers = [...managers].sort((a, b) => {
@@ -87,6 +104,13 @@ const TeamView = () => {
     });
     return sortedManagers.findIndex(m => m.id === manager.id) + 1;
   }, [managers, manager]);
+
+  // Ensure weekly data is fetched
+  useEffect(() => {
+    if (currentLeagueId && selectedRosterWeek) {
+      fetchWeeklyData(currentLeagueId, selectedRosterWeek);
+    }
+  }, [currentLeagueId, selectedRosterWeek, fetchWeeklyData]);
 
   if (!manager) {
     return (
@@ -112,6 +136,65 @@ const TeamView = () => {
   const slots = getActiveRosterSlots(activePlayers, config);
   const internationalCount = activePlayers.filter(p => p.isInternational).length;
   const sortedBench = sortPlayersByRole(benchPlayers);
+
+  // Player match/stats helper
+  const getPlayerMatchInfo = (player: Player) => {
+    const statsData = weeklyStats[selectedRosterWeek] || [];
+    const matchesData = weeklyMatches[selectedRosterWeek] || [];
+
+    const playerStats = statsData.filter(s => s.playerId === player.id);
+
+    // Map stats with on-the-fly point calculation for consistency and robustness
+    const statsWithPoints = playerStats.map(stat => {
+      const ptsRaw = calculateFantasyPoints({
+        runs: stat.runs || 0,
+        ballsFaced: stat.ballsFaced || 0,
+        fours: stat.fours || 0,
+        sixes: stat.sixes || 0,
+        isOut: stat.isOut,
+        isInPlaying11: stat.isInPlaying11,
+        isImpactPlayer: stat.isImpactPlayer,
+        isManOfMatch: stat.isManOfMatch,
+        teamWon: stat.teamWon,
+        wickets: stat.wickets || 0,
+        overs: stat.overs || 0,
+        maidens: stat.maidens || 0,
+        runsConceded: stat.runsConceded || 0,
+        dots: stat.dots || 0,
+        wides: stat.wides || 0,
+        noBalls: stat.noBalls || 0,
+        lbwBowledCount: stat.lbwBowledCount || 0,
+        catches: stat.catches || 0,
+        stumpings: stat.stumpings || 0,
+        runOuts: stat.runOuts || 0,
+      }, scoringRules).total;
+
+      return { ...stat, fantasyPoints: ptsRaw };
+    });
+
+    const totalPointsRaw = statsWithPoints.reduce((sum, s) => sum + (s.fantasyPoints || 0), 0);
+    const isCaptain = manager?.captainId === player.id;
+    const isViceCaptain = manager?.viceCaptainId === player.id;
+    const totalPoints = isCaptain ? totalPointsRaw * 2 : isViceCaptain ? totalPointsRaw * 1.5 : totalPointsRaw;
+
+    // Robust match filtering using team short codes and country mappings
+    const getCountry = (t: string) => TEAM_SHORT_TO_COUNTRY[t] || t;
+    const pCountry = getCountry(player.team);
+
+    const playerMatches = matchesData.filter(m =>
+      getCountry(m.team1.name || '') === pCountry ||
+      getCountry(m.team1.shortName || '') === pCountry ||
+      getCountry(m.team2.name || '') === pCountry ||
+      getCountry(m.team2.shortName || '') === pCountry ||
+      statsWithPoints.some(s => s.matchId === m.id)
+    );
+
+    return {
+      matches: playerMatches,
+      points: totalPoints,
+      hasStats: playerStats.length > 0
+    };
+  };
 
 
   const handleMoveToActive = async (playerId: string) => {
@@ -160,22 +243,29 @@ const TeamView = () => {
   const handleSwap = async (targetPlayer: Player) => {
     if (!playerToSwap || !teamId) return;
 
-    // Validate the swap
+    // Determine the target slot and its role
+    const activeSlots = getActiveRosterSlots(activePlayers, config);
+    const targetSlot = activeSlots.find(s => s.player?.id === targetPlayer.id);
+    const targetSlotRole = targetSlot?.role || 'Any Position';
+
     let swapValidation;
     if (playerToSwap.from === 'bench') {
       if (targetPlayer.id === playerToSwap.player.id) {
-        // Filling an empty slot
+        // Filling an empty slot (targetPlayer is own dummy)
+        // Note: In this case, targetSlot is found by dummy ID or similar? 
+        // Actually, for empty slots, UI passes something else or we get it from context.
+        // Let's ensure handleSwap receives the slot role if possible.
         swapValidation = canAddToActive(activePlayers, playerToSwap.player, config);
       } else {
         // Replacing an active player
-        swapValidation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer, targetPlayer.role, config);
+        swapValidation = canSwapInActive(activePlayers, playerToSwap.player, targetPlayer, targetSlotRole, config);
       }
     } else if (targetPlayer.id === 'bench-target') {
       // Moving active player to bench
       swapValidation = canRemoveFromActive(activePlayers, playerToSwap.player);
     } else {
       // Intra-active swap
-      swapValidation = canSwapInActive(activePlayers, targetPlayer, playerToSwap.player, playerToSwap.player.role, config);
+      swapValidation = canSwapInActive(activePlayers, targetPlayer, playerToSwap.player, targetSlotRole, config);
     }
 
     if (!swapValidation.isValid) {
@@ -240,12 +330,50 @@ const TeamView = () => {
 
       <div className="px-4 py-4 space-y-6">
 
+        {/* Week Selector */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Trophy className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Tournament Week</h3>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Select week to view roster</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {Array.from({ length: 7 }, (_, i) => i + 1).map((w) => (
+              <button
+                key={w}
+                onClick={() => handleWeekChange(w)}
+                className={cn(
+                  "w-10 h-10 rounded-lg text-sm font-bold transition-all border shrink-0",
+                  selectedRosterWeek === w
+                    ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-110 z-10"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/30 hover:bg-primary/5"
+                )}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Week & Lock Indicator */}
         {isTeamLocked ? (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
             <Lock className="w-4 h-4 text-destructive" />
             <p className="text-sm font-medium text-destructive">
               Team is locked — the season is in its final week (Week {currentWeek})
+            </p>
+          </div>
+        ) : !isEditableWeek ? (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+            <Info className="w-4 h-4 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Viewing <strong>Week {selectedRosterWeek}</strong> roster.
+              {selectedRosterWeek <= currentWeek ? " This week is completed." : ` Editing is only available for Week ${editingWeek}.`}
             </p>
           </div>
         ) : (
@@ -266,7 +394,13 @@ const TeamView = () => {
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
             <Lock className="w-4 h-4 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              You can view this team but cannot make changes
+              {selectedRosterWeek === currentWeek ? (
+                <>This week is <strong>ongoing</strong> and the roster is <strong>locked</strong></>
+              ) : selectedRosterWeek < currentWeek ? (
+                <>Viewing <strong>historical data</strong> for Week {selectedRosterWeek}</>
+              ) : (
+                <>You can view this team but cannot make changes</>
+              )}
             </p>
           </div>
         )}
@@ -321,119 +455,83 @@ const TeamView = () => {
           </div>
 
           <div className="space-y-2">
-            {/* We want to render exactly 11 slots in a specific order: WK, 3 BAT, 2 AR, 3 BWL, 2 FLEX */}
-            {(() => {
-              // Create a copy of active players to map to slots
-              const unassigned = [...activePlayers];
-
-              const pullPlayer = (roles: string[]) => {
-                const idx = unassigned.findIndex(p => roles.includes(p.role));
-                if (idx !== -1) return unassigned.splice(idx, 1)[0] || null;
-                return null;
-              };
-
-              const assignedSlots: { roleLabel: string, player: Player | null, originalSlotData?: SlotRequirement }[] = [];
-              assignedSlots.push({ roleLabel: 'WK', player: pullPlayer(['Wicket Keeper']) });
-              for (let i = 0; i < 3; i++) assignedSlots.push({ roleLabel: 'BAT', player: pullPlayer(['Batsman', 'Wicket Keeper']) });
-              for (let i = 0; i < 2; i++) assignedSlots.push({ roleLabel: 'AR', player: pullPlayer(['All Rounder']) });
-              for (let i = 0; i < 3; i++) assignedSlots.push({ roleLabel: 'BWL', player: pullPlayer(['Bowler']) });
-
-              const remainingFlexCount = 11 - assignedSlots.length;
-              for (let i = 0; i < remainingFlexCount; i++) {
-                assignedSlots.push({ roleLabel: 'FLEX', player: unassigned.length > 0 ? unassigned.shift()! : null });
-              }
-
-              // We also need to map these visual slots back to the validation 'slots' 
-              // so the 'setSlotToFill' dialg works correctly with `SlotRequirement` data
-              const mappedSlots = assignedSlots.map(visualSlot => {
-                // Find a matching requirement from the `roster-validation.ts` slots
-                let correspondingReq = slots.find(s => !s.filled && (
-                  (visualSlot.roleLabel === 'WK' && s.role === 'Wicket Keeper') ||
-                  (visualSlot.roleLabel === 'BAT' && ['Batsman', 'WK/BAT'].includes(s.role)) ||
-                  (visualSlot.roleLabel === 'AR' && ['All Rounder', 'AR/BWL'].includes(s.role)) ||
-                  (visualSlot.roleLabel === 'BWL' && s.role === 'Bowler') ||
-                  (visualSlot.roleLabel === 'FLEX' && s.role === 'Any Position')
-                ));
-
-                // fallback to Flex if specific role requirement is not found.
-                if (!correspondingReq && !visualSlot.player) {
-                  correspondingReq = slots.find(s => !s.filled && s.role === 'Any Position');
-                }
-
-                return { ...visualSlot, originalSlotData: correspondingReq };
-              });
-
-              return mappedSlots.map((slot, index) => (
-                slot.player ? (
-                  <div key={slot.player.id} className="relative flex items-center">
-                    <div className="w-12 shrink-0 flex justify-center">
-                      <span className={cn(
-                        "text-[10px] font-bold uppercase tracking-tight",
-                        slot.roleLabel === 'BAT' ? "text-blue-500" :
-                          slot.roleLabel === 'BWL' ? "text-red-500" :
-                            slot.roleLabel === 'AR' ? "text-purple-500" :
-                              slot.roleLabel === 'WK' ? "text-green-500" :
-                                "text-amber-500"
-                      )}>
-                        {slot.roleLabel}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <PlayerCard
-                        player={slot.player}
-                        isOwned
-                        captainBadge={
-                          manager.captainId === slot.player.id ? 'C'
-                            : manager.viceCaptainId === slot.player.id ? 'VC'
-                              : null
-                        }
-                        onSetCaptain={canEdit && manager.captainId !== slot.player.id ? () => handleSetCaptain(slot.player!.id) : undefined}
-                        onSetViceCaptain={canEdit && manager.viceCaptainId !== slot.player.id ? () => handleSetViceCaptain(slot.player!.id) : undefined}
-                        onSwap={canEdit && benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
-                        onClick={() => setDetailPlayer(slot.player!)}
-                      />
-                    </div>
+            {slots.map((slot, index) => (
+              slot.player ? (
+                <div key={slot.player.id} className="relative flex items-center">
+                  <div className="w-12 shrink-0 flex justify-center">
+                    <span className={cn(
+                      "text-[10px] font-bold uppercase tracking-tight",
+                      slot.role === 'Batsman' ? "text-blue-500" :
+                        slot.role === 'Bowler' ? "text-red-500" :
+                          slot.role === 'All Rounder' ? "text-purple-500" :
+                            slot.role === 'Wicket Keeper' ? "text-green-500" :
+                              "text-amber-500"
+                    )}>
+                      {slot.role === 'Wicket Keeper' ? 'WK' :
+                        slot.role === 'Batsman' ? 'BAT' :
+                          slot.role === 'All Rounder' ? 'AR' :
+                            slot.role === 'Bowler' ? 'BWL' : 'FLEX'}
+                    </span>
                   </div>
-                ) : (
-                  <div key={`empty-${index}`} className="relative flex items-center">
-                    <div className="w-12 shrink-0 flex justify-center">
-                      <span className={cn(
-                        "text-[10px] font-bold uppercase tracking-tight opacity-50",
-                        slot.roleLabel === 'BAT' ? "text-blue-500" :
-                          slot.roleLabel === 'BWL' ? "text-red-500" :
-                            slot.roleLabel === 'AR' ? "text-purple-500" :
-                              slot.roleLabel === 'WK' ? "text-green-500" :
-                                "text-amber-500"
-                      )}>
-                        {slot.roleLabel}
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={canEdit && slot.originalSlotData ? () => setSlotToFill(slot.originalSlotData!) : undefined}
-                      className={cn(
-                        "flex-1 p-[14px] rounded-xl border border-dashed border-border bg-muted/10 flex items-center gap-3 transition-all text-left group",
-                        canEdit && slot.originalSlotData && "hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-10 h-10 rounded-full bg-background border flex items-center justify-center text-lg transition-colors group-hover:border-primary/30",
-                        slot.roleLabel === 'BAT' ? "border-blue-500/20 text-blue-500/50" :
-                          slot.roleLabel === 'BWL' ? "border-red-500/20 text-red-500/50" :
-                            slot.roleLabel === 'AR' ? "border-purple-500/20 text-purple-500/50" :
-                              slot.roleLabel === 'WK' ? "border-green-500/20 text-green-500/50" :
-                                "border-amber-500/20 text-amber-500/50"
-                      )}>
-                        {canEdit ? <Plus className="w-4 h-4 opacity-50" /> : '👤'}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-muted-foreground/80 group-hover:text-foreground transition-colors">Empty</p>
-                      </div>
-                    </button>
+                  <div className="flex-1 min-w-0">
+                    <PlayerCard
+                      player={slot.player}
+                      isOwned
+                      captainBadge={
+                        manager.captainId === slot.player.id ? 'C'
+                          : manager.viceCaptainId === slot.player.id ? 'VC'
+                            : null
+                      }
+                      onSetCaptain={canEdit && manager.captainId !== slot.player.id ? () => handleSetCaptain(slot.player!.id) : undefined}
+                      onSetViceCaptain={canEdit && manager.viceCaptainId !== slot.player.id ? () => handleSetViceCaptain(slot.player!.id) : undefined}
+                      onSwap={canEdit && benchPlayers.length > 0 ? () => handleStartSwap(slot.player!, 'active') : undefined}
+                      onClick={() => setDetailPlayer(slot.player!)}
+                      {...getPlayerMatchInfo(slot.player)}
+                    />
                   </div>
-                )
-              ));
-            })()}
+                </div>
+              ) : (
+                <div key={`empty-${index}`} className="relative flex items-center">
+                  <div className="w-12 shrink-0 flex justify-center">
+                    <span className={cn(
+                      "text-[10px] font-bold uppercase tracking-tight opacity-50",
+                      slot.role === 'Batsman' ? "text-blue-500" :
+                        slot.role === 'Bowler' ? "text-red-500" :
+                          slot.role === 'All Rounder' ? "text-purple-500" :
+                            slot.role === 'Wicket Keeper' ? "text-green-500" :
+                              "text-amber-500"
+                    )}>
+                      {slot.role === 'Wicket Keeper' ? 'WK' :
+                        slot.role === 'Batsman' ? 'BAT' :
+                          slot.role === 'All Rounder' ? 'AR' :
+                            slot.role === 'Bowler' ? 'BWL' : 'FLEX'}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={canEdit ? () => setSlotToFill(slot) : undefined}
+                    className={cn(
+                      "flex-1 p-[14px] rounded-xl border border-dashed border-border bg-muted/10 flex items-center gap-3 transition-all text-left group",
+                      canEdit && "hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-10 h-10 rounded-full bg-background border flex items-center justify-center text-lg transition-colors group-hover:border-primary/30",
+                      slot.role === 'Batsman' ? "border-blue-500/20 text-blue-500/50" :
+                        slot.role === 'Bowler' ? "border-red-500/20 text-red-500/50" :
+                          slot.role === 'All Rounder' ? "border-purple-500/20 text-purple-500/50" :
+                            slot.role === 'Wicket Keeper' ? "border-green-500/20 text-green-500/50" :
+                              "border-amber-500/20 text-amber-500/50"
+                    )}>
+                      {canEdit ? <Plus className="w-4 h-4 opacity-50" /> : '👤'}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground/80 group-hover:text-foreground transition-colors">{slot.label || 'Empty Slot'}</p>
+                    </div>
+                  </button>
+                </div>
+              )
+            ))}
           </div>
         </section>
 
@@ -458,7 +556,7 @@ const TeamView = () => {
                           player.role === 'Wicket Keeper' ? "text-green-500" :
                             "text-amber-500"
                   )}>
-                    BN
+                    BNCH
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -467,6 +565,7 @@ const TeamView = () => {
                     isOwned
                     onSwap={canEdit && activePlayers.length > 0 ? () => handleStartSwap(player, 'bench') : undefined}
                     onClick={() => setDetailPlayer(player)}
+                    {...getPlayerMatchInfo(player)}
                   />
                 </div>
               </div>
@@ -477,7 +576,7 @@ const TeamView = () => {
               <div key={`bench-empty-${i}`} className="relative flex items-center">
                 <div className="w-12 shrink-0 flex justify-center">
                   <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground opacity-50">
-                    BN
+                    BNCH
                   </span>
                 </div>
                 <div className="flex-1 p-[14px] rounded-xl border border-dashed border-border bg-muted/10 flex items-center gap-3 opacity-60">
@@ -600,22 +699,27 @@ const TeamView = () => {
                     })
                     .map(player => {
                       if (!playerToSwap) return null;
-                      // If swapping from bench, playerToSwap is moving INTO active, 'player' is moving OUT
-                      // targetSlotRole is the role of the slot we are clicking on ('player.role')
-                      const isValidSwap = playerToSwap.from === 'bench'
-                        ? canSwapInActive(activePlayers, playerToSwap.player, player, player.role, config).isValid
-                        : canSwapInActive(activePlayers, player, playerToSwap.player, playerToSwap.player.role, config).isValid;
+                      // 1. Get the source player's slot role (where the swap IS STARTING FROM)
+                      const sourceSlot = slots.find(s => s.player?.id === playerToSwap.player.id);
+                      const sourceSlotRole = sourceSlot?.role || 'Any Position';
 
-                      // We also need to determine the slot label the player is currently occupying
-                      // to show "Swap to WK slot" etc.
-                      const activeSlots = getActiveRosterSlots(activePlayers, config);
-                      const targetSlot = activeSlots.find(s => s.player?.id === player.id);
-                      const targetRoleLabel = targetSlot ? (
-                        targetSlot.role === 'Wicket Keeper' ? 'WK' :
-                          targetSlot.role === 'Batsman' ? 'BAT' :
-                            targetSlot.role === 'All Rounder' ? 'AR' :
-                              targetSlot.role === 'Bowler' ? 'BWL' : 'FLEX'
-                      ) : player.role;
+                      // 2. Get the target player's slot role (where the player IS MOVING TO)
+                      const targetSlot = slots.find(s => s.player?.id === player.id);
+                      const targetSlotRole = targetSlot?.role || 'Any Position';
+
+                      // 3. Validation:
+                      const isValidSwap = playerToSwap.from === 'bench'
+                        ? canSwapInActive(activePlayers, playerToSwap.player, player, targetSlotRole, config).isValid
+                        : (
+                          // Intra-active: source player must fit in target slot AND target player must fit in source slot
+                          canSwapInActive(activePlayers, playerToSwap.player, player, targetSlotRole, config).isValid &&
+                          isRoleCompatible(player.role, sourceSlotRole)
+                        );
+
+                      const targetRoleLabel = targetSlotRole === 'Wicket Keeper' ? 'WK' :
+                        targetSlotRole === 'Batsman' ? 'BAT' :
+                          targetSlotRole === 'All Rounder' ? 'AR' :
+                            targetSlotRole === 'Bowler' ? 'BWL' : 'FLEX';
 
                       return (
                         <button
@@ -652,7 +756,7 @@ const TeamView = () => {
                 {playerToSwap.from === 'bench' && activePlayers.length < config.activeSize && (
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Empty Active Slots</p>
-                    {getActiveRosterSlots(activePlayers, config)
+                    {slots
                       .filter(slot => !slot.filled)
                       .map((slot, idx) => {
                         if (!playerToSwap) return null;
@@ -694,9 +798,17 @@ const TeamView = () => {
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bench</p>
                   {sortedBench.map(player => {
+                    // 1. Get the source player's slot role (the one currently in active)
+                    const sourceSlot = slots.find(s => s.player?.id === playerToSwap.player.id);
+                    const sourceSlotRole = sourceSlot?.role || 'Any Position';
+
                     const isValidSwap = playerToSwap.from === 'bench'
-                      ? canSwapInActive(activePlayers, playerToSwap.player, player, 'BENCH', config).isValid
-                      : canSwapInActive(activePlayers, player, playerToSwap.player, 'Any Position', config).isValid;
+                      ? true // Bench to Bench swap is internal, doesn't affect active roster
+                      : (
+                        // Active to Bench: Bench player (target) must fit in Active player's (source) slot
+                        isRoleCompatible(player.role, sourceSlotRole) &&
+                        canRemoveFromActive(activePlayers, playerToSwap.player).isValid // Extra safety for active removal
+                      );
 
                     let swapActionText = '';
                     if (!isValidSwap) {
