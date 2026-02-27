@@ -288,6 +288,7 @@ export function calculatePointsFromMatchStats(
     isImpactPlayer: matchStats.isImpactPlayer,
     isManOfMatch: matchStats.isManOfMatch,
     teamWon: matchStats.teamWon,
+    playerRole: matchStats.playerRole,
   };
 
   return calculateFantasyPoints(stats, rules);
