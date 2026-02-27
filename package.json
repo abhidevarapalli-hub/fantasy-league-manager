@@ -22,7 +22,8 @@
     "supabase:deploy-functions": "npx supabase functions deploy",
     "dev:live": "VITE_USE_LIVE_API=true vite",
     "dev:full": "npx supabase start && npm run dev",
-    "dev:full:live": "npx supabase start && npm run dev:live"
+    "dev:full:live": "npx supabase start && npm run dev:live",
+    "sync:scoring": "cp src/lib/scoring-types.ts supabase/functions/_shared/scoring-types.ts && echo 'Scoring types synced to _shared'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
