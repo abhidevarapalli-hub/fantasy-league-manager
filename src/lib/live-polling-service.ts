@@ -109,9 +109,10 @@ class LivePollingService {
   /**
    * Enable polling for a match
    */
-  async enablePolling(cricbuzzMatchId: number, initialState: 'Upcoming' | 'Live' = 'Live'): Promise<boolean> {
+  async enablePolling(cricbuzzMatchId: number, matchId: string, initialState: 'Upcoming' | 'Live' = 'Live'): Promise<boolean> {
     const { data, error } = await supabase.rpc('enable_match_polling', {
       p_cricbuzz_match_id: cricbuzzMatchId,
+      p_match_id: matchId,
       p_initial_state: initialState,
     });
 

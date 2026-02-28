@@ -280,11 +280,11 @@ export const GlobalStatsImport = () => {
   }, [matches]);
 
   // Toggle polling
-  const handleTogglePolling = async (cricbuzzMatchId: number, enable: boolean) => {
+  const handleTogglePolling = async (cricbuzzMatchId: number, matchId: string, enable: boolean) => {
     setIsTogglingPolling(cricbuzzMatchId);
     try {
       const success = enable
-        ? await livePollingService.enablePolling(cricbuzzMatchId)
+        ? await livePollingService.enablePolling(cricbuzzMatchId, matchId)
         : await livePollingService.disablePolling(cricbuzzMatchId);
 
       if (success) {
@@ -1037,7 +1037,7 @@ export const GlobalStatsImport = () => {
                                   checked={isPollingEnabled}
                                   disabled={isTogglingPolling === match.cricbuzzMatchId}
                                   onCheckedChange={(checked) =>
-                                    handleTogglePolling(match.cricbuzzMatchId, checked)
+                                    handleTogglePolling(match.cricbuzzMatchId, match.id, checked)
                                   }
                                 />
                                 <Label

@@ -616,6 +616,7 @@ export async function saveMatchStatsLive(
       if (matchData) {
         await supabase.rpc('enable_match_polling', {
           p_cricbuzz_match_id: matchData.cricbuzz_match_id,
+          p_match_id: matchId,
           p_initial_state: 'Live',
         });
       }
