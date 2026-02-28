@@ -4,6 +4,8 @@
 -- ============================================
 
 -- 1. Update get_league_match_stats_for_recompute to include player role
+-- Must DROP first because return type is changing (adding primary_role column)
+DROP FUNCTION IF EXISTS get_league_match_stats_for_recompute(UUID);
 CREATE OR REPLACE FUNCTION get_league_match_stats_for_recompute(p_league_id UUID)
 RETURNS TABLE (
   score_id UUID,
@@ -314,8 +316,10 @@ GRANT EXECUTE ON FUNCTION finalize_week(UUID, INTEGER) TO service_role;
 
 -- ============================================
 -- 5. Update get_live_fantasy_standings to include W/L and sort by wins first
+-- Must DROP first because return type is changing (adding wins/losses columns)
 -- ============================================
 
+DROP FUNCTION IF EXISTS get_live_fantasy_standings(UUID);
 CREATE OR REPLACE FUNCTION get_live_fantasy_standings(p_league_id UUID)
 RETURNS TABLE (
   manager_id UUID,
@@ -358,6 +362,8 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 -- Also update the non-live version
+-- Must DROP first because return type is changing (adding wins/losses columns)
+DROP FUNCTION IF EXISTS get_fantasy_standings(UUID);
 CREATE OR REPLACE FUNCTION get_fantasy_standings(p_league_id UUID)
 RETURNS TABLE (
   manager_id UUID,

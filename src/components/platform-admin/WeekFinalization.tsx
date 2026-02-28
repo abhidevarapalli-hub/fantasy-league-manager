@@ -123,8 +123,7 @@ export const WeekFinalization = () => {
       const weekStatusesResults = await Promise.all(
         distinctWeeks.map(async (week) => {
           const [readinessResult, matchupsResult] = await Promise.all([
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (supabase.rpc as any)('check_week_finalization_ready', {
+            supabase.rpc('check_week_finalization_ready', {
               p_league_id: leagueId,
               p_week: week,
             }),
@@ -176,8 +175,7 @@ export const WeekFinalization = () => {
 
     setIsFinalizing(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)('finalize_week', {
+      const { error } = await supabase.rpc('finalize_week', {
         p_league_id: selectedLeagueId,
         p_week: selectedWeek.week,
       });

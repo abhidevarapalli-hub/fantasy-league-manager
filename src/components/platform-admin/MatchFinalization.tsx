@@ -157,8 +157,7 @@ export const MatchFinalization = () => {
     setFinalizingMatchId(match.id);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: rpcError } = await (supabase.rpc as any)('admin_finalize_match', {
+      const { error: rpcError } = await supabase.rpc('admin_finalize_match', {
         p_match_id: match.id,
         p_man_of_match_cricbuzz_id: momId,
         p_winner_team_id: winnerId,
