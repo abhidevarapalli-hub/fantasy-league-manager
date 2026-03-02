@@ -30,17 +30,19 @@ const MockDraft = () => {
                     .select('*')
                     .order('id');
 
-                if (error) throw error;
+                const iplTeams = ['CSK', 'DC', 'GT', 'KKR', 'LSG', 'MI', 'PBKS', 'RR', 'RCB', 'SRH'];
 
-                const mappedPlayers: Player[] = (data || []).map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    team: p.teams && p.teams.length > 0 ? p.teams[0] : 'Unknown', // Primary team
-                    role: p.primary_role as Player['role'],
-                    points: 0,
-                    isInternational: p.is_international,
-                    cricbuzz_id: null,
-                }));
+                const mappedPlayers: Player[] = (data || [])
+                    .filter(p => p.teams && p.teams.some((t: string) => iplTeams.includes(t)))
+                    .map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        team: p.teams && p.teams.length > 0 ? p.teams[0] : 'Unknown', // Primary team
+                        role: p.primary_role as Player['role'],
+                        points: 0,
+                        isInternational: p.is_international,
+                        cricbuzz_id: null,
+                    }));
 
                 setMasterPlayers(mappedPlayers);
             } catch (err) {

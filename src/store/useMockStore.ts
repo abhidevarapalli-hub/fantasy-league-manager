@@ -19,6 +19,8 @@ export interface MockDraft {
     currentRound: number;
     currentPickIndex: number;
     teamRosters: Record<number, string[]>;
+    pausedAt?: string | null;
+    lastPickAt?: string | null;
 }
 
 interface MockStoreState {
@@ -46,6 +48,8 @@ export const useMockStore = create<MockStoreState>()(
                     currentRound: 1,
                     currentPickIndex: 0,
                     teamRosters: {},
+                    lastPickAt: new Date().toISOString(),
+                    pausedAt: null,
                 };
 
                 set((state) => ({

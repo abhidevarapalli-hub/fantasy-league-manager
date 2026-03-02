@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Plane, Clock, Plus, Minus, ArrowLeftRight } from 'lucide-react';
+import { calculateFantasyPoints, PlayerStats } from '@/lib/fantasy-points-calculator';
 import {
     Dialog,
     DialogContent,
@@ -11,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Player } from '@/lib/supabase-types';
+import { Player, Manager } from '@/lib/supabase-types';
 import { TournamentPlayer } from '@/lib/cricket-types';
 import { getTournamentById, SUPPORTED_TOURNAMENTS } from '@/lib/tournaments';
 import { usePlayerSchedule, useExtendedPlayer, usePlayerMatchStats, PlayerMatchPerformance } from '@/hooks/usePlayerDetails';
@@ -20,6 +21,14 @@ import { getTeamColors } from '@/lib/team-colors';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { DraftTimer, DraftTimerProps } from '@/components/DraftTimer';
+import { DraftState, DraftPick } from '@/lib/draft-types';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+    Drawer,
+    DrawerContent,
+    DrawerTitle,
+    DrawerDescription,
+} from '@/components/ui/drawer';
 
 /** Extended player data with optional fields from DB/API */
 interface ExtendedPlayer extends Player {
@@ -46,9 +55,22 @@ interface PlayerDetailDialogProps {
     onTrade?: () => void;
     onDraft?: () => void;
     draftTimerProps?: DraftTimerProps;
+    // Overrides for Mock Draft
+    draftState?: DraftState;
+    draftPicks?: DraftPick[];
+    managers?: Manager[];
+    isMyTurn?: boolean;
 }
 
-import { calculateFantasyPoints, PlayerStats } from '@/lib/fantasy-points-calculator';
+/** Stat Row Component for breakdown */
+const StatRow = ({ label, value, color }: { label: string; value: number | string; color?: string }) => (
+    <div className="flex justify-between items-center bg-white/[0.02] px-3 py-2 rounded-lg border border-white/5">
+        <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">{label}</span>
+        <span className={cn("text-xs font-black", color || "text-white/80")}>
+            {typeof value === 'number' ? (value > 0 ? `+${value.toFixed(0)}` : value.toFixed(0)) : value}
+        </span>
+    </div>
+);
 
 // Helper to coerce a partial scorecard to the PlayerStats format required for calculation
 const getPlayerStatsForCalc = (stats: PlayerMatchPerformance | undefined | null): PlayerStats => {
@@ -88,36 +110,16 @@ export function PlayerDetailDialog({
     onTrade,
     onDraft,
     draftTimerProps,
+    draftState: propsDraftState,
+    draftPicks: propsDraftPicks,
+    managers: propsManagers,
+    isMyTurn: propsIsMyTurn,
 }: PlayerDetailDialogProps) {
     // First, try to get extended player data from our database
     // This has the cricbuzz_id and image_id we need
     const { data: extendedData, isLoading: isLoadingExtended } = useExtendedPlayer(player?.id);
 
-    // Debug Log when component renders or props change
-    React.useEffect(() => {
-        if (open) {
-            console.log(`[TRACE] PlayerDetailDialog OPEN for: ${player.name} (ID: ${player.id})`);
-            console.log('[TRACE] TournamentPlayer prop:', tournamentPlayer);
-        }
-    }, [open, player, tournamentPlayer]);
-
-    React.useEffect(() => {
-        if (open && !isLoadingExtended) {
-            console.log('[TRACE] extendedData from DB:', extendedData);
-        }
-    }, [open, isLoadingExtended, extendedData]);
-
-    // Get the Cricbuzz ID from either:
-    // 1. tournamentPlayer prop (if provided)
-    // 2. Extended player data from database
     const cricbuzzId = tournamentPlayer?.id || extendedData?.cricbuzzId || null;
-
-    if (open && cricbuzzId) {
-        // This will trigger the usePlayerInfo hook
-        console.log(`[TRACE] Resolved Cricbuzz ID: ${cricbuzzId}. Triggers usePlayerInfo...`);
-    } else if (open && !isLoadingExtended && !cricbuzzId && player) {
-        console.warn(`[TRACE] ⚠️ Could not resolve Cricbuzz ID for ${player.name}. Hook will SKIP.`);
-    }
 
     const isNationalTeam = useMemo(() => {
         return player ? player.team in TEAM_SHORT_TO_COUNTRY : false;
@@ -149,7 +151,7 @@ export function PlayerDetailDialog({
             tournamentType,
             undefined
         );
-        console.log(`[PlayerDetailDialog] 🏢 Resolved playerTeamShort for ${player.name}:`, resolved);
+
         return resolved;
     }, [player, tournamentType]);
 
@@ -158,13 +160,16 @@ export function PlayerDetailDialog({
         playerTeamShort
     );
 
-    const { currentLeagueId, draftState, draftPicks, scoringRules } = useGameStore();
+    const { currentLeagueId, draftState: storeDraftState, draftPicks: storeDraftPicks, scoringRules } = useGameStore();
+    const draftState = propsDraftState || storeDraftState;
+    const draftPicks = propsDraftPicks || storeDraftPicks;
     const { data: playerStatsMap } = usePlayerMatchStats(player?.id, currentLeagueId);
 
     const teamColors = getTeamColors(player?.team || 'OTHER');
     const imageId = tournamentPlayer?.imageId || extendedData?.imageId;
 
-    const { managers } = useGameStore();
+    const { managers: storeManagers } = useGameStore();
+    const managers = propsManagers || storeManagers;
 
     const isDraftActive = useMemo(() => {
         return draftState?.isActive && !draftState?.isFinalized;
@@ -196,12 +201,13 @@ export function PlayerDetailDialog({
     }, [managers, player, draftPicks, isDraftActive]);
 
     const isMyTurn = useMemo(() => {
+        if (propsIsMyTurn !== undefined) return propsIsMyTurn;
         if (!managerProfile || !draftState) return false;
         // In the draft feature, we usually have draftOrder to determine which manager is at which position
         const { draftOrder } = useGameStore.getState();
         const currentActiveManagerId = draftOrder.find(o => o.position === draftState.currentPosition)?.managerId;
         return currentActiveManagerId === managerProfile.id;
-    }, [managerProfile, draftState]);
+    }, [managerProfile, draftState, propsIsMyTurn]);
 
     const canDraft = useMemo(() => {
         return draftState?.isActive && !draftState?.isFinalized && isMyTurn && !isDrafted;
@@ -255,10 +261,6 @@ export function PlayerDetailDialog({
     const unifiedMatches: UnifiedMatchData[] = useMemo(() => {
         if (!player) return [];
         const schedule = playerSchedule && playerSchedule.length > 0 ? playerSchedule : matchStats;
-        console.log(`[PlayerDetailDialog] 🔎 UnifiedMatches processing for ${player?.name}:`, {
-            scheduleCount: schedule.length,
-            playerStatsMapSize: playerStatsMap?.size || 0
-        });
 
         if (!playerStatsMap || playerStatsMap.size === 0) return schedule as UnifiedMatchData[];
 
@@ -281,7 +283,7 @@ export function PlayerDetailDialog({
                 isLiveStats: dbStats.isLiveStats || false
             };
         });
-        console.log(`[PlayerDetailDialog] ✅ UnifiedMatches Result for ${player?.name}:`, merged);
+
         return merged;
     }, [playerSchedule, matchStats, playerStatsMap, player]);
 
@@ -307,569 +309,530 @@ export function PlayerDetailDialog({
         return calculateFantasyPoints(getPlayerStatsForCalc(selectedMatch), scoringRules);
     }, [selectedMatch, scoringRules]);
 
+    const isMobile = useIsMobile();
+
     if (!player) return null;
+
+    const Content = (
+        <div className="relative flex flex-col w-full bg-background md:bg-[#0f1014] rounded-t-2xl md:rounded-2xl overflow-hidden border border-border/50 shadow-2xl h-full max-h-[90svh] md:h-auto md:max-h-[85vh]">
+            {/* Visual Close Button for Mobile Accessibility */}
+            {!isMobile && (
+                <button
+                    onClick={() => onOpenChange && onOpenChange(false)}
+                    className="absolute top-4 right-4 z-50 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md text-white rounded-full transition-colors border border-white/20 shadow-xl"
+                    aria-label="Close dialog"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                </button>
+            )}
+
+            <DrawerDescription className="sr-only">Player details and statistics for {player.name}</DrawerDescription>
+
+            {/* Header Section */}
+            <div
+                className={cn(
+                    "relative flex flex-row items-center transition-colors duration-500 overflow-hidden flex-shrink-0 border-b border-border/10 h-32 md:h-40",
+                    teamColors.bg === 'bg-muted' ? "bg-muted/30" : ""
+                )}
+                style={teamColors.bg !== 'bg-muted' ? {
+                    backgroundColor: teamColors.raw,
+                } : {}}
+            >
+                {/* Background subtle gradient for depth */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent pointer-events-none z-0" />
+
+                {/* Player Image - Horizontal Layout */}
+                <div className="relative w-32 md:w-40 h-full flex-shrink-0 flex items-end justify-center z-10 transition-transform duration-300">
+                    <img
+                        src={getPlayerAvatarUrl(imageId, 'det')}
+                        alt={player.name}
+                        className="relative z-30 h-[105%] w-auto max-w-none object-contain object-bottom drop-shadow-[0_8px_16px_rgba(0,0,0,0.4)] md:h-[115%]"
+                    />
+                </div>
+
+                {/* Info and Metadata Grid */}
+                <div className="flex-1 p-4 md:p-6 flex flex-col justify-center relative z-20">
+                    <div>
+                        <DialogTitle className={cn(
+                            "text-xl md:text-2xl lg:text-3xl font-black tracking-tight leading-tight drop-shadow-md flex flex-col uppercase",
+                            teamColors.text
+                        )}>
+                            {player.name.includes(' ') ? (
+                                <>
+                                    <span className="text-xs md:text-sm lg:text-base opacity-75 font-bold tracking-widest">{player.name.substring(0, player.name.lastIndexOf(' '))}</span>
+                                    <span>{player.name.substring(player.name.lastIndexOf(' ') + 1)}</span>
+                                </>
+                            ) : (
+                                <span>{player.name}</span>
+                            )}
+                        </DialogTitle>
+
+                        <div className="flex flex-row flex-wrap items-center gap-1.5 md:gap-2 mt-1.5">
+                            {/* Team Badge */}
+                            <div className={cn(
+                                "text-[9px] md:text-[10px] font-black uppercase tracking-widest bg-black/30 md:bg-black/20 px-2.5 py-0.5 rounded-full backdrop-blur-md border border-white/20",
+                                teamColors.text
+                            )}>
+                                {player.team}
+                            </div>
+
+                            {/* Role Badge */}
+                            <Badge
+                                className="text-[9px] md:text-[10px] px-2.5 py-0.5 font-bold uppercase tracking-widest shadow-md pointer-events-none whitespace-nowrap bg-black/50 backdrop-blur-md border border-white/20 text-white"
+                                variant="secondary"
+                            >
+                                {player.role}
+                            </Badge>
+
+                            {/* Ownership Badge */}
+                            {owningManager ? (
+                                <Badge
+                                    className="text-[9px] md:text-[10px] px-2.5 py-0.5 font-bold uppercase tracking-widest shadow-md pointer-events-none whitespace-nowrap bg-indigo-500/80 backdrop-blur-md border border-white/20 text-white"
+                                    variant="secondary"
+                                >
+                                    {owningManager.teamName}
+                                </Badge>
+                            ) : (
+                                <Badge
+                                    className="text-[9px] md:text-[10px] px-2.5 py-0.5 font-bold uppercase tracking-widest shadow-md pointer-events-none whitespace-nowrap bg-emerald-500/80 backdrop-blur-md border border-white/20 text-white"
+                                    variant="secondary"
+                                >
+                                    Free Agent
+                                </Badge>
+                            )}
+                        </div>
+
+
+                    </div>
+                </div>
+            </div>
+
+            {/* Content Section */}
+            <div className="bg-[#0f1014] flex-1 flex flex-col min-h-0 overflow-hidden relative z-30">
+                {/* Section Header */}
+                <div className="flex items-center px-4 md:px-6 pt-3 border-b border-white/5 flex-shrink-0">
+                    {selectedMatch ? (
+                        <div className="flex items-center gap-2 w-full pb-2">
+                            <button
+                                onClick={() => setSelectedMatch(null)}
+                                className="p-1 hover:bg-white/5 rounded-md transition-colors text-white/40 hover:text-white"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
+                            </button>
+                            <div className="font-bold text-[10px] md:text-xs tracking-widest text-white/80 uppercase">
+                                Points Breakdown vs {selectedMatch.opponentShort}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex gap-4">
+                            <div className="pb-2 border-b-2 border-primary font-black text-[10px] md:text-xs tracking-widest text-white uppercase">
+                                Game Log
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <ScrollArea className="flex-1 min-h-0 w-full">
+                    {selectedMatch && breakdownData ? (
+                        /* Points Breakdown View */
+                        <div className="p-4 md:p-6 space-y-4">
+                            <div className="flex items-center justify-between bg-white/[0.03] p-4 rounded-xl border border-white/5 shadow-inner">
+                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">Total Fantasy Points</div>
+                                <div className="text-3xl font-black text-primary drop-shadow-[0_0_15px_rgba(var(--primary),0.3)]">{breakdownData.total.toFixed(1)}</div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {/* Batting Breakdown */}
+                                {breakdownData.batting.total !== 0 && (
+                                    <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl overflow-hidden">
+                                        <div className="bg-emerald-500/10 px-4 py-2 font-bold text-[10px] uppercase tracking-widest text-emerald-400 flex justify-between items-center">
+                                            <span>Batting</span>
+                                            <span>{breakdownData.batting.total.toFixed(1)}</span>
+                                        </div>
+                                        <div className="p-3 space-y-2 text-[11px]">
+                                            {breakdownData.batting.runs !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Runs ({selectedMatch.runs || 0})</span>
+                                                    <span className="font-bold text-emerald-400">+{breakdownData.batting.runs}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.batting.fours !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Fours ({selectedMatch.fours || 0})</span>
+                                                    <span className="font-bold text-emerald-400">+{breakdownData.batting.fours}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.batting.sixes !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Sixes ({selectedMatch.sixes || 0})</span>
+                                                    <span className="font-bold text-emerald-400">+{breakdownData.batting.sixes}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.batting.strikeRateBonus !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">SR Bonus ({selectedMatch.strikeRate?.toFixed(1)})</span>
+                                                    <span className={cn("font-bold", breakdownData.batting.strikeRateBonus > 0 ? "text-emerald-400" : "text-rose-400")}>
+                                                        {breakdownData.batting.strikeRateBonus > 0 ? "+" : ""}{breakdownData.batting.strikeRateBonus}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {breakdownData.batting.milestoneBonus !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Milestone Bonus</span>
+                                                    <span className="font-bold text-emerald-400">+{breakdownData.batting.milestoneBonus}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.batting.duckPenalty !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Duck Penalty</span>
+                                                    <span className="font-bold text-rose-400">{breakdownData.batting.duckPenalty}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.batting.lowScorePenalty !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Run Penalty</span>
+                                                    <span className="font-bold text-rose-400">{breakdownData.batting.lowScorePenalty}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Bowling Breakdown */}
+                                {breakdownData.bowling.total !== 0 && (
+                                    <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl overflow-hidden">
+                                        <div className="bg-rose-500/10 px-4 py-2 font-bold text-[10px] uppercase tracking-widest text-rose-400 flex justify-between items-center">
+                                            <span>Bowling</span>
+                                            <span>{breakdownData.bowling.total.toFixed(1)}</span>
+                                        </div>
+                                        <div className="p-3 space-y-2 text-[11px]">
+                                            {breakdownData.bowling.wickets !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Wickets ({selectedMatch.wickets || 0})</span>
+                                                    <span className="font-bold text-rose-400">+{breakdownData.bowling.wickets}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.bowling.maidens !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Maidens ({selectedMatch.maidens || 0})</span>
+                                                    <span className="font-bold text-rose-400">+{breakdownData.bowling.maidens}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.bowling.economyBonus !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Econ Bonus ({selectedMatch.economy?.toFixed(2)})</span>
+                                                    <span className={cn("font-bold", breakdownData.bowling.economyBonus > 0 ? "text-rose-400" : "text-rose-400")}>
+                                                        {breakdownData.bowling.economyBonus > 0 ? "+" : ""}{breakdownData.bowling.economyBonus}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {breakdownData.bowling.dots !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Dot Balls ({selectedMatch.dots || 0})</span>
+                                                    <span className="font-bold text-rose-400">+{breakdownData.bowling.dots}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.bowling.lbwBowledBonus !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">LBW/Bowled Bonus</span>
+                                                    <span className="font-bold text-rose-400">+{breakdownData.bowling.lbwBowledBonus}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.bowling.milestoneBonus !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Wicket Milestones</span>
+                                                    <span className="font-bold text-rose-400">+{breakdownData.bowling.milestoneBonus}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.bowling.widePenalty !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Wide Penalty ({selectedMatch.wides || 0})</span>
+                                                    <span className="font-bold text-rose-400">{breakdownData.bowling.widePenalty}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.bowling.noBallPenalty !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">No Ball Penalty ({selectedMatch.noBalls || 0})</span>
+                                                    <span className="font-bold text-rose-400">{breakdownData.bowling.noBallPenalty}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Fielding Breakdown */}
+                                {breakdownData.fielding.total !== 0 && (
+                                    <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl overflow-hidden">
+                                        <div className="bg-amber-500/10 px-4 py-2 font-bold text-[10px] uppercase tracking-widest text-amber-400 flex justify-between items-center">
+                                            <span>Fielding</span>
+                                            <span>{breakdownData.fielding.total.toFixed(1)}</span>
+                                        </div>
+                                        <div className="p-3 space-y-2 text-[11px]">
+                                            {breakdownData.fielding.catches !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Catches ({selectedMatch.catches || 0})</span>
+                                                    <span className="font-bold text-amber-400">+{breakdownData.fielding.catches}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.fielding.runOuts !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Run Outs ({selectedMatch.runOuts || 0})</span>
+                                                    <span className="font-bold text-amber-400">+{breakdownData.fielding.runOuts}</span>
+                                                </div>
+                                            )}
+                                            {'stumpings' in breakdownData.fielding && breakdownData.fielding.stumpings !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Stumpings ({selectedMatch.stumpings || 0})</span>
+                                                    <span className="font-bold text-amber-400">+{breakdownData.fielding.stumpings}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.fielding.multiCatchBonus !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Multi-Catch Bonus</span>
+                                                    <span className="font-bold text-amber-400">+{breakdownData.fielding.multiCatchBonus}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Match Context (Common) */}
+                                {(breakdownData.common.total !== 0) && (
+                                    <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl overflow-hidden">
+                                        <div className="bg-blue-500/10 px-4 py-2 font-bold text-[10px] uppercase tracking-widest text-blue-400 flex justify-between items-center">
+                                            <span>Match Context</span>
+                                            <span>{breakdownData.common.total.toFixed(1)}</span>
+                                        </div>
+                                        <div className="p-3 space-y-2 text-[11px]">
+                                            {breakdownData.common.starting11 !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Starting 11</span>
+                                                    <span className="font-bold text-blue-400">+{breakdownData.common.starting11}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.common.matchWinningTeam !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Winning Team Bonus</span>
+                                                    <span className="font-bold text-blue-400">+{breakdownData.common.matchWinningTeam}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.common.impactPlayer !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Impact Player Points</span>
+                                                    <span className="font-bold text-blue-400">+{breakdownData.common.impactPlayer}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.common.impactPlayerWinBonus !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Impact Win Bonus</span>
+                                                    <span className="font-bold text-blue-400">+{breakdownData.common.impactPlayerWinBonus}</span>
+                                                </div>
+                                            )}
+                                            {breakdownData.common.manOfTheMatch !== 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-white/40">Man of the Match</span>
+                                                    <span className="font-bold text-blue-400">+{breakdownData.common.manOfTheMatch}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        /* Existing Game Log View - More Dense */
+                        <div className="p-0">
+                            {/* Unified Grid Table */}
+                            <div className="grid text-[10px] md:text-xs text-center border-collapse">
+                                {/* Header Row 1 - Groups */}
+                                <div className="flex w-full min-w-[600px] md:min-w-full bg-white/[0.02] font-black text-[9px] uppercase tracking-[0.2em] text-white/20 sticky top-0 z-20 border-b border-white/5 backdrop-blur-md">
+                                    <div className="w-[90px] flex-shrink-0 h-8 flex items-center justify-center border-r border-white/5 bg-[#0f1014]">Match</div>
+                                    <div className="w-[45px] flex-shrink-0 h-8 flex items-center justify-center border-r border-white/5 text-primary bg-[#0f1014]">Pts</div>
+
+                                    {sections.map(section => (
+                                        <div
+                                            key={section.id}
+                                            className={cn("h-8 flex items-center justify-center border-r border-white/5 last:border-r-0", section.color)}
+                                            style={{ flex: `${section.width} 1 0%`, minWidth: `${section.width}px` }}
+                                        >
+                                            {section.label}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Header Row 2 - Columns */}
+                                <div className="flex w-full min-w-[600px] md:min-w-full bg-[#0f1014]/80 backdrop-blur-md font-bold border-b border-white/10 sticky top-[32px] z-10 text-[8px] text-white/40 uppercase tracking-widest">
+                                    <div className="w-[24px] flex-shrink-0 py-2 border-r border-white/5 flex items-center justify-center">Wk</div>
+                                    <div className="w-[66px] flex-shrink-0 py-2 border-r border-white/5 text-left px-2 flex items-center">Opp</div>
+                                    <div className="w-[45px] flex-shrink-0 py-2 border-r border-white/5 flex items-center justify-center">Tot</div>
+
+                                    {sections.map(section => (
+                                        <React.Fragment key={`${section.id}-cols`}>
+                                            {section.cols.map(col => (
+                                                <div
+                                                    key={col.key}
+                                                    className={cn("py-2 border-r border-white/5 last:border-r-0 flex items-center justify-center", section.color)}
+                                                    style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
+                                                >
+                                                    {col.label}
+                                                </div>
+                                            ))}
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+
+                                {/* Data Rows */}
+                                {unifiedMatches.length > 0 ? unifiedMatches.map((matchItem, index) => {
+                                    const hasStats = matchItem.runs !== undefined || matchItem.wickets !== undefined;
+                                    const stats = hasStats ? matchItem : undefined;
+                                    const fpts = hasStats
+                                        ? (matchItem.fantasyPoints ?? calculateFantasyPoints(getPlayerStatsForCalc(stats), scoringRules).total)
+                                        : 0;
+
+                                    const opponentShort = matchItem.opponentShort;
+                                    const isUpcoming = !hasStats && matchItem.isUpcoming && matchItem.matchDate > new Date() && matchItem.matchState !== 'Complete';
+                                    const weekNum = matchItem.week || index + 1;
+
+                                    return (
+                                        <div
+                                            key={matchItem.matchId || index}
+                                            onClick={() => hasStats && setSelectedMatch(matchItem)}
+                                            className={cn(
+                                                "flex w-full min-w-[550px] md:min-w-full transition-colors border-b border-white/[0.03] group",
+                                                index % 2 === 0 ? "bg-transparent" : "bg-white/[0.01]",
+                                                isUpcoming && "opacity-30",
+                                                hasStats ? "cursor-pointer hover:bg-white/[0.06]" : "cursor-default"
+                                            )}
+                                        >
+                                            <div className="w-[24px] flex-shrink-0 py-2.5 border-r border-white/5 items-center justify-center flex text-white/30 font-mono text-[9px]">
+                                                {weekNum}
+                                            </div>
+                                            <div className="w-[66px] flex-shrink-0 py-2.5 border-r border-white/5 text-left px-2 flex flex-col justify-center">
+                                                <span className="font-bold text-white/90 group-hover:text-white flex items-center gap-1 overflow-hidden">
+                                                    <span className="truncate">{opponentShort}</span>
+                                                    {(matchItem.matchState?.toLowerCase().includes('live') || matchItem.isLiveStats) && (
+                                                        <span className="w-1.5 h-1.5 flex-shrink-0 rounded-full bg-rose-500 animate-pulse" />
+                                                    )}
+                                                </span>
+                                            </div>
+                                            <div className="w-[45px] flex-shrink-0 py-2.5 border-r border-white/5 font-black text-primary flex items-center justify-center text-xs">
+                                                {hasStats ? fpts.toFixed(1) : (isUpcoming ? '' : '-')}
+                                            </div>
+
+                                            {sections.map(section => (
+                                                <React.Fragment key={section.id}>
+                                                    {section.cols.map(col => {
+                                                        let val: string | number | undefined = '-';
+                                                        if (hasStats && stats) {
+                                                            val = (stats as unknown as Record<string, string | number | undefined>)[col.key];
+                                                            if (val === undefined || val === null) val = '-';
+                                                            else if (col.key === 'strikeRate' || col.key === 'economy') val = (val as number).toFixed(0);
+                                                        }
+                                                        return (
+                                                            <div key={col.key} className="py-2.5 border-r border-white/5 flex items-center justify-center text-white/60 group-hover:text-white/80" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
+                                                                {val}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </React.Fragment>
+                                            ))}
+                                        </div>
+                                    );
+                                }) : (
+                                    <div className="p-12 text-white/20 font-medium italic flex flex-col items-center gap-3">
+                                        <Clock className="w-8 h-8 opacity-20" />
+                                        No matches scheduled
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+            </div>
+
+            {/* Action Bar */}
+            {(onAdd || onDrop || onTrade || (canDraft && onDraft) || draftTimerProps) && (
+                <div className="p-4 md:p-6 bg-[#0f1014] border-t border-white/5 flex flex-col sm:flex-row gap-3 flex-shrink-0 z-40 sticky bottom-0 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] sm:items-center">
+                    {draftTimerProps && (
+                        <div className="flex-shrink-0 w-full sm:w-auto flex justify-center sm:justify-start sm:mr-auto sm:scale-110 sm:origin-left">
+                            <DraftTimer {...draftTimerProps} className="w-full sm:w-auto justify-center" />
+                        </div>
+                    )}
+                    {/* Draft Case */}
+                    {canDraft && onDraft && (
+                        <Button
+                            onClick={onDraft}
+                            className="flex-1 gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-emerald-500/20 w-full"
+                        >
+                            <Plus className="w-5 h-5" />
+                            DRAFT PLAYER
+                        </Button>
+                    )}
+
+                    {/* Free Agent Case */}
+                    {!owningManager && onAdd && !canDraft && (draftState?.isFinalized || draftState === undefined) && (
+                        <Button
+                            onClick={onAdd}
+                            className="flex-1 gap-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-indigo-500/20 w-full"
+                        >
+                            <Plus className="w-5 h-5" />
+                            ADD PLAYER
+                        </Button>
+                    )}
+
+                    {/* Owned by Current User Case */}
+                    {owningManager && managerProfile && owningManager.id === managerProfile.id && onDrop && (draftState?.isFinalized || draftState === undefined) && (
+                        <Button
+                            onClick={onDrop}
+                            variant="destructive"
+                            className="flex-1 gap-2 font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-red-500/20 w-full"
+                        >
+                            <Minus className="w-5 h-5" />
+                            DROP PLAYER
+                        </Button>
+                    )}
+
+                    {/* Owned by Someone Else Case */}
+                    {owningManager && managerProfile && owningManager.id !== managerProfile.id && onTrade && (draftState?.isFinalized || draftState === undefined) && (
+                        <Button
+                            onClick={onTrade}
+                            className="flex-1 gap-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg w-full"
+                        >
+                            <ArrowLeftRight className="w-5 h-5" />
+                            TRADE PLAYER
+                        </Button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+
+    if (isMobile) {
+        return (
+            <Drawer open={open} onOpenChange={onOpenChange}>
+                <DrawerContent
+                    className="p-0 border-none bg-transparent h-[90svh]"
+                    aria-describedby={undefined}
+                >
+                    <DrawerTitle className="sr-only">Player Details</DrawerTitle>
+                    {Content}
+                </DrawerContent>
+            </Drawer>
+        );
+    }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 className="max-w-4xl w-[95vw] sm:w-[90vw] md:w-full p-0 gap-0 overflow-hidden border-0 bg-transparent shadow-none h-auto max-h-[90svh] z-[100] flex flex-col md:flex-row rounded-2xl"
+                aria-describedby={undefined}
                 onInteractOutside={(e) => {
-                    // Only prevent default if we're dealing with something specific, otherwise allow the interact outside to close it
                     if (onOpenChange) onOpenChange(false);
                 }}
             >
-                <div className="relative flex flex-col w-full max-h-[90svh] h-[90svh] md:h-auto md:max-h-[85vh] bg-background md:bg-[#0f1014] rounded-2xl overflow-hidden border border-border/50 shadow-2xl">
-
-                    {/* Visual Close Button for Mobile Accessibility */}
-                    <button
-                        onClick={() => onOpenChange && onOpenChange(false)}
-                        className="md:hidden absolute top-4 right-4 z-50 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md text-white rounded-full transition-colors border border-white/20 shadow-xl"
-                        aria-label="Close dialog"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                    </button>
-
-                    <DialogDescription className="sr-only">Player details and statistics for {player.name}</DialogDescription>
-
-                    {/* Header Section */}
-                    <div
-                        className={cn(
-                            "relative flex flex-col md:flex-row items-end md:items-stretch transition-colors duration-500 overflow-hidden flex-shrink-0 pt-14 md:pt-0 border-b border-border/10",
-                            teamColors.bg === 'bg-muted' ? "bg-muted/30" : ""
-                        )}
-                        style={teamColors.bg !== 'bg-muted' ? {
-                            backgroundColor: teamColors.raw,
-                        } : {}}
-                    >
-                        {/* Background subtle gradient for depth */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-0" />
-                        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/40 to-transparent pointer-events-none z-0" />
-
-                        {/* Player Image - Floating Cutout Style */}
-                        <div className="relative w-full md:w-64 h-[180px] md:h-[260px] flex-shrink-0 flex items-end justify-center z-10 mx-auto md:mx-0 -mb-4 md:mb-0">
-                            <img
-                                src={getPlayerAvatarUrl(imageId, 'det')}
-                                alt={player.name}
-                                className="relative z-30 h-[120%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]"
-                            />
-                            {/* Bottom fade to blend image with content below on mobile */}
-                            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background to-transparent z-40 md:hidden" />
-                        </div>
-
-                        {/* Info and Metadata Grid */}
-                        <div className="flex-1 w-full p-5 md:p-8 flex flex-col justify-end md:justify-center relative z-20 md:bg-gradient-to-l from-black/40 via-black/10 to-transparent">
-                            <div className="mb-4 text-center md:text-left">
-                                <DialogTitle className={cn(
-                                    "text-3xl md:text-4xl lg:text-5xl font-black tracking-tight leading-none drop-shadow-md mb-2 flex flex-col uppercase",
-                                    teamColors.text
-                                )}>
-                                    {/* Split name if there's a space for dramatic visual effect on desktop */}
-                                    {player.name.includes(' ') ? (
-                                        <>
-                                            <span className="text-xl md:text-2xl lg:text-3xl opacity-90">{player.name.substring(0, player.name.lastIndexOf(' '))}</span>
-                                            <span>{player.name.substring(player.name.lastIndexOf(' ') + 1)}</span>
-                                        </>
-                                    ) : (
-                                        <span>{player.name}</span>
-                                    )}
-                                </DialogTitle>
-
-                                <div className="flex flex-row flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 mt-3">
-                                    {/* Team & International Badge */}
-                                    <div className={cn(
-                                        "text-[10px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] opacity-90 flex items-center justify-center gap-1.5 md:gap-2 bg-black/30 md:bg-black/20 px-3 py-1.5 md:px-3 md:py-1 rounded-full backdrop-blur-md border border-white/10",
-                                        teamColors.text
-                                    )}>
-                                        <span>{player.team}</span>
-                                        {player.isInternational && (
-                                            <>
-                                                <span className="w-1 h-1 rounded-full bg-current opacity-50" />
-                                                <span className="flex items-center gap-1">
-                                                    <Plane className="w-3 md:w-3.5 h-3 md:h-3.5" />
-                                                    INTL
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    {/* Status Badges Group */}
-                                    <div className="flex items-center gap-2">
-                                        {/* Role Badge */}
-                                        <Badge
-                                            className="text-[9px] md:text-[10px] px-2 py-1 md:py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-black/50 backdrop-blur-md border border-white/20 text-white"
-                                            variant="secondary"
-                                        >
-                                            {player.role}
-                                        </Badge>
-
-                                        {/* Ownership Badge */}
-                                        {owningManager ? (
-                                            <Badge
-                                                className="text-[9px] md:text-[10px] px-2 py-1 md:py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-indigo-500/80 backdrop-blur-md border border-indigo-300/30 text-white"
-                                                variant="secondary"
-                                            >
-                                                {owningManager.teamName}
-                                            </Badge>
-                                        ) : (
-                                            <Badge
-                                                className="text-[9px] md:text-[10px] px-2 py-1 md:py-0.5 font-bold uppercase tracking-wider shadow-md pointer-events-none whitespace-nowrap bg-emerald-500/80 backdrop-blur-md border border-emerald-300/30 text-white"
-                                                variant="secondary"
-                                            >
-                                                Free Agent
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Content Section */}
-                    <div className="bg-background flex-1 flex flex-col min-h-0 overflow-hidden relative z-30">
-                        {/* Section Header */}
-                        <div className="flex items-center px-4 md:px-6 pt-4 border-b border-border/40 flex-shrink-0">
-                            {selectedMatch ? (
-                                <div className="flex items-center gap-3 w-full pb-3">
-                                    <button
-                                        onClick={() => setSelectedMatch(null)}
-                                        className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
-                                    </button>
-                                    <div className="font-bold text-xs md:text-sm tracking-wide text-foreground uppercase border-b-2 border-primary">
-                                        Points Breakdown vs {selectedMatch.opponentShort}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="px-4 pb-3 border-b-2 border-primary font-bold text-xs md:text-sm tracking-wide text-foreground uppercase">
-                                    Game Log
-                                </div>
-                            )}
-                        </div>
-
-                        <ScrollArea className="flex-1 min-h-0 w-full bg-background/50">
-                            {selectedMatch && breakdownData ? (
-                                /* Points Breakdown View */
-                                <div className="p-4 md:p-6 space-y-6">
-                                    <div className="flex items-center justify-between bg-muted/20 p-4 rounded-xl border border-border/50">
-                                        <div className="text-sm font-semibold text-muted-foreground">TOTAL FANTASY POINTS</div>
-                                        <div className="text-3xl font-black text-primary">{breakdownData.total.toFixed(1)}</div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Batting Breakdown */}
-                                        {breakdownData.batting.total !== 0 && (
-                                            <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl overflow-hidden">
-                                                <div className="bg-emerald-500/10 px-4 py-2 font-bold text-xs uppercase tracking-wider text-emerald-600 flex justify-between items-center">
-                                                    <span>Batting</span>
-                                                    <span>{breakdownData.batting.total.toFixed(1)} pts</span>
-                                                </div>
-                                                <div className="p-4 space-y-3 text-sm">
-                                                    {breakdownData.batting.runs !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Runs ({selectedMatch.runs || 0})</span>
-                                                            <span className="font-medium text-emerald-500">+{breakdownData.batting.runs}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.batting.fours !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Fours ({selectedMatch.fours || 0})</span>
-                                                            <span className="font-medium text-emerald-500">+{breakdownData.batting.fours}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.batting.sixes !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Sixes ({selectedMatch.sixes || 0})</span>
-                                                            <span className="font-medium text-emerald-500">+{breakdownData.batting.sixes}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.batting.milestoneBonus !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Milestone Bonus</span>
-                                                            <span className="font-medium text-emerald-500">+{breakdownData.batting.milestoneBonus}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.batting.strikeRateBonus !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Strike Rate Bonus</span>
-                                                            <span className={cn("font-medium", breakdownData.batting.strikeRateBonus > 0 ? "text-emerald-500" : "text-rose-500")}>
-                                                                {breakdownData.batting.strikeRateBonus > 0 ? '+' : ''}{breakdownData.batting.strikeRateBonus}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.batting.duckPenalty !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Duck Penalty</span>
-                                                            <span className="font-medium text-rose-500">{breakdownData.batting.duckPenalty}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Bowling Breakdown */}
-                                        {breakdownData.bowling.total !== 0 && (
-                                            <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl overflow-hidden">
-                                                <div className="bg-rose-500/10 px-4 py-2 font-bold text-xs uppercase tracking-wider text-rose-600 flex justify-between items-center">
-                                                    <span>Bowling</span>
-                                                    <span>{breakdownData.bowling.total.toFixed(1)} pts</span>
-                                                </div>
-                                                <div className="p-4 space-y-3 text-sm">
-                                                    {breakdownData.bowling.wickets !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Wickets ({selectedMatch.wickets || 0})</span>
-                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.wickets}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.bowling.milestoneBonus !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Milestone Bonus</span>
-                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.milestoneBonus}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.bowling.dots !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Dot Balls ({selectedMatch.dots || 0})</span>
-                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.dots}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.bowling.maidens !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Maidens ({selectedMatch.maidens || 0})</span>
-                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.maidens}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.bowling.economyBonus !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Economy Bonus</span>
-                                                            <span className={cn("font-medium", breakdownData.bowling.economyBonus > 0 ? "text-rose-500" : "text-amber-500")}>
-                                                                {breakdownData.bowling.economyBonus > 0 ? '+' : ''}{breakdownData.bowling.economyBonus}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.bowling.lbwBowledBonus !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">LBW/Bowled Bonus</span>
-                                                            <span className="font-medium text-rose-500">+{breakdownData.bowling.lbwBowledBonus}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Fielding Breakdown */}
-                                        {breakdownData.fielding.total !== 0 && (
-                                            <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl overflow-hidden">
-                                                <div className="bg-amber-500/10 px-4 py-2 font-bold text-xs uppercase tracking-wider text-amber-600 flex justify-between items-center">
-                                                    <span>Fielding</span>
-                                                    <span>{breakdownData.fielding.total.toFixed(1)} pts</span>
-                                                </div>
-                                                <div className="p-4 space-y-3 text-sm">
-                                                    {breakdownData.fielding.catches !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Catches ({selectedMatch.catches || 0})</span>
-                                                            <span className="font-medium text-amber-500">+{breakdownData.fielding.catches}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.fielding.runOuts !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Run Outs ({selectedMatch.runOuts || 0})</span>
-                                                            <span className="font-medium text-amber-500">+{breakdownData.fielding.runOuts}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.fielding.stumpings !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Stumpings ({selectedMatch.stumpings || 0})</span>
-                                                            <span className="font-medium text-amber-500">+{breakdownData.fielding.stumpings}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.fielding.multiCatchBonus !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Multi-Catch Bonus</span>
-                                                            <span className="font-medium text-amber-500">+{breakdownData.fielding.multiCatchBonus}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Common / Bonuses */}
-                                        {breakdownData.common.total !== 0 && (
-                                            <div className="bg-primary/5 border border-primary/10 rounded-xl overflow-hidden">
-                                                <div className="bg-primary/10 px-4 py-2 font-bold text-xs uppercase tracking-wider text-primary flex justify-between items-center">
-                                                    <span>Common / Match Bonus</span>
-                                                    <span>{breakdownData.common.total.toFixed(1)} pts</span>
-                                                </div>
-                                                <div className="p-4 space-y-3 text-sm">
-                                                    {breakdownData.common.starting11 !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Starting XI</span>
-                                                            <span className="font-medium text-primary">+{breakdownData.common.starting11}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.common.matchWinningTeam !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Winning Team Bonus</span>
-                                                            <span className="font-medium text-primary">+{breakdownData.common.matchWinningTeam}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.common.impactPlayer !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Impact Player</span>
-                                                            <span className="font-medium text-primary">+{breakdownData.common.impactPlayer}</span>
-                                                        </div>
-                                                    )}
-                                                    {breakdownData.common.manOfTheMatch !== 0 && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Man of the Match</span>
-                                                            <span className="font-medium text-primary">+{breakdownData.common.manOfTheMatch}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                /* Existing Game Log View */
-                                <div className="p-0">
-                                    <div className="min-w-[700px] md:min-w-full pb-4">
-                                        {/* Year/Filter header */}
-                                        <div className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/10">
-                                            2025 Regular Season
-                                        </div>
-
-                                        {/* Unified Grid Table */}
-                                        <div className="grid text-xs text-center border-b border-border/50">
-                                            {/* Header Row 1 - Groups */}
-                                            <div className="flex w-full min-w-[700px] md:min-w-full bg-muted/30 font-bold text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 z-20 shadow-sm border-b border-border/50">
-                                                <div className="w-[180px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-background/95 backdrop-blur-sm">MATCH</div>
-                                                <div className="w-[80px] flex-shrink-0 h-8 flex items-center justify-center border-r border-border/50 bg-indigo-500/10 text-indigo-400">FANTASY</div>
-
-                                                {sections.map(section => (
-                                                    <div
-                                                        key={section.id}
-                                                        className={cn("h-8 flex items-center justify-center border-r border-border/50 last:border-r-0", section.color)}
-                                                        style={{ flex: `${section.width} 1 0%`, minWidth: `${section.width}px` }}
-                                                    >
-                                                        {section.label}
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            {/* Header Row 2 - Columns */}
-                                            <div className="flex w-full min-w-[700px] md:min-w-full bg-background/95 backdrop-blur-sm font-bold border-b border-border/50 sticky top-[32px] z-10 shadow-sm text-[10px] md:text-xs">
-                                                {/* Match Columns */}
-                                                <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 text-muted-foreground flex items-center justify-center">WK</div>
-                                                <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 text-muted-foreground flex items-center">OPP</div>
-
-                                                {/* Fantasy Columns */}
-                                                <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 text-indigo-400 bg-indigo-500/5 flex items-center justify-center">FPTS</div>
-
-                                                {/* Dynamic Section Columns */}
-                                                {sections.map(section => (
-                                                    <React.Fragment key={`${section.id}-cols`}>
-                                                        {section.cols.map(col => (
-                                                            <div
-                                                                key={col.key}
-                                                                className={cn("py-2 border-r border-border/50 last:border-r-0 flex items-center justify-center", section.color)}
-                                                                style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
-                                                            >
-                                                                {col.label}
-                                                            </div>
-                                                        ))}
-                                                    </React.Fragment>
-                                                ))}
-                                            </div>
-
-                                            {/* Data Rows */}
-                                            {unifiedMatches.length > 0 ? unifiedMatches.map((matchItem, index) => {
-                                                // Stats are merged directly into matchItem from player_match_stats
-                                                const hasStats = matchItem.runs !== undefined || matchItem.wickets !== undefined;
-                                                const stats = hasStats ? matchItem : undefined;
-
-                                                // Use DB fantasy_points if available, otherwise calculate
-                                                const fpts = hasStats
-                                                    ? (matchItem.fantasyPoints ?? calculateFantasyPoints(getPlayerStatsForCalc(stats), scoringRules).total)
-                                                    : 0;
-
-                                                const matchDate = matchItem.matchDate;
-                                                const opponentShort = matchItem.opponentShort;
-                                                // If we have stats, the match is not upcoming.
-                                                // If no stats but match is in the past or state is Complete, treat as DNP (not upcoming).
-                                                const isUpcoming = hasStats
-                                                    ? false
-                                                    : matchItem.isUpcoming && matchItem.matchDate > new Date() && matchItem.matchState !== 'Complete';
-                                                const result = matchItem.result;
-
-                                                // Week number
-                                                const weekNum = matchItem.week || index + 1;
-
-                                                return (
-                                                    <div
-                                                        key={matchItem.matchId || index}
-                                                        onClick={() => {
-                                                            if (hasStats) {
-                                                                setSelectedMatch(matchItem);
-                                                            }
-                                                        }}
-                                                        className={cn(
-                                                            "flex w-full min-w-[700px] md:min-w-full transition-colors border-b border-border/30",
-                                                            index % 2 === 0 ? "bg-background" : "bg-muted/10", // Alternating rows
-                                                            isUpcoming && "opacity-70 bg-muted/5",
-                                                            hasStats ? "cursor-pointer hover:bg-muted/60" : "cursor-default"
-                                                        )}
-                                                    >
-                                                        {/* Match Info */}
-                                                        <div className="w-[40px] flex-shrink-0 py-2 border-r border-border/50 items-center justify-center flex text-muted-foreground font-mono text-[10px]">
-                                                            {weekNum}
-                                                        </div>
-                                                        <div className="w-[140px] flex-shrink-0 py-2 border-r border-border/50 text-left px-3 flex flex-col justify-center relative">
-                                                            <span className="font-semibold text-foreground flex items-center justify-between">
-                                                                <span>vs {opponentShort}</span>
-                                                                {isUpcoming && (
-                                                                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground border px-1 rounded">Upcoming</span>
-                                                                )}
-                                                                {(matchItem.matchState?.toLowerCase().includes('live') || matchItem.matchState?.toLowerCase().includes('progress') || matchItem.isLiveStats) && (
-                                                                    <span className="flex items-center gap-1.5 bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded border border-rose-500/20 text-[9px] font-bold animate-pulse">
-                                                                        <span className="w-1 h-1 rounded-full bg-rose-500" />
-                                                                        LIVE
-                                                                    </span>
-                                                                )}
-                                                            </span>
-                                                            <span className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
-                                                                {isUpcoming ? (
-                                                                    matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-                                                                ) : (
-                                                                    result || matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                                                )}
-                                                            </span>
-                                                        </div>
-
-                                                        {/* Fantasy Points */}
-                                                        <div className="w-[80px] flex-shrink-0 py-2 border-r border-border/50 bg-muted/20 font-bold text-primary flex items-center justify-center text-sm">
-                                                            {hasStats ? fpts.toFixed(1) : (isUpcoming ? '' : 'DNP')}
-                                                        </div>
-
-                                                        {/* Dynamic Data Columns */}
-                                                        {sections.map(section => (
-                                                            <React.Fragment key={section.id}>
-                                                                {section.cols.map(col => {
-                                                                    // Extract value safely
-                                                                    let val: string | number | undefined = '-';
-                                                                    if (hasStats && stats) {
-                                                                        val = (stats as unknown as Record<string, string | number | undefined>)[col.key];
-
-                                                                        // Formatting
-                                                                        if (val === undefined || val === null) val = '-';
-                                                                        else if (col.key === 'strikeRate' || col.key === 'economy') val = (val as number).toFixed(1);
-                                                                        else if (col.key === 'runs' && section.id === 'batting' && (val as number) >= 30) {
-                                                                            // Highlight high runs
-                                                                            return (
-                                                                                <div key={col.key} className="py-2 border-r border-border/50 flex items-center justify-center" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
-                                                                                    <span className="text-foreground font-semibold">{val}</span>
-                                                                                </div>
-                                                                            );
-                                                                        }
-                                                                        else if (col.key === 'wickets' && (val as number) >= 2) {
-                                                                            // Highlight high wickets
-                                                                            return (
-                                                                                <div key={col.key} className="py-2 border-r border-border/50 flex items-center justify-center" style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}>
-                                                                                    <span className="text-foreground font-semibold">{val}</span>
-                                                                                </div>
-                                                                            );
-                                                                        }
-                                                                        else if (col.key === 'overs' && !val) {
-                                                                            val = '-';
-                                                                        }
-                                                                    }
-
-                                                                    return (
-                                                                        <div
-                                                                            key={col.key}
-                                                                            className="py-2 border-r border-border/50 flex items-center justify-center text-muted-foreground"
-                                                                            style={{ flex: `${col.px} 1 0%`, minWidth: `${col.px}px` }}
-                                                                        >
-                                                                            {isUpcoming ? '' : (hasStats ? val : 'DNP')}
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </React.Fragment>
-                                                        ))}
-                                                    </div>
-                                                );
-                                            }) : (
-                                                <div className="flex flex-col items-center justify-center py-20 text-center">
-                                                    <Clock className="h-12 w-12 text-muted-foreground/20 mb-3" />
-                                                    <p className="text-muted-foreground font-medium">No played matches yet</p>
-                                                    <p className="text-xs text-muted-foreground/60 mt-1">Season has not started or player played no games</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <ScrollBar orientation="horizontal" />
-                            <ScrollBar orientation="vertical" />
-                        </ScrollArea>
-
-                        {/* Action Bar */}
-                        {(onAdd || onDrop || onTrade || (canDraft && onDraft) || draftTimerProps) && (
-                            <div className="p-4 md:p-6 bg-background/95 backdrop-blur-xl border-t border-border/20 flex flex-col sm:flex-row gap-3 flex-shrink-0 z-40 sticky bottom-0 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] sm:items-center">
-                                {draftTimerProps && (
-                                    <div className="flex-shrink-0 w-full sm:w-auto flex justify-center sm:justify-start sm:mr-auto sm:scale-110 sm:origin-left">
-                                        <DraftTimer {...draftTimerProps} className="w-full sm:w-auto justify-center" />
-                                    </div>
-                                )}
-                                {/* Draft Case */}
-                                {canDraft && onDraft && (
-                                    <Button
-                                        onClick={onDraft}
-                                        className="flex-1 gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-emerald-500/20 w-full"
-                                    >
-                                        <Plus className="w-5 h-5" />
-                                        DRAFT PLAYER
-                                    </Button>
-                                )}
-
-                                {/* Free Agent Case */}
-                                {!owningManager && onAdd && !canDraft && draftState?.isFinalized && (
-                                    <Button
-                                        onClick={onAdd}
-                                        className="flex-1 gap-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-indigo-500/20 w-full"
-                                    >
-                                        <Plus className="w-5 h-5" />
-                                        ADD PLAYER
-                                    </Button>
-                                )}
-
-                                {/* Owned by Current User Case */}
-                                {owningManager && managerProfile && owningManager.id === managerProfile.id && onDrop && draftState?.isFinalized && (
-                                    <Button
-                                        onClick={onDrop}
-                                        variant="destructive"
-                                        className="flex-1 gap-2 font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg shadow-red-500/20 w-full"
-                                    >
-                                        <Minus className="w-5 h-5" />
-                                        DROP PLAYER
-                                    </Button>
-                                )}
-
-                                {/* Owned by Someone Else Case */}
-                                {owningManager && managerProfile && owningManager.id !== managerProfile.id && onTrade && draftState?.isFinalized && (
-                                    <Button
-                                        onClick={onTrade}
-                                        className="flex-1 gap-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 font-bold h-12 md:h-14 rounded-full text-sm md:text-base shadow-lg w-full"
-                                    >
-                                        <ArrowLeftRight className="w-5 h-5" />
-                                        TRADE PLAYER
-                                    </Button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <DialogTitle className="sr-only">Player Details</DialogTitle>
+                {Content}
             </DialogContent>
         </Dialog>
     );

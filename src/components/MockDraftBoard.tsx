@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
-import { User, Plane, Play, RotateCcw, Timer, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { User, Plane, Play, RotateCcw, Timer, Trash2, Zap, Pause, RefreshCw } from 'lucide-react';
 import { useMockDraft } from '@/hooks/useMockDraft';
-import type { Player } from '@/lib/supabase-types';
+import type { Player, Manager } from '@/lib/supabase-types';
+import type { DraftPick } from '@/lib/draft-types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
+import { DraftTimer } from '@/components/DraftTimer';
 import { cn } from '@/lib/utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +31,7 @@ interface MockDraftCellProps {
   pickNumber: string;
   isCurrentPick: boolean;
   isUserTeam: boolean;
+  isUserTurn: boolean;
   onCellClick?: () => void;
 }
 
@@ -40,6 +42,7 @@ const MockDraftCell = ({
   pickNumber,
   isCurrentPick,
   isUserTeam,
+  isUserTurn,
   onCellClick
 }: MockDraftCellProps) => {
   const colors = player ? getTeamColors(player.team) : null;
@@ -47,12 +50,12 @@ const MockDraftCell = ({
     <div
       onClick={onCellClick}
       className={cn(
-        "relative min-h-[80px] p-2 border rounded-lg transition-all",
+        "relative min-h-[80px] p-2 border rounded-lg transition-all overflow-hidden",
         !player && "bg-muted/50 border-border text-muted-foreground",
-        isCurrentPick && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-        isUserTeam && !player && "border-primary border-2",
+        !player && isCurrentPick && "border-primary ring-2 ring-primary ring-inset animate-pulse",
+        !player && isUserTeam && !isCurrentPick && "bg-primary/5 border-primary/20",
         onCellClick ? "cursor-pointer hover:opacity-80" : "cursor-default",
-        !player && "border-dashed"
+        !player && !isCurrentPick && "border-dashed"
       )}
       style={player && colors ? {
         backgroundColor: colors.raw,
@@ -71,23 +74,17 @@ const MockDraftCell = ({
         </div>
       )}
 
-      {/* Current pick indicator */}
-      {isCurrentPick && !player && (
-        <div className="absolute top-1 left-1">
-          <Timer className="w-3 h-3 text-primary animate-pulse" />
-        </div>
-      )}
 
       {player ? (
-        <div className="pt-3 flex flex-col items-center justify-center text-center">
+        <div className="pt-3 flex flex-col items-center justify-center text-center relative z-10">
           <p className={cn(
-            "font-medium text-xs truncate leading-tight w-full",
+            "font-medium text-[10px] truncate leading-tight w-full opacity-90",
             colors?.text
           )}>
             {player.name.split(' ')[0]}
           </p>
           <p className={cn(
-            "font-bold text-sm truncate leading-tight w-full",
+            "font-bold text-xs truncate leading-tight w-full",
             colors?.text
           )}>
             {player.name.split(' ').slice(1).join(' ')}
@@ -108,7 +105,22 @@ const MockDraftCell = ({
         </div>
       ) : (
         <div className="flex items-center justify-center h-full pt-2">
-          <User className="w-6 h-6 opacity-30" />
+          {isCurrentPick && isUserTurn ? (
+            <div className="flex flex-col items-center gap-1 group-hover:scale-110 transition-transform duration-300">
+              <Zap className="w-8 h-8 text-primary animate-pulse fill-primary/20" />
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-black text-primary uppercase tracking-tighter">Click to</span>
+                <span className="text-[12px] font-black text-primary uppercase tracking-tighter leading-none">Pick Player</span>
+              </div>
+            </div>
+          ) : isCurrentPick ? (
+            <div className="flex flex-col items-center gap-1 opacity-50">
+              <Timer className="w-6 h-6 text-primary" />
+              <span className="text-[8px] font-bold text-primary uppercase">On Clock</span>
+            </div>
+          ) : (
+            <User className="w-6 h-6 opacity-30" />
+          )}
         </div>
       )}
     </div>
@@ -130,10 +142,14 @@ export const MockDraftBoard = ({ draftId, masterPlayers }: { draftId: string, ma
     getPickByTeam,
     getPickDisplayNumber,
     getTeamForPick,
+    pauseDraft,
+    resumeDraft,
+    resetClock,
+    getRemainingTime,
   } = useMockDraft(draftId, masterPlayers);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedCell, setSelectedCell] = useState<{ round: number; teamIndex: number } | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [targetPick, setTargetPick] = useState<{ round: number; position: number } | null>(null);
 
   // Start auto-picking loop when mock draft starts
   useEffect(() => {
@@ -159,17 +175,10 @@ export const MockDraftBoard = ({ draftId, masterPlayers }: { draftId: string, ma
     if (round !== draft.currentRound) return;
     if (teamIndex !== userTeamIndex) return;
 
-    setSelectedCell({ round, teamIndex });
-    setDialogOpen(true);
+    setTargetPick({ round, position: teamIndex + 1 });
+    setDrawerOpen(true);
   };
 
-  const handlePickConfirm = async (playerId: string) => {
-    makeUserPick(playerId);
-    setDialogOpen(false);
-
-    // Continue auto-picking after user pick
-    continueAfterUserPick();
-  };
 
   const handleDeleteDraft = () => {
     deleteDraft(draftId);
@@ -183,35 +192,33 @@ export const MockDraftBoard = ({ draftId, masterPlayers }: { draftId: string, ma
   return (
     <div className="space-y-4 pb-28">
       {/* Status Bar */}
-      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
-        <div className="flex items-center gap-4">
-          <Badge variant={isUserTurn ? 'default' : 'secondary'}>
-            {isComplete ? 'Complete' : isUserTurn ? 'Your Pick!' : 'AI Drafting...'}
-          </Badge>
-          <span className="text-sm text-muted-foreground">
-            Round {Math.min(draft.currentRound, rounds)} | Pick {Math.min(draft.currentPickIndex + 1, positions)}/{positions}
-          </span>
-          <span className="text-sm text-muted-foreground">
-            Your position: #{draft.userPosition}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/')} className="gap-2">
-            Back to Leagues
-          </Button>
-          <Button variant="destructive" size="sm" onClick={handleDeleteDraft} className="gap-2">
-            <Trash2 className="w-4 h-4" />
-            Delete
-          </Button>
+      <div className="flex flex-col gap-4 p-4 bg-muted/30 rounded-xl border border-border shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Badge variant={isUserTurn ? 'default' : 'secondary'} className={cn(isUserTurn && "bg-emerald-500 hover:bg-emerald-600 animate-pulse")}>
+              {isComplete ? 'Complete' : isUserTurn ? 'Your Pick!' : 'AI Drafting...'}
+            </Badge>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold">
+                Round {Math.min(draft.currentRound, rounds)} | Pick {Math.min(draft.currentPickIndex + 1, positions)}/{positions}
+              </span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                Your position: #{draft.userPosition}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/')} className="h-9">
+              Back Home
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleDeleteDraft} className="h-9 px-3">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* User turn prompt */}
-      {isUserTurn && !isComplete && (
-        <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg text-center animate-in fade-in slide-in-from-top-2">
-          <p className="font-medium text-primary">It's your turn! Click on your column to make a pick.</p>
-        </div>
-      )}
 
       {/* Scrollable Draft Container */}
       <div className="overflow-x-auto -mx-4 px-4">
@@ -290,6 +297,7 @@ export const MockDraftBoard = ({ draftId, masterPlayers }: { draftId: string, ma
                     pickNumber={pickNumber}
                     isCurrentPick={isCurrentPick}
                     isUserTeam={isUserTeam}
+                    isUserTurn={isUserTurn}
                     onCellClick={canClick ? () => handleCellClick(round, teamIndex) : undefined}
                   />
                 );
@@ -320,19 +328,113 @@ export const MockDraftBoard = ({ draftId, masterPlayers }: { draftId: string, ma
       {/* Draft Pick Dialog - only render if not completely finished */}
       {!isComplete && (
         <>
-          <DraftPickDialog
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
-            round={selectedCell?.round || 0}
-            position={(selectedCell?.teamIndex || 0) + 1}
-            draftedPlayerIds={getDraftedPlayerIds()}
-            currentPlayerId={null}
-            onConfirm={handlePickConfirm}
-            isMockDraft={true}
-          />
 
-          <AvailablePlayersDrawer draftedPlayerIds={getDraftedPlayerIds()} />
+          <AvailablePlayersDrawer
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+            targetPick={targetPick}
+            draftState={{
+              leagueId: draftId,
+              status: 'active',
+              currentRound: draft.currentRound,
+              currentPosition: draft.currentPickIndex + 1,
+              clockDurationSeconds: 60,
+              lastPickAt: new Date(),
+              pausedAt: null,
+              totalPausedDurationMs: 0,
+              version: 1,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              isActive: true,
+              isFinalized: false
+            }}
+            draftedPlayerIds={getDraftedPlayerIds()}
+            players={masterPlayers}
+            canPick={isUserTurn}
+            onDraftPlayer={(playerId) => {
+              makeUserPick(playerId);
+              continueAfterUserPick();
+              setDrawerOpen(false);
+            }}
+            managers={Object.entries(draft.teamRosters).map(([idx, roster]) => ({
+              id: idx,
+              name: `Team ${Number(idx) + 1}`,
+              teamName: `Team ${Number(idx) + 1}`,
+              wins: 0,
+              losses: 0,
+              points: 0,
+              activeRoster: roster,
+              bench: [],
+            }))}
+            config={draft.config}
+            draftPicks={draft.picks.map((p, i) => ({
+              id: `pick-${i}`,
+              leagueId: draftId,
+              round: p.round,
+              pickNumber: p.position + ((p.round - 1) * draft.config.managerCount),
+              managerId: String(p.teamIndex),
+              playerId: p.playerId,
+              isAutoDraft: p.teamIndex !== draft.userPosition - 1,
+              createdAt: new Date(),
+            }))}
+          />
         </>
+      )}
+      {!isComplete && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-4 pointer-events-none">
+          {/* Floating Action Bar */}
+          <div className="bg-[#0f111a]/95 backdrop-blur-md border border-white/10 px-4 py-2.5 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center gap-4 pointer-events-auto animate-in fade-in slide-in-from-bottom-8 duration-500">
+            <div className="flex items-center gap-1">
+              {draft.pausedAt ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={resumeDraft}
+                  className="h-10 w-10 text-white hover:bg-white/10 rounded-xl transition-all active:scale-95"
+                >
+                  <Play className="w-5 h-5 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={pauseDraft}
+                  className="h-10 w-10 text-white hover:bg-white/10 rounded-xl transition-all active:scale-95"
+                >
+                  <Pause className="w-5 h-5 fill-current" />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={resetClock}
+                className="h-10 w-10 text-white hover:bg-white/10 rounded-xl transition-all active:scale-95"
+                title="Reset Clock"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="h-6 w-[1px] bg-white/10" />
+
+            <div className="bg-[#1e1b2e] border border-[#3b2b85]/30 px-4 py-2 rounded-xl flex items-center gap-2.5 min-w-[100px] group transition-all hover:border-[#5b46cc]/50">
+              <Timer className="w-5 h-5 text-[#8b6dfc] group-hover:animate-pulse" />
+              <span className="text-[#8b6dfc] font-black font-mono text-xl tracking-tight leading-none">
+                {Math.ceil(getRemainingTime() / 1000)}s
+              </span>
+            </div>
+          </div>
+
+          {/* Turn Indicator */}
+          {isUserTurn && !draft.pausedAt && (
+            <div className="bg-primary px-6 py-1.5 rounded-full shadow-lg border-2 border-primary-foreground/20 animate-in fade-in slide-in-from-bottom-4 duration-300 pointer-events-auto">
+              <span className="text-primary-foreground font-black text-xs md:text-sm tracking-tighter uppercase flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                It's Your Turn! Pick Now
+              </span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

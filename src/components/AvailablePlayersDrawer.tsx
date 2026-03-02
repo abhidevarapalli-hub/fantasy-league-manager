@@ -7,14 +7,15 @@ import { useGameStore } from '@/store/useGameStore';
 import { sortPlayersByPriority } from '@/lib/player-order';
 import { cn } from '@/lib/utils';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
-import { Player } from '@/lib/supabase-types';
+import { Player, Manager } from '@/lib/supabase-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RosterGrid } from '@/components/RosterGrid';
 import { DraftTimer, DraftTimerProps } from '@/components/DraftTimer';
-import { buildOptimalActive11, validateActiveRoster } from '@/lib/roster-validation';
+import { buildOptimalActive11, validateActiveRoster, LeagueConfig } from '@/lib/roster-validation';
 import { usePlayerFilters, RoleFilter, NationalityFilter } from '@/hooks/usePlayerFilters';
 import { getTeamPillStyles } from '@/lib/team-colors';
+import { DraftPick, DraftState } from '@/lib/draft-types';
 import {
   Sheet,
   SheetContent,
@@ -63,6 +64,12 @@ interface AvailablePlayersDrawerProps {
   onOpenChange?: (open: boolean) => void;
   targetPick?: { round: number; position: number } | null;
   draftTimerProps?: DraftTimerProps;
+  // Optional overrides for Mock Draft or other contexts
+  players?: Player[];
+  managers?: Manager[];
+  config?: LeagueConfig;
+  draftPicks?: DraftPick[];
+  draftState?: DraftState;
 }
 
 export const AvailablePlayersDrawer = ({
@@ -73,18 +80,30 @@ export const AvailablePlayersDrawer = ({
   open: externalOpen,
   onOpenChange: setExternalOpen,
   targetPick,
-  draftTimerProps
+  draftTimerProps,
+  players: propsPlayers,
+  managers: propsManagers,
+  config: propsConfig,
+  draftPicks: propsDraftPicks,
+  draftState: propsDraftState
 }: AvailablePlayersDrawerProps) => {
-  const players = useGameStore(state => state.players);
-  const managers = useGameStore(state => state.managers);
-  const draftPicks = useGameStore(state => state.draftPicks);
-  const config = useGameStore(state => state.config);
+  const storePlayers = useGameStore(state => state.players);
+  const storeManagers = useGameStore(state => state.managers);
+  const storeDraftPicks = useGameStore(state => state.draftPicks);
+  const { draftState: storeDraftState, scoringRules, config: storeConfig } = useGameStore();
   const currentManagerId = useGameStore(state => state.currentManagerId);
+
+  // Use props if provided, otherwise fallback to store
+  const players = propsPlayers || storePlayers;
+  const managers = propsManagers || storeManagers;
+  const draftPicks = propsDraftPicks || storeDraftPicks;
+  const config = propsConfig || storeConfig;
 
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = setExternalOpen || setInternalOpen;
+  const draftState = propsDraftState || storeDraftState;
 
   const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
 
@@ -407,6 +426,10 @@ export const AvailablePlayersDrawer = ({
             }
             setDetailPlayer(null); // Close dialog after draft
           } : undefined}
+          managers={managers}
+          draftPicks={draftPicks}
+          draftState={draftState}
+          isMyTurn={canPick}
         />
       )}
     </>

@@ -168,6 +168,8 @@ export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
       currentPickIndex: nextPickIndex,
       teamRosters: newRosters,
       status: nextRound > ROUNDS ? 'completed' : 'in_progress',
+      lastPickAt: new Date().toISOString(),
+      pausedAt: null,
     });
   }, [draftId, draft, TEAMS, ROUNDS, updateDraft]);
 
@@ -210,14 +212,39 @@ export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
       currentPickIndex: nextPickIndex,
       teamRosters: newRosters,
       status: nextRound > ROUNDS ? 'completed' : 'in_progress',
+      lastPickAt: new Date().toISOString(),
+      pausedAt: null,
     };
   }, [getTeamForPick, selectPlayerForTeam, TEAMS, ROUNDS]);
+
+  const pauseDraft = useCallback(() => {
+    if (!draft || draft.status !== 'in_progress') return;
+    updateDraft(draftId, { pausedAt: new Date().toISOString() });
+  }, [draftId, draft, updateDraft]);
+
+  const resumeDraft = useCallback(() => {
+    if (!draft || draft.status !== 'in_progress' || !draft.pausedAt) return;
+    updateDraft(draftId, { pausedAt: null });
+  }, [draftId, draft, updateDraft]);
+
+  const resetClock = useCallback(() => {
+    updateDraft(draftId, { lastPickAt: new Date().toISOString() });
+  }, [draftId, updateDraft]);
+
+  const getRemainingTime = useCallback(() => {
+    if (!draft || draft.status !== 'in_progress' || !draft.lastPickAt) return 0;
+    const duration = (draft.config.draftTimerSeconds || 60) * 1000;
+    const lastPickTime = new Date(draft.lastPickAt).getTime();
+    const now = draft.pausedAt ? new Date(draft.pausedAt).getTime() : Date.now();
+    const elapsed = now - lastPickTime;
+    return Math.max(0, duration - elapsed);
+  }, [draft]);
 
   const runAutoPickLoop = useCallback(() => {
     if (abortRef.current) return;
 
     const currentDraft = useMockStore.getState().drafts[draftId];
-    if (!currentDraft || currentDraft.status !== 'in_progress') return;
+    if (!currentDraft || currentDraft.status !== 'in_progress' || currentDraft.pausedAt) return;
 
     const currentTeamIndex = getTeamForPick(currentDraft.currentRound, currentDraft.currentPickIndex);
     const userTeamIndex = currentDraft.userPosition - 1;
@@ -282,6 +309,33 @@ export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
     return playerIds.map(id => allPlayers.find(p => p.id === id)).filter(Boolean) as Player[];
   }, [allPlayers, draft]);
 
+  // Handle auto-pick on timeout
+  useEffect(() => {
+    if (!draft || draft.status !== 'in_progress' || draft.pausedAt) return;
+
+    const interval = setInterval(() => {
+      const remaining = getRemainingTime();
+      if (remaining <= 0) {
+        const currentTeamIndex = getTeamForPick(draft.currentRound, draft.currentPickIndex);
+        const userTeamIndex = draft.userPosition - 1;
+
+        if (currentTeamIndex === userTeamIndex) {
+          // User timeout - auto pick best available
+          const available = getAvailablePlayers();
+          if (available.length > 0) {
+            makeUserPick(available[0].id);
+            continueAfterUserPick();
+          }
+        } else {
+          // AI timeout - should be handled by loop but safety first
+          runAutoPickLoop();
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [draft, getRemainingTime, getTeamForPick, getAvailablePlayers, makeUserPick, continueAfterUserPick, runAutoPickLoop]);
+
   return {
     draft,
     isUserTurn: isUserTurnState,
@@ -295,5 +349,9 @@ export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
     getPickDisplayNumber,
     getTeamForPick,
     getUserRoster,
+    pauseDraft,
+    resumeDraft,
+    resetClock,
+    getRemainingTime,
   };
 };
