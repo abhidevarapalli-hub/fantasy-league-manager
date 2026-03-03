@@ -410,8 +410,11 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
   // Derive current round and position for timer/active highlighting
   const currentTotalPicks = (draftPicks || []).length;
   const positionsCount = config.managerCount;
-  const currentRound = Math.floor(currentTotalPicks / (positionsCount || 1)) + 1;
-  const pickIndexInRound = currentTotalPicks % (positionsCount || 1);
+
+  // These are for UI/Timer display only - they represent what the NEXT pick will be
+  const nextPickIndex = currentTotalPicks;
+  const currentRound = Math.floor(nextPickIndex / (positionsCount || 1)) + 1;
+  const pickIndexInRound = nextPickIndex % (positionsCount || 1);
 
   // Snake draft logic for current position
   const isEvenRound = currentRound % 2 === 0;
@@ -421,7 +424,18 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
 
   // Get manager for currently selected cell
   const selectedManager = selectedCell ? getManagerAtPosition(selectedCell.position) : null;
-  const selectedPick = selectedCell ? getPick(selectedCell.round, selectedCell.position) : null;
+
+  // Logic fix: We need to match picks by their absolute pick number
+  // Database stores pick_number as ((round-1) * managerCount) + position_in_round
+  // But wait! In snake rounds, position_in_round is NOT just the column index.
+  // Let's use a helper in useDraft or define it here.
+  const getAbsolutePickNumber = (r: number, p: number) => {
+    const isRRoundEven = r % 2 === 0;
+    const posInRound = isRRoundEven
+      ? (positionsCount - p + 1)
+      : p;
+    return ((r - 1) * positionsCount) + posInRound;
+  };
 
   // Get all assigned manager IDs to filter available managers
   const assignedManagerIds = Array.from({ length: config.managerCount }, (_, i) => {
@@ -617,8 +631,9 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                 const position = colIdx + 1;
 
                 const manager = getManagerAtPosition(position);
-                const pick = getPick(round, position);
-                const player = getPlayerForPick(pick);
+                const absolutePickNumber = getAbsolutePickNumber(round, position);
+                const pick = draftPicks.find(p => p.pickNumber === absolutePickNumber);
+                const player = getPlayerForPick(pick || null);
                 const pickNumber = `${round}.${position}`;
 
                 const isActivePick = draftState?.isActive &&
