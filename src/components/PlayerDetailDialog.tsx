@@ -262,29 +262,35 @@ export function PlayerDetailDialog({
         if (!player) return [];
         const schedule = playerSchedule && playerSchedule.length > 0 ? playerSchedule : matchStats;
 
-        if (!playerStatsMap || playerStatsMap.size === 0) return schedule as UnifiedMatchData[];
+        // If we have a schedule, merge DB stats into it
+        if (schedule && schedule.length > 0) {
+            if (!playerStatsMap || playerStatsMap.size === 0) return schedule as UnifiedMatchData[];
+            return schedule.map(match => {
+                const dbStats = playerStatsMap.get(match.matchId);
+                if (!dbStats) return match;
+                return {
+                    ...match,
+                    ...dbStats,
+                    matchId: match.matchId,
+                    matchDate: match.matchDate,
+                    opponent: match.opponent,
+                    opponentShort: match.opponentShort,
+                    venue: match.venue,
+                    result: match.result,
+                    isUpcoming: match.isUpcoming,
+                    week: (match as UnifiedMatchData).week,
+                    matchState: dbStats.matchState || match.matchState,
+                    isLiveStats: dbStats.isLiveStats || false
+                };
+            });
+        }
 
-        // Merge DB stats into each schedule entry by cricbuzz_match_id
-        const merged = schedule.map(match => {
-            const dbStats = playerStatsMap.get(match.matchId);
-            if (!dbStats) return match;
-            return {
-                ...match,
-                ...dbStats,
-                matchId: match.matchId,
-                matchDate: match.matchDate,
-                opponent: match.opponent,
-                opponentShort: match.opponentShort,
-                venue: match.venue,
-                result: match.result,
-                isUpcoming: match.isUpcoming,
-                week: (match as UnifiedMatchData).week,
-                matchState: dbStats.matchState || match.matchState,
-                isLiveStats: dbStats.isLiveStats || false
-            };
-        });
+        // No schedule available — use DB stats as the source
+        if (playerStatsMap && playerStatsMap.size > 0) {
+            return Array.from(playerStatsMap.values()) as UnifiedMatchData[];
+        }
 
-        return merged;
+        return [];
     }, [playerSchedule, matchStats, playerStatsMap, player]);
 
     // Local state for the selected match to show breakdown

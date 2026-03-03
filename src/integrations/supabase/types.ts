@@ -1949,6 +1949,14 @@ export type Database = {
         Args: { p_cricbuzz_match_id: number; p_lock_duration_seconds?: number }
         Returns: boolean
       }
+      admin_finalize_match: {
+        Args: {
+          p_man_of_match_cricbuzz_id?: string
+          p_match_id: string
+          p_winner_team_id?: number
+        }
+        Returns: undefined
+      }
       auto_link_league_matches: {
         Args: never
         Returns: {
@@ -1956,7 +1964,22 @@ export type Database = {
         }[]
       }
       batch_update_league_scores: { Args: { p_updates: Json }; Returns: number }
+      bulk_activate_stale_matches: {
+        Args: never
+        Returns: {
+          rows_inserted: number
+        }[]
+      }
       check_auto_draft: { Args: { p_league_id: string }; Returns: Json }
+      check_week_finalization_ready: {
+        Args: { p_league_id: string; p_week: number }
+        Returns: {
+          finalized_matches: number
+          is_ready: boolean
+          total_matches: number
+          unfinalized_match_ids: string[]
+        }[]
+      }
       disable_match_polling: {
         Args: { p_cricbuzz_match_id: number }
         Returns: undefined
@@ -1966,6 +1989,7 @@ export type Database = {
           p_auto?: boolean
           p_cricbuzz_match_id: number
           p_initial_state?: string
+          p_match_id: string
         }
         Returns: string
       }
@@ -1986,14 +2010,20 @@ export type Database = {
         }
         Returns: number
       }
+      finalize_week: {
+        Args: { p_league_id: string; p_week: number }
+        Returns: undefined
+      }
       get_fantasy_standings: {
         Args: { p_league_id: string }
         Returns: {
+          losses: number
           manager_id: string
           manager_name: string
           rank: number
           team_name: string
           total_points: number
+          wins: number
         }[]
       }
       get_league_match_stats_for_recompute: {
@@ -2013,6 +2043,7 @@ export type Database = {
           no_balls: number
           overs: number
           player_id: string
+          primary_role: string
           run_outs: number
           runs: number
           runs_conceded: number
@@ -2038,11 +2069,13 @@ export type Database = {
           finalized_points: number
           has_live_stats: boolean
           live_points: number
+          losses: number
           manager_id: string
           manager_name: string
           rank: number
           team_name: string
           total_points: number
+          wins: number
         }[]
       }
       get_manager_total_points: {

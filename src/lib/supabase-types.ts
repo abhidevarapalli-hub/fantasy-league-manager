@@ -273,6 +273,7 @@ export interface PlayerMatchStats {
   isImpactPlayer: boolean;
   isManOfMatch: boolean;
   teamWon: boolean;
+  playerRole?: string;
   // Calculated
   fantasyPoints: number | null;
   leagueId: string | null;
