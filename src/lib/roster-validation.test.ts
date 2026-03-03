@@ -1,129 +1,121 @@
 import { describe, it, expect } from 'vitest';
-import { buildOptimalActive11, LeagueConfig } from './roster-validation';
+import { buildOptimalActive11, getActiveRosterSlots, LeagueConfig } from './roster-validation';
 import { Player } from './supabase-types';
 
-const DEFAULT_CONFIG: LeagueConfig = {
-    managerCount: 8,
-    activeSize: 11,
-    benchSize: 3,
-    minBatWk: 4,
-    maxBatWk: 7,
-    minBowlers: 3,
-    maxBowlers: 6,
-    minAllRounders: 2,
-    maxAllRounders: 4,
-    maxInternational: 4,
-    requireWk: true,
-};
+const STD: LeagueConfig = { managerCount: 8, activeSize: 11, benchSize: 3, minBatWk: 4, maxBatWk: 7, minBowlers: 3, maxBowlers: 6, minAllRounders: 2, maxAllRounders: 4, maxInternational: 4, requireWk: true };
+const S8: LeagueConfig = { managerCount: 6, activeSize: 8, benchSize: 1, minBatWk: 2, maxBatWk: 5, minBowlers: 2, maxBowlers: 4, minAllRounders: 1, maxAllRounders: 3, maxInternational: 4, requireWk: true };
+const S8_NW: LeagueConfig = { ...S8, requireWk: false };
+const S8_MIN: LeagueConfig = { managerCount: 6, activeSize: 8, benchSize: 1, minBatWk: 1, maxBatWk: 6, minBowlers: 1, maxBowlers: 6, minAllRounders: 1, maxAllRounders: 6, maxInternational: 4, requireWk: false };
+const S9: LeagueConfig = { managerCount: 6, activeSize: 9, benchSize: 2, minBatWk: 3, maxBatWk: 6, minBowlers: 2, maxBowlers: 4, minAllRounders: 1, maxAllRounders: 3, maxInternational: 4, requireWk: true };
+const S9_NW: LeagueConfig = { ...S9, requireWk: false };
+const C10: LeagueConfig = { managerCount: 8, activeSize: 10, benchSize: 2, minBatWk: 3, maxBatWk: 6, minBowlers: 3, maxBowlers: 5, minAllRounders: 2, maxAllRounders: 4, maxInternational: 4, requireWk: true };
+const C10_HB: LeagueConfig = { ...C10, minBatWk: 2, minBowlers: 4, minAllRounders: 1 };
+const C10_LI: LeagueConfig = { ...C10, maxInternational: 2 };
+const C9_ZF: LeagueConfig = { ...S9, minBatWk: 3, minBowlers: 3, minAllRounders: 3 };
+const C9_LI: LeagueConfig = { ...S9, maxInternational: 2 };
 
-const createPlayer = (id: string, role: Player['role'], isInternational: boolean = false): Player => ({
-    id,
-    name: `Player ${id}`,
-    team: 'Team A',
-    role,
-    isInternational,
+const p = (id: string, role: Player['role'], intl = false): Player => ({
+    id, name: id, team: 'T1', role, isInternational: intl,
 });
 
 describe('buildOptimalActive11', () => {
-    it('fills a perfect roster correctly', () => {
-        const players: Player[] = [
-            createPlayer('1', 'Wicket Keeper'),
-            createPlayer('2', 'Batsman'),
-            createPlayer('3', 'Batsman'),
-            createPlayer('4', 'Batsman'),
-            createPlayer('5', 'All Rounder'),
-            createPlayer('6', 'All Rounder'),
-            createPlayer('7', 'Bowler'),
-            createPlayer('8', 'Bowler'),
-            createPlayer('9', 'Bowler'),
-            createPlayer('10', 'Batsman'), // Flex
-            createPlayer('12', 'All Rounder'), // Flex
-            createPlayer('11', 'Bowler'), // Bench
-        ];
-
-        const { active, bench } = buildOptimalActive11(players, DEFAULT_CONFIG);
-
-        expect(active).toHaveLength(11);
-        expect(bench).toHaveLength(1);
-        expect(active.filter(p => p.role === 'Wicket Keeper')).toHaveLength(1);
-        expect(active.filter(p => p.role === 'Batsman')).toHaveLength(4);
-        expect(active.filter(p => p.role === 'All Rounder')).toHaveLength(3); // 2 mandatory + 1 flex (id: 5, 6, 12)
-        expect(active.filter(p => p.role === 'Bowler')).toHaveLength(3); // 3 mandatory (id: 7, 8, 9), flex was filled by AR (id: 11 goes to bench)
+    describe('baseline scenarios (S01-S26)', () => {
+        it('[S01] standard 14', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('b2', 'Batsman'), p('b3', 'Batsman'), p('a1', 'All Rounder'), p('a2', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('bo3', 'Bowler'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('r1', 'Bowler'), p('r2', 'Batsman'), p('r3', 'All Rounder')], STD).active).toHaveLength(11); });
+        it('[S02] small 9', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('f3', 'Bowler'), p('b1', 'Batsman')], S8).active).toHaveLength(8); });
+        it('[S03] Smith no WK', () => { expect(buildOptimalActive11([p('1', 'Bowler'), p('2', 'All Rounder'), p('3', 'Batsman'), p('4', 'Bowler'), p('5', 'All Rounder'), p('6', 'All Rounder'), p('7', 'All Rounder'), p('8', 'Bowler'), p('9', 'Batsman')], S8).active).toHaveLength(7); });
+        it('[S04] standard 14 no WK', () => { expect(buildOptimalActive11([p('b1', 'Batsman'), p('b2', 'Batsman'), p('b3', 'Batsman'), p('b4', 'Batsman'), p('a1', 'All Rounder'), p('a2', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('bo3', 'Bowler'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('r1', 'Bowler'), p('r2', 'Batsman'), p('r3', 'All Rounder')], STD).active).toHaveLength(10); });
+        it('[S05] small no-WK-req', () => { expect(buildOptimalActive11([p('b1', 'Batsman'), p('b2', 'Batsman'), p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('f3', 'Bowler'), p('b1', 'Batsman')], S8_NW).active).toHaveLength(8); });
+        it('[S06] small need 2 BWL have 1', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('f3', 'All Rounder'), p('f4', 'Batsman'), p('b1', 'Batsman')], S8).active).toHaveLength(7); });
+        it('[S07] small need 2 BWL have 0', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('a1', 'All Rounder'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('f3', 'All Rounder'), p('f4', 'All Rounder'), p('b1', 'Batsman'), p('b2', 'Batsman')], S8).active).toHaveLength(6); });
+        it('[S08] standard need 3 BWL have 1', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('b2', 'Batsman'), p('b3', 'Batsman'), p('a1', 'All Rounder'), p('a2', 'All Rounder'), p('bo1', 'Bowler'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('r1', 'All Rounder'), p('r2', 'Batsman'), p('r3', 'All Rounder'), p('r4', 'Batsman'), p('r5', 'All Rounder')], STD).active).toHaveLength(9); });
+        it('[S09] small no AR', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'Batsman'), p('f2', 'Batsman'), p('f3', 'Bowler'), p('f4', 'Bowler'), p('b1', 'Batsman')], S8).active).toHaveLength(7); });
+        it('[S10] standard no AR', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('b2', 'Batsman'), p('b3', 'Batsman'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('bo3', 'Bowler'), p('f1', 'Batsman'), p('f2', 'Bowler'), p('r1', 'Batsman'), p('r2', 'Bowler'), p('r3', 'Batsman'), p('r4', 'Bowler'), p('r5', 'Batsman')], STD).active).toHaveLength(9); });
+        it('[S11] small 0 BAT', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'All Rounder'), p('f2', 'All Rounder'), p('f3', 'All Rounder'), p('f4', 'All Rounder'), p('r1', 'All Rounder')], S8).active).toHaveLength(7); });
+        it('[S12] standard WK + 1 BAT', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('a1', 'All Rounder'), p('a2', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('bo3', 'Bowler'), p('f1', 'All Rounder'), p('f2', 'Bowler'), p('r1', 'Bowler'), p('r2', 'Bowler'), p('r3', 'Bowler'), p('r4', 'Bowler'), p('r5', 'Bowler')], STD).active).toHaveLength(9); });
+        it('[S13] small no WK no BWL', () => { expect(buildOptimalActive11([p('b1', 'Batsman'), p('b2', 'Batsman'), p('a1', 'All Rounder'), p('f1', 'All Rounder'), p('f2', 'All Rounder'), p('f3', 'All Rounder'), p('f4', 'Batsman'), p('r1', 'Batsman'), p('r2', 'Batsman')], S8).active).toHaveLength(5); });
+        it('[S14] small no WK no AR', () => { expect(buildOptimalActive11([p('b1', 'Batsman'), p('b2', 'Batsman'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'Batsman'), p('f2', 'Bowler'), p('f3', 'Batsman'), p('f4', 'Bowler'), p('r1', 'Batsman')], S8).active).toHaveLength(6); });
+        it('[S15] small no WK no BWL no AR', () => { expect(buildOptimalActive11([p('b1', 'Batsman'), p('b2', 'Batsman'), p('bo1', 'Bowler'), p('f1', 'Batsman'), p('f2', 'Batsman'), p('f3', 'Batsman'), p('f4', 'Batsman'), p('r1', 'Batsman'), p('r2', 'Batsman')], S8).active).toHaveLength(5); });
+        it('[S16] all mandatory missing except AR', () => { expect(buildOptimalActive11(Array.from({ length: 14 }, (_, i) => p(`a${i}`, 'All Rounder')), STD).active).toHaveLength(4); });
+        it('[S17] intl limit WK skipped', () => { expect(buildOptimalActive11([p('b1', 'Batsman', true), p('b2', 'Batsman', true), p('b3', 'Batsman', true), p('a1', 'All Rounder', true), p('wk', 'Wicket Keeper', true), p('a2', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'Batsman')], S8).active).toHaveLength(7); });
+        it('[S18] intl limit BWL skipped', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper', true), p('b1', 'Batsman', true), p('b2', 'Batsman', true), p('a1', 'All Rounder', true), p('bo1', 'Bowler', true), p('bo2', 'Bowler', true), p('f1', 'Batsman'), p('f2', 'Batsman'), p('f3', 'Batsman')], S8).active).toHaveLength(6); });
+        it('[S19] fewer than 8 players', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler')], S8).active).toHaveLength(5); });
+        it('[S20] 3 ARs only', () => { expect(buildOptimalActive11([p('a1', 'All Rounder'), p('a2', 'All Rounder'), p('a3', 'All Rounder')], S8).active).toHaveLength(3); });
+        it('[S21] empty', () => { expect(buildOptimalActive11([], S8).active).toHaveLength(0); });
+        it('[S22] requireWk=false WK fills BAT', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('f3', 'Bowler'), p('r1', 'Batsman')], S8_NW).active).toHaveLength(8); });
+        it('[S23] requireWk=false no BAT', () => { expect(buildOptimalActive11([p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'All Rounder'), p('f2', 'All Rounder'), p('f3', 'All Rounder'), p('f4', 'All Rounder'), p('f5', 'All Rounder'), p('r1', 'All Rounder')], S8_NW).active).toHaveLength(6); });
+        it('[S24] boundary activeSize', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'Batsman'), p('f2', 'All Rounder'), p('f3', 'Bowler')], S8).active).toHaveLength(8); });
+        it('[S25] boundary missing WK', () => { expect(buildOptimalActive11([p('b1', 'Batsman'), p('b2', 'Batsman'), p('a1', 'All Rounder'), p('bo1', 'Bowler'), p('bo2', 'Bowler'), p('f1', 'All Rounder'), p('f2', 'All Rounder'), p('f3', 'Bowler')], S8).active).toHaveLength(7); });
+        it('[S26] 1 each role standard', () => { expect(buildOptimalActive11([p('wk', 'Wicket Keeper'), p('b1', 'Batsman'), p('a1', 'All Rounder'), p('bo1', 'Bowler')], STD).active).toHaveLength(4); });
     });
 
-    it('leaves vacant spots if requirements are not met', () => {
-        const players: Player[] = [
-            createPlayer('1', 'Wicket Keeper'),
-            createPlayer('2', 'Batsman'),
-            createPlayer('3', 'Batsman'),
-            // Missing 1 BAT/WK (needs 4 total)
-            createPlayer('5', 'All Rounder'),
-            createPlayer('6', 'All Rounder'),
-            // Missing 1 BOWL (needs 3 total)
-            createPlayer('7', 'Bowler'),
-            createPlayer('8', 'Bowler'),
-            // Extra players that should go to flex or bench
-            createPlayer('10', 'All Rounder'),
-            createPlayer('11', 'All Rounder'),
-            createPlayer('12', 'All Rounder'),
-            createPlayer('13', 'All Rounder'),
-        ];
-
-        const { active, bench } = buildOptimalActive11(players, DEFAULT_CONFIG);
-
-        // Mandatory: 1 WK, 2 BAT (Total 3 of 4 BAT/WK), 2 AR (Total 2 of 2 AR), 2 BOWL (Total 2 of 3 BOWL)
-        // Total mandatory filled: 3 + 2 + 2 = 7
-        // Remaining flex: 11 - (4 + 2 + 3) = 2
-        // ARs available for flex: 10, 11
-        // Total active: 7 + 2 = 9
-        // Bench: 12, 13
-
-        expect(active).toHaveLength(9);
-        expect(bench).toHaveLength(2);
-        expect(active.filter(p => p.role === 'Wicket Keeper')).toHaveLength(1);
-        expect(active.filter(p => p.role === 'Batsman')).toHaveLength(2);
-        expect(active.filter(p => p.role === 'All Rounder')).toHaveLength(4); // 2 mandatory + 2 flex
-        expect(active.filter(p => p.role === 'Bowler')).toHaveLength(2);
+    describe('Full Roster Mismatches (F01-F16)', () => {
+        it('[F01] C9 no WK (6B+1A+2W) → 8', () => { expect(buildOptimalActive11([p('1', 'Batsman'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'Bowler'), p('6', 'Bowler'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], S9).active).toHaveLength(8); });
+        it('[F02] C9 1WK+10BAT → 6', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'Batsman'), p('5', 'Batsman'), p('6', 'Batsman'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], S9).active).toHaveLength(6); });
+        it('[F03] C9 1WK+1B+3A+4W → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Bowler'), p('3', 'Bowler'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'All Rounder'), p('7', 'All Rounder'), p('8', 'All Rounder'), p('9', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Bowler')], S9).active).toHaveLength(9); });
+        it('[F04] C9 all AR → 4', () => { expect(buildOptimalActive11(Array.from({ length: 11 }, (_, i) => p(`${i}`, 'All Rounder')), S9).active).toHaveLength(4); });
+        it('[F05] C9 missing 1 BWL → 8', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'Bowler'), p('6', 'Batsman'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], S9).active).toHaveLength(8); });
+        it('[F06] C10 correct → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Batsman'), p('10', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], C10).active).toHaveLength(10); });
+        it('[F07] C10 no WK → 9', () => { expect(buildOptimalActive11([p('1', 'Batsman'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'Batsman'), p('5', 'All Rounder'), p('6', 'All Rounder'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler'), p('10', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], C10).active).toHaveLength(9); });
+        it('[F08] C10 1WK+11BAT → 5', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'Batsman'), p('5', 'Batsman'), p('6', 'Batsman'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman'), p('10', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], C10).active).toHaveLength(5); });
+        it('[F09] C10 all BWL → 5', () => { expect(buildOptimalActive11(Array.from({ length: 12 }, (_, i) => p(`${i}`, 'Bowler')), C10).active).toHaveLength(5); });
+        it('[F10] C10 multiples WKs → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Wicket Keeper'), p('3', 'Wicket Keeper'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Batsman'), p('10', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], C10).active).toHaveLength(10); });
+        it('[F11] HB config correct → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'All Rounder'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Batsman'), p('9', 'Batsman'), p('10', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], C10_HB).active).toHaveLength(10); });
+        it('[F12] HB missing 2 BWL → 8', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'All Rounder'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'Batsman'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman'), p('10', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], C10_HB).active).toHaveLength(8); });
+        it('[F13] HB missing BAT → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Bowler'), p('3', 'Bowler'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('10', 'All Rounder'), p('b1', 'Bowler'), p('b2', 'Bowler')], C10_HB).active).toHaveLength(9); });
+        it('[F14] ZeroFlex perfect → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'All Rounder'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler'), p('b1', 'Batsman'), p('b2', 'Bowler')], C9_ZF).active).toHaveLength(9); });
+        it('[F15] ZeroFlex no WK → 8', () => { expect(buildOptimalActive11([p('1', 'Batsman'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'All Rounder'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler'), p('b1', 'Batsman'), p('b2', 'Bowler')], C9_ZF).active).toHaveLength(8); });
+        it('[F16] ZeroFlex no AR → 6', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'Batsman'), p('5', 'Batsman'), p('6', 'Batsman'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler'), p('b1', 'Batsman'), p('b2', 'Bowler')], C9_ZF).active).toHaveLength(6); });
     });
 
-    it('respects the 4-international limit', () => {
-        const players: Player[] = [
-            createPlayer('1', 'Wicket Keeper', true),
-            createPlayer('2', 'Batsman', true),
-            createPlayer('3', 'Batsman', true),
-            createPlayer('4', 'Batsman', true),
-            createPlayer('5', 'Batsman', true), // Should be skipped for mandatory
-            createPlayer('6', 'All Rounder'),
-            createPlayer('7', 'All Rounder'),
-            createPlayer('8', 'Bowler'),
-            createPlayer('9', 'Bowler'),
-            createPlayer('10', 'Bowler'),
-        ];
-
-        const { active } = buildOptimalActive11(players, DEFAULT_CONFIG);
-
-        expect(active.filter(p => p.isInternational)).toHaveLength(4);
-        expect(active.find(p => p.id === '5')).toBeUndefined();
+    describe('International Scenarios (I01-I11)', () => {
+        it('[I01] max 4, 5th intl (BWL) benched → 8', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'Batsman', true), p('3', 'Batsman', true), p('4', 'All Rounder', true), p('5', 'Bowler', true), p('6', 'Bowler'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], S9).active).toHaveLength(8); });
+        it('[I02] WK 5th intl benched → 8', () => { expect(buildOptimalActive11([p('1', 'Batsman', true), p('2', 'Batsman', true), p('3', 'Batsman', true), p('4', 'Batsman', true), p('5', 'Wicket Keeper', true), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'All Rounder'), p('9', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], S9).active).toHaveLength(8); });
+        it('[I03] 10-config, 6 intl(max 4) → 8 (unfilled BWL)', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'Batsman', true), p('3', 'All Rounder', true), p('4', 'Bowler', true), p('5', 'Bowler', true), p('6', 'Bowler', true), p('7', 'All Rounder'), p('8', 'Batsman'), p('9', 'Batsman'), p('10', 'Batsman'), p('b1', 'Batsman'), p('b2', 'Batsman')], C10).active).toHaveLength(8); });
+        it('[I04] C10_LI max 2, 3 intl → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'Batsman', true), p('3', 'Batsman', true), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Batsman'), p('10', 'Batsman'), p('b1', 'Batsman')], C10_LI).active).toHaveLength(10); });
+        it('[I05] all intl (11) only 4 play → 4', () => { expect(buildOptimalActive11(Array.from({ length: 11 }, (_, i) => p(`${i}`, 'Batsman', true)), S9).active).toHaveLength(4); });
+        it('[I06] at limit 2 → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'Batsman', true), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'Bowler'), p('6', 'Bowler'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman')], C9_LI).active).toHaveLength(9); });
+        it('[I07] 5 intl bowlers (max 4) → 10', () => { expect(buildOptimalActive11([p('1', 'Bowler', true), p('2', 'Bowler', true), p('3', 'Bowler', true), p('4', 'Bowler', true), p('5', 'Bowler', true), p('6', 'Wicket Keeper'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'All Rounder'), p('10', 'All Rounder'), p('b1', 'Batsman')], C10).active).toHaveLength(10); });
+        it('[I08] HB 4BWL req, 5 intl-BWL(max 4) → 10', () => { expect(buildOptimalActive11([p('1', 'Bowler', true), p('2', 'Bowler', true), p('3', 'Bowler', true), p('4', 'Bowler', true), p('5', 'Bowler', true), p('6', 'Wicket Keeper'), p('7', 'Batsman'), p('8', 'All Rounder'), p('9', 'Batsman'), p('10', 'Batsman'), p('b1', 'Batsman')], C10_HB).active).toHaveLength(10); });
+        it('[I09] 2 intl WK + 2 intl BAT → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'Wicket Keeper', true), p('3', 'Batsman', true), p('4', 'Batsman', true), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Batsman'), p('9', 'Batsman')], S9).active).toHaveLength(9); });
+        it('[I10] 5 intl, benched 5th(AR) → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'All Rounder', true), p('3', 'All Rounder', true), p('4', 'All Rounder', true), p('5', 'Bowler', true), p('6', 'Batsman'), p('7', 'Batsman'), p('8', 'Bowler'), p('9', 'Bowler'), p('10', 'Batsman')], C10).active).toHaveLength(9); });
+        it('[I11] mix 5 intl → 9', () => { expect(buildOptimalActive11([p('1', 'Batsman', true), p('2', 'Bowler', true), p('3', 'All Rounder', true), p('4', 'Wicket Keeper', true), p('5', 'Batsman', true), p('6', 'Bowler'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman'), p('b1', 'Batsman')], S9).active).toHaveLength(9); });
     });
 
-    it('handles requirement for WK separately', () => {
-        const players: Player[] = [
-            createPlayer('1', 'Batsman'),
-            createPlayer('2', 'Batsman'),
-            createPlayer('3', 'Batsman'),
-            createPlayer('4', 'Batsman'),
-            createPlayer('5', 'All Rounder'),
-            createPlayer('6', 'All Rounder'),
-            createPlayer('7', 'Bowler'),
-            createPlayer('8', 'Bowler'),
-            createPlayer('9', 'Bowler'),
-        ];
+    describe('Mixed / Roster Sizes (M01-M17)', () => {
+        it('[M01] C8 rich → 8', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'All Rounder'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'All Rounder'), p('7', 'All Rounder'), p('8', 'Batsman'), p('9', 'Bowler')], S8).active).toHaveLength(8); });
+        it('[M02] C8 all BWL → 5', () => { expect(buildOptimalActive11(Array.from({ length: 9 }, (_, i) => p(`${i}`, 'Bowler')), S8).active).toHaveLength(5); });
+        it('[M03] C8 3WK → 8', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Wicket Keeper'), p('3', 'Wicket Keeper'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'All Rounder'), p('7', 'Batsman'), p('8', 'Batsman')], S8).active).toHaveLength(8); });
+        it('[M04] C8_NW all ok → 8', () => { expect(buildOptimalActive11([p('1', 'Batsman'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'All Rounder'), p('7', 'Batsman'), p('8', 'Batsman')], S8_NW).active).toHaveLength(8); });
+        it('[M05] C8_MIN all BAT → 6', () => { expect(buildOptimalActive11(Array.from({ length: 9 }, (_, i) => p(`${i}`, 'Batsman')), S8_MIN).active).toHaveLength(6); });
+        it('[M06] C8_MIN all AR → 6', () => { expect(buildOptimalActive11(Array.from({ length: 9 }, (_, i) => p(`${i}`, 'All Rounder')), S8_MIN).active).toHaveLength(6); });
+        it('[M07] exactly 8 ok → 8', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'All Rounder'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'Batsman'), p('7', 'All Rounder'), p('8', 'All Rounder')], S8).active).toHaveLength(8); });
+        it('[M08] 5 intl C8 → 7', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'Batsman', true), p('3', 'All Rounder', true), p('4', 'Bowler', true), p('5', 'Bowler', true), p('6', 'Batsman'), p('7', 'All Rounder'), p('8', 'All Rounder')], S8).active).toHaveLength(7); });
+        it('[M09] C10 rich → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'All Rounder'), p('10', 'All Rounder')], C10).active).toHaveLength(10); });
+        it('[M10] C10 4WK → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Wicket Keeper'), p('3', 'Wicket Keeper'), p('4', 'Wicket Keeper'), p('5', 'All Rounder'), p('6', 'All Rounder'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler'), p('10', 'Batsman')], C10).active).toHaveLength(10); });
+        it('[M11] C10 missing 1 AR → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'Bowler'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Batsman'), p('9', 'Batsman')], C10).active).toHaveLength(9); });
+        it('[M12] C10 no AR (need 2) → 8', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'Batsman'), p('5', 'Batsman'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler')], C10).active).toHaveLength(8); });
+        it('[M13] C11 perfect → 11', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'Batsman'), p('5', 'All Rounder'), p('6', 'All Rounder'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler'), p('10', 'Batsman'), p('11', 'All Rounder')], STD).active).toHaveLength(11); });
+        it('[M14] C11 WK+13BAT → 6', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'Batsman'), p('5', 'Batsman'), p('6', 'Batsman')], STD).active).toHaveLength(6); });
+        it('[M15] C11 all BWL → 5', () => { expect(buildOptimalActive11(Array.from({ length: 14 }, (_, i) => p(`${i}`, 'Bowler')), STD).active).toHaveLength(5); });
+        it('[M16] C11 6 intl → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'Batsman', true), p('3', 'Batsman', true), p('4', 'All Rounder', true), p('5', 'All Rounder', true), p('6', 'Bowler', true), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Batsman'), p('10', 'Batsman'), p('11', 'Batsman')], STD).active).toHaveLength(9); });
+        it('[M17] C11 rich mixed → 11', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'All Rounder'), p('10', 'Batsman'), p('11', 'Bowler')], STD).active).toHaveLength(11); });
+    });
 
-        const { active } = buildOptimalActive11(players, DEFAULT_CONFIG);
+    describe('Edge Cases (E01-E08)', () => {
+        it('[E01] 9-config exact 9 → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'Bowler'), p('6', 'Bowler'), p('7', 'Batsman'), p('8', 'Batsman'), p('9', 'Batsman')], S9).active).toHaveLength(9); });
+        it('[E02] 10-config exact 10 → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Batsman'), p('10', 'All Rounder')], C10).active).toHaveLength(10); });
+        it('[E03] 9-config 4 players → 4', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'All Rounder'), p('3', 'Bowler'), p('4', 'Bowler')], S9).active).toHaveLength(4); });
+        it('[E04] 10-config 1 player → 1', () => { expect(buildOptimalActive11([p('1', 'Bowler')], C10).active).toHaveLength(1); });
+        it('[E05] ZeroFlex 12 players → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'All Rounder'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler'), p('b1', 'Batsman'), p('b2', 'Bowler'), p('b3', 'All Rounder')], C9_ZF).active).toHaveLength(9); });
+        it('[E06] exact limit 4 intl → 9', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper', true), p('2', 'Batsman', true), p('3', 'Batsman', true), p('4', 'Batsman', true), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Batsman'), p('9', 'Batsman')], S9).active).toHaveLength(9); });
+        it('[E07] surplus bowlers → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'All Rounder'), p('4', 'Bowler'), p('5', 'Bowler'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Bowler'), p('10', 'Bowler')], C10_HB).active).toHaveLength(10); });
+        it('[E08] intl flex but domestic mandatory → 10', () => { expect(buildOptimalActive11([p('1', 'Wicket Keeper'), p('2', 'Batsman'), p('3', 'Batsman'), p('4', 'All Rounder'), p('5', 'All Rounder'), p('6', 'Bowler'), p('7', 'Bowler'), p('8', 'Bowler'), p('9', 'Batsman', true), p('10', 'Batsman', true)], C10).active).toHaveLength(10); });
+    });
+});
 
-        // Should have 0 Wicket Keepers in active, and total BAT/WK = 4
-        expect(active.filter(p => p.role === 'Wicket Keeper')).toHaveLength(0);
-        expect(active.filter(p => p.role === 'Batsman')).toHaveLength(4);
-        expect(active).toHaveLength(9); // 4 BAT + 2 AR + 3 BOWL = 9. 2 flex vacant.
+describe('getActiveRosterSlots', () => {
+    it('correct slots for 7/8 small config no WK', () => {
+        const slots = getActiveRosterSlots([p('1', 'Bowler'), p('2', 'All Rounder'), p('3', 'Batsman'), p('4', 'Bowler'), p('5', 'All Rounder'), p('6', 'All Rounder'), p('7', 'All Rounder')], S8);
+        expect(slots).toHaveLength(8); expect(slots.filter(s => s.filled)).toHaveLength(7); expect(slots.find(s => s.role === 'Wicket Keeper')?.filled).toBe(false);
     });
 });
