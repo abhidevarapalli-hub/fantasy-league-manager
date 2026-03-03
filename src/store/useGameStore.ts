@@ -1236,12 +1236,9 @@ export const useGameStore = create<GameState>()(
           const [statsRes, matchesRes, rostersRes] = await Promise.all([
             supabase
               .from('player_match_stats_compat')
-              .select(`
-                *,
-                match:cricket_matches!inner(match_week)
-              `)
+              .select('*')
               .eq('league_id', leagueId)
-              .eq('match.match_week', week),
+              .eq('week', week),
             supabase
               .from('league_cricket_matches')
               .select('*')
