@@ -23,7 +23,7 @@
     "dev:live": "VITE_USE_LIVE_API=true vite",
     "dev:full": "npx supabase start && npm run dev",
     "dev:full:live": "npx supabase start && npm run dev:live",
-    "sync:scoring": "cp src/lib/scoring-types.ts supabase/functions/_shared/scoring-types.ts && echo 'Scoring types synced to _shared'"
+    "sync:scoring": "cp src/lib/scoring-types.ts supabase/functions/_shared/scoring-types.ts && diff <(grep -v '^import' src/lib/fantasy-points-calculator.ts) <(grep -v '^import' supabase/functions/_shared/fantasy-points-calculator.ts) > /dev/null 2>&1 && echo 'Scoring synced (calculator in sync)' || echo 'WARNING: calculator logic differs between src/lib and _shared — manual sync may be needed'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

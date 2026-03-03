@@ -269,7 +269,7 @@ function parseScorecard(
 // PointsBreakdown and calculateFantasyPoints imported from _shared/fantasy-points-calculator.ts
 
 // Adapter: convert ParsedPlayerStats to shared PlayerStats format
-function toPlayerStats(s: ParsedPlayerStats, isManOfMatch: boolean): PlayerStats {
+function toPlayerStats(s: ParsedPlayerStats, isManOfMatch: boolean, playerRole?: string): PlayerStats {
   return {
     runs: s.runs ?? 0,
     ballsFaced: s.ballsFaced ?? 0,
@@ -291,7 +291,7 @@ function toPlayerStats(s: ParsedPlayerStats, isManOfMatch: boolean): PlayerStats
     isImpactPlayer: false, // Not tracked by poller yet
     isManOfMatch,
     teamWon: s.teamWon ?? false,
-    playerRole: undefined, // Not available from scorecard data; role-based exemptions apply on recompute
+    playerRole,
   };
 }
 
@@ -473,6 +473,18 @@ serve(async (req) => {
 
     // Extract Man of Match if match is complete
     const manOfMatch = isMatchComplete ? extractManOfMatch(scorecard) : null;
+
+    // Fetch player roles from master_players for duck exemption logic
+    const cricbuzzIdsForRoles = parsedStats.map(s => s.cricbuzzPlayerId.toString());
+    const { data: playerRolesData } = await supabase
+      .from('master_players')
+      .select('cricbuzz_id, primary_role')
+      .in('cricbuzz_id', cricbuzzIdsForRoles);
+    const roleMap = new Map<string, string>(
+      (playerRolesData ?? [])
+        .filter((p: { cricbuzz_id: string; primary_role: string | null }) => p.primary_role != null)
+        .map((p: { cricbuzz_id: string; primary_role: string }) => [p.cricbuzz_id, p.primary_role])
+    );
 
     // Update cricket_matches state and result BEFORE league processing
     // This ensures state is always updated even if league processing fails
@@ -674,7 +686,7 @@ serve(async (req) => {
           const leaguePlayer = cricbuzzToPlayer.get(cricbuzzId)!;
           const ownership = playerToManager.get(leaguePlayer.playerId);
           const isManOfMatch = manOfMatch?.id === s.cricbuzzPlayerId;
-          const playerStats = toPlayerStats(s, isManOfMatch);
+          const playerStats = toPlayerStats(s, isManOfMatch, roleMap.get(cricbuzzId) ?? undefined);
           const breakdown = calculatePoints(playerStats, rules);
           const totalPoints = breakdown.total;
 

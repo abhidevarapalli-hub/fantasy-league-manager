@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Calendar, Check, Loader2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -93,7 +93,7 @@ export const WeekFinalization = () => {
     fetchLeagues();
   }, []);
 
-  const fetchWeekData = async (leagueId: string) => {
+  const fetchWeekData = useCallback(async (leagueId: string) => {
     setIsLoading(true);
     try {
       // Get distinct weeks
@@ -158,7 +158,7 @@ export const WeekFinalization = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch week data when league is selected
   useEffect(() => {
@@ -168,7 +168,7 @@ export const WeekFinalization = () => {
       return;
     }
     fetchWeekData(selectedLeagueId);
-  }, [selectedLeagueId]);
+  }, [selectedLeagueId, fetchWeekData]);
 
   const handleFinalizeWeek = async () => {
     if (!selectedWeek || !selectedLeagueId) return;

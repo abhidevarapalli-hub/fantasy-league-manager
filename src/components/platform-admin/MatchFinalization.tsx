@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { Trophy, CheckCircle2, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
-import { mergeScoringRules } from '@/lib/scoring-types';
+import { mergeScoringRules, type ScoringRules } from '@/lib/scoring-types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,7 @@ export const MatchFinalization = () => {
   const [selectedWinner, setSelectedWinner] = useState<Map<string, number>>(new Map());
   const [finalizingMatchId, setFinalizingMatchId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const fetchedMatchIdsRef = useRef<Set<string>>(new Set());
 
   const fetchMatches = useCallback(async () => {
     setIsLoading(true);
@@ -107,7 +108,8 @@ export const MatchFinalization = () => {
   }, [fetchMatches]);
 
   const fetchMatchPlayers = useCallback(async (matchId: string) => {
-    if (matchPlayers.has(matchId)) return;
+    if (fetchedMatchIdsRef.current.has(matchId)) return;
+    fetchedMatchIdsRef.current.add(matchId);
 
     try {
       const { data: statsData, error: statsError } = await supabase
@@ -143,13 +145,13 @@ export const MatchFinalization = () => {
     } catch (error) {
       console.error('Error fetching match players:', error);
     }
-  }, [matchPlayers]);
+  }, []);
 
   const handleFinalizeMatch = async (match: CricketMatch) => {
     const momId = selectedMoM.get(match.id);
     const winnerId = selectedWinner.get(match.id);
 
-    if (!momId || !winnerId) {
+    if (!momId || winnerId == null) {
       toast.error('Please select both Man of the Match and Winner');
       return;
     }
@@ -174,11 +176,9 @@ export const MatchFinalization = () => {
       }
 
       toast.info('Recomputing league scores...');
-      let successCount = 0;
-      let errorCount = 0;
 
-      for (const lm of leaguesWithMatch) {
-        try {
+      const results = await Promise.allSettled(
+        leaguesWithMatch.map(async (lm) => {
           const { data: scoringRulesData, error: scoringError } = await supabase
             .from('scoring_rules')
             .select('rules')
@@ -187,12 +187,16 @@ export const MatchFinalization = () => {
 
           if (scoringError) throw scoringError;
 
-          const rules = mergeScoringRules(scoringRulesData?.rules as never);
+          const rules = mergeScoringRules(scoringRulesData?.rules as Partial<ScoringRules> | null);
           await recomputeLeaguePoints(lm.league_id, rules);
-          successCount++;
-        } catch (error) {
-          console.error(`Error recomputing league ${lm.league_id}:`, error);
-          errorCount++;
+        })
+      );
+
+      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      const errorCount = results.filter(r => r.status === 'rejected').length;
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          console.error('Error recomputing league:', r.reason);
         }
       }
 
@@ -397,6 +401,7 @@ export const MatchFinalization = () => {
                                     <SelectValue placeholder="Select winner..." />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="0">No Winner / Tie</SelectItem>
                                     {match.team1_id && match.team1_name && (
                                       <SelectItem value={match.team1_id.toString()}>
                                         {match.team1_name}
@@ -415,6 +420,8 @@ export const MatchFinalization = () => {
                                     ? match.team1_name
                                     : match.winner_team_id === match.team2_id
                                     ? match.team2_name
+                                    : isFinalized
+                                    ? 'No Winner / Tie'
                                     : '-'}
                                 </span>
                               )}
