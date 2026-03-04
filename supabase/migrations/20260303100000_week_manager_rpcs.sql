@@ -151,7 +151,7 @@ BEGIN
   )
   SELECT
     lm.match_id,
-    COALESCE(cm.match_title, cm.team1_name || ' vs ' || cm.team2_name) AS match_title,
+    COALESCE(cm.match_description, cm.team1_name || ' vs ' || cm.team2_name) AS match_title,
     cm.match_date,
     (mw.mw + 1 + FLOOR(EXTRACT(EPOCH FROM (cm.match_date - v_start_date)) / (p_interval_days * 86400))::INTEGER) AS proposed_week
   FROM league_matches lm
