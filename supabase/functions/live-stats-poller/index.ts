@@ -54,6 +54,26 @@ interface CricbuzzScorecard {
   playersOfTheSeries?: Array<{ id: number; name: string }>;
 }
 
+interface CricbuzzLeanbackPlayer {
+  id: string;
+  name: string;
+  captain: boolean;
+  role: string;
+  keeper: boolean;
+  teamname: string;
+  faceimageid: number;
+}
+
+interface CricbuzzLeanback {
+  matchheaders?: {
+    state?: string;
+    status?: string;
+    momplayers?: {
+      player?: CricbuzzLeanbackPlayer[];
+    };
+  };
+}
+
 interface ParsedPlayerStats {
   cricbuzzPlayerId: number;
   playerName: string;
@@ -295,12 +315,64 @@ function toPlayerStats(s: ParsedPlayerStats, isManOfMatch: boolean, playerRole?:
   };
 }
 
-// Extract Man of Match from scorecard response
-function extractManOfMatch(scorecard: CricbuzzScorecard): { id: number; name: string } | null {
+// Extract Man of Match from leanback response (primary, more reliable source)
+function extractManOfMatchFromLeanback(leanback: CricbuzzLeanback): { id: number; name: string } | null {
+  const players = leanback.matchheaders?.momplayers?.player;
+  if (players && players.length > 0) {
+    const mom = players[0];
+    const id = parseInt(mom.id, 10);
+    if (!isNaN(id)) {
+      return { id, name: mom.name };
+    }
+  }
+  return null;
+}
+
+// Fallback: extract Man of Match from scorecard response
+function extractManOfMatchFromScorecard(scorecard: CricbuzzScorecard): { id: number; name: string } | null {
   if (scorecard.playersOfTheMatch && scorecard.playersOfTheMatch.length > 0) {
     return scorecard.playersOfTheMatch[0];
   }
   return null;
+}
+
+// Fetch MoM from leanback endpoint with fallback to scorecard field
+async function fetchManOfMatch(
+  cricbuzz_match_id: number,
+  scorecard: CricbuzzScorecard,
+  rapidApiKey: string,
+): Promise<{ id: number; name: string } | null> {
+  // Try leanback endpoint first (reliably has MoM data)
+  try {
+    const leanbackUrl = `https://${RAPIDAPI_HOST}/mcenter/v1/${cricbuzz_match_id}/leanback`;
+    const leanbackResp = await fetch(leanbackUrl, {
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key': rapidApiKey,
+        'X-RapidAPI-Host': RAPIDAPI_HOST,
+      },
+    });
+
+    if (leanbackResp.ok) {
+      const leanback: CricbuzzLeanback = await leanbackResp.json();
+      const mom = extractManOfMatchFromLeanback(leanback);
+      if (mom) {
+        console.log(`MoM from leanback: ${mom.name} (${mom.id})`);
+        return mom;
+      }
+    } else {
+      console.warn(`Leanback API returned ${leanbackResp.status} for match ${cricbuzz_match_id}`);
+    }
+  } catch (err) {
+    console.warn(`Failed to fetch leanback for match ${cricbuzz_match_id}:`, err);
+  }
+
+  // Fallback to scorecard's playersOfTheMatch field
+  const fallback = extractManOfMatchFromScorecard(scorecard);
+  if (fallback) {
+    console.log(`MoM from scorecard fallback: ${fallback.name} (${fallback.id})`);
+  }
+  return fallback;
 }
 
 // Normalize scoring rules from DB format to expected format
@@ -471,8 +543,8 @@ serve(async (req) => {
     // Parse scorecard
     const parsedStats = parseScorecard(scorecard, winnerTeamName);
 
-    // Extract Man of Match if match is complete
-    const manOfMatch = isMatchComplete ? extractManOfMatch(scorecard) : null;
+    // Extract Man of Match if match is complete (leanback endpoint, with scorecard fallback)
+    const manOfMatch = isMatchComplete ? await fetchManOfMatch(cricbuzz_match_id, scorecard, rapidApiKey) : null;
 
     // Fetch player roles from master_players for duck exemption logic
     const cricbuzzIdsForRoles = parsedStats.map(s => s.cricbuzzPlayerId.toString());
