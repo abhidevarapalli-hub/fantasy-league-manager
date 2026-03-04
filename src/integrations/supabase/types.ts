@@ -1957,6 +1957,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      auto_generate_weeks: {
+        Args: { p_interval_days?: number; p_league_id: string }
+        Returns: {
+          match_date: string
+          match_id: string
+          match_title: string
+          proposed_week: number
+        }[]
+      }
       auto_link_league_matches: {
         Args: never
         Returns: {
@@ -1969,6 +1978,12 @@ export type Database = {
         Args: never
         Returns: {
           rows_inserted: number
+        }[]
+      }
+      bulk_update_match_weeks: {
+        Args: { p_assignments: Json; p_league_id: string }
+        Returns: {
+          updated_count: number
         }[]
       }
       check_auto_draft: { Args: { p_league_id: string }; Returns: Json }
@@ -2147,6 +2162,10 @@ export type Database = {
       sync_league_rosters: { Args: { p_league_id: string }; Returns: undefined }
       update_league_standings: {
         Args: { league_uuid: string }
+        Returns: undefined
+      }
+      update_match_week: {
+        Args: { p_league_id: string; p_match_id: string; p_new_week: number }
         Returns: undefined
       }
       upsert_league_match: {
