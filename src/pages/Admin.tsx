@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { RefreshCw, Calendar, Trophy } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -21,8 +21,8 @@ import {
 
 const Admin = () => {
   const navigate = useNavigate();
+  const { leagueId } = useParams<{ leagueId: string }>();
   const loading = useGameStore(state => state.loading);
-  const currentLeagueId = useGameStore(state => state.currentLeagueId);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
   // If not league manager, redirect home
@@ -49,7 +49,7 @@ const Admin = () => {
     <AppLayout title="League Manager Settings" subtitle="League management tools">
       <div className="px-4 py-4 space-y-6">
         <CurrentWeekSetting />
-        {currentLeagueId && (
+        {leagueId && (
           <section className="bg-card rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="w-5 h-5 text-primary" />
@@ -58,10 +58,10 @@ const Admin = () => {
             <p className="text-sm text-muted-foreground mb-3">
               Assign matches to weeks and organize your league schedule.
             </p>
-            <WeekManager leagueId={currentLeagueId} />
+            <WeekManager leagueId={leagueId} />
           </section>
         )}
-        {currentLeagueId && (
+        {leagueId && (
           <section className="bg-card rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 mb-4">
               <Trophy className="w-5 h-5 text-primary" />
@@ -70,7 +70,7 @@ const Admin = () => {
             <p className="text-sm text-muted-foreground mb-3">
               Finalize weekly matchups to calculate C/VC scores, determine winners, and update standings.
             </p>
-            <WeekFinalization leagueId={currentLeagueId} />
+            <WeekFinalization leagueId={leagueId} />
           </section>
         )}
         <TestDraftStatus />
