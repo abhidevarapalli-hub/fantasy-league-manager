@@ -1107,31 +1107,36 @@ INSERT INTO league_matchups (league_id, week, manager1_id, manager2_id, manager1
 UPDATE cricket_matches SET
   state = 'Complete', match_state = 'Complete',
   team1_score = '185/4', team2_score = '179/8',
-  winner_team_id = 201, result = 'Chennai Super Kings won by 6 runs'
+  winner_team_id = 201, result = 'Chennai Super Kings won by 6 runs',
+  man_of_match_id = 12092, man_of_match_name = 'Ruturaj Gaikwad'
 WHERE cricbuzz_match_id = 200001;
 
 UPDATE cricket_matches SET
   state = 'Complete', match_state = 'Complete',
   team1_score = '201/6', team2_score = '195/7',
-  winner_team_id = 203, result = 'Royal Challengers Bengaluru won by 6 runs'
+  winner_team_id = 203, result = 'Royal Challengers Bengaluru won by 6 runs',
+  man_of_match_id = 1413, man_of_match_name = 'Virat Kohli'
 WHERE cricbuzz_match_id = 200002;
 
 UPDATE cricket_matches SET
   state = 'Complete', match_state = 'Complete',
   team1_score = '168/9', team2_score = '172/4',
-  winner_team_id = 206, result = 'Gujarat Titans won by 6 wickets'
+  winner_team_id = 206, result = 'Gujarat Titans won by 6 wickets',
+  man_of_match_id = 11808, man_of_match_name = 'Shubman Gill'
 WHERE cricbuzz_match_id = 200003;
 
 UPDATE cricket_matches SET
   state = 'Complete', match_state = 'Complete',
   team1_score = '155/8', team2_score = '158/3',
-  winner_team_id = 208, result = 'Punjab Kings won by 7 wickets'
+  winner_team_id = 208, result = 'Punjab Kings won by 7 wickets',
+  man_of_match_id = 13476, man_of_match_name = 'Arshdeep Singh'
 WHERE cricbuzz_match_id = 200004;
 
 UPDATE cricket_matches SET
   state = 'Complete', match_state = 'Complete',
   team1_score = '192/5', team2_score = '188/7',
-  winner_team_id = 209, result = 'Rajasthan Royals won by 4 runs'
+  winner_team_id = 209, result = 'Rajasthan Royals won by 4 runs',
+  man_of_match_id = 4645, man_of_match_name = 'Jos Buttler'
 WHERE cricbuzz_match_id = 200005;
 
 -- Mark league_matches stats as imported for week 1
@@ -1238,6 +1243,13 @@ INSERT INTO match_player_stats (id, match_id, player_id, cricbuzz_player_id, run
   ('40000000-0000-0000-0000-000000050206', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200005), '30000000-0000-0000-0000-000000000231', '10809', 15, 12, 1, 0, 125.00, true, 5, 4.0, 0, 35, 1, 8.75, 8, 0, 0, 0, 1, 0, 0, true, false, '2026-03-17T18:00:00.000Z'),
   ('40000000-0000-0000-0000-000000050207', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200005), '30000000-0000-0000-0000-000000000230', '14252', 0, 0, 0, 0, 0, false, 0, 3.0, 0, 30, 1, 10.00, 5, 1, 0, 0, 0, 0, 0, true, false, '2026-03-17T18:00:00.000Z');
 
+-- Set Man of the Match flags on match_player_stats
+UPDATE match_player_stats SET is_man_of_match = true WHERE id = '40000000-0000-0000-0000-000000010101'; -- Ruturaj Gaikwad (CSK, match 200001)
+UPDATE match_player_stats SET is_man_of_match = true WHERE id = '40000000-0000-0000-0000-000000020101'; -- Virat Kohli (RCB, match 200002)
+UPDATE match_player_stats SET is_man_of_match = true WHERE id = '40000000-0000-0000-0000-000000030201'; -- Shubman Gill (GT, match 200003)
+UPDATE match_player_stats SET is_man_of_match = true WHERE id = '40000000-0000-0000-0000-000000040202'; -- Arshdeep Singh (PBKS, match 200004)
+UPDATE match_player_stats SET is_man_of_match = true WHERE id = '40000000-0000-0000-0000-000000050101'; -- Jos Buttler (RR, match 200005)
+
 -- =============================================
 -- 16. League player match scores (fantasy points for drafted players who played)
 -- =============================================
@@ -1249,8 +1261,8 @@ INSERT INTO match_player_stats (id, match_id, player_id, cricbuzz_player_id, run
 
 INSERT INTO league_player_match_scores (league_id, match_id, player_id, match_player_stats_id, manager_id, total_points, batting_points, bowling_points, fielding_points, common_points, was_in_active_roster, week, finalized_at) VALUES
   -- Match 200001: CSK vs MI
-  -- Gaikwad (Mgr5 active): 72r+8f+3×2s+25m(10)+40m(15)+60m(20)+SR150(30) = 72+8+6+10+15+20+30=161 bat, 10 field(catch), 10 common(5+5win) = 181
-  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000121', '40000000-0000-0000-0000-000000010101', '20000000-0000-0000-0000-000000000005', 181.0, 161.0, 0, 10.0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
+  -- Gaikwad (Mgr5 active): 72r+8f+3×2s+25m(10)+40m(15)+60m(20)+SR150(30) = 161 bat, 10 field(catch), 60 common(5+5win+50mom) = 231
+  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000121', '40000000-0000-0000-0000-000000010101', '20000000-0000-0000-0000-000000000005', 231.0, 161.0, 0, 10.0, 60.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Jadeja (Mgr5 active): 38r+2f+2×2s+25m(10) = 38+2+4+10=54 bat, 2w×30+8d+1lbw×5=73 bowl, 10 common = 137
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000005', '40000000-0000-0000-0000-000000010102', '20000000-0000-0000-0000-000000000005', 137.0, 54.0, 73.0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Dube (Mgr8 active): 28r+3f+1×2s+25m(10) = 28+3+2+10=43 bat, 10 common(5+5win) = 53
@@ -1269,8 +1281,8 @@ INSERT INTO league_player_match_scores (league_id, match_id, player_id, match_pl
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200001), '30000000-0000-0000-0000-000000000133', '40000000-0000-0000-0000-000000010205', '20000000-0000-0000-0000-000000000006', 26.0, 21.0, 0, 0, 5.0, false, 1, '2026-03-18T00:00:00.000Z'),
 
   -- Match 200002: RCB vs KKR
-  -- Kohli (Mgr5 active): 82r+9f+4×2s+25m(10)+40m(15)+60m(20)+80m(25)+SR164(30) = 82+9+8+10+15+20+25+30=199 bat, 10 field, 10 common = 219
-  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000020101', '20000000-0000-0000-0000-000000000005', 219.0, 199.0, 0, 10.0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
+  -- Kohli (Mgr5 active): 82r+9f+4×2s+25m(10)+40m(15)+60m(20)+80m(25)+SR164(30) = 199 bat, 10 field, 60 common(5+5win+50mom) = 269
+  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000020101', '20000000-0000-0000-0000-000000000005', 269.0, 199.0, 0, 10.0, 60.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Faf (Mgr6 active): 48r+5f+2×2s+25m(10)+40m(15)+SR150(30) = 48+5+4+10+15+30=112 bat, 10 common = 122
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200002), '30000000-0000-0000-0000-000000000142', '40000000-0000-0000-0000-000000020102', '20000000-0000-0000-0000-000000000006', 122.0, 112.0, 0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Salt (Mgr8 active): 32r+4f+1×2s+25m(10)+SR160(30) = 32+4+2+10+30=78 bat, 10 common = 88
@@ -1307,8 +1319,8 @@ INSERT INTO league_player_match_scores (league_id, match_id, player_id, match_pl
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200003), '30000000-0000-0000-0000-000000000171', '40000000-0000-0000-0000-000000030104', '20000000-0000-0000-0000-000000000008', 42.0, 0, 37.0, 0, 5.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Fraser-McGurk (Mgr8 bench): 35r+4f+2×2s+25m(10)+SR159(30) = 35+4+4+10+30=83 bat, 5 common = 88
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200003), '30000000-0000-0000-0000-000000000166', '40000000-0000-0000-0000-000000030105', '20000000-0000-0000-0000-000000000008', 88.0, 83.0, 0, 0, 5.0, false, 1, '2026-03-18T00:00:00.000Z'),
-  -- Gill (Mgr6 active): 65r+6f+3×2s+25m(10)+40m(15)+60m(20)+SR155(30) = 65+6+6+10+15+20+30=152 bat, 10 common = 162
-  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200003), '30000000-0000-0000-0000-000000000010', '40000000-0000-0000-0000-000000030201', '20000000-0000-0000-0000-000000000006', 162.0, 152.0, 0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
+  -- Gill (Mgr6 active): 65r+6f+3×2s+25m(10)+40m(15)+60m(20)+SR155(30) = 152 bat, 60 common(5+5win+50mom) = 212
+  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200003), '30000000-0000-0000-0000-000000000010', '40000000-0000-0000-0000-000000030201', '20000000-0000-0000-0000-000000000006', 212.0, 152.0, 0, 0, 60.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Sudharsan (Mgr7 active): 48r+5f+1×2s+25m(10)+40m(15) = 48+5+2+10+15=80 bat, 10 field, 10 common = 100
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200003), '30000000-0000-0000-0000-000000000178', '40000000-0000-0000-0000-000000030202', '20000000-0000-0000-0000-000000000007', 100.0, 80.0, 0, 10.0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Rashid Khan (Mgr6 active): 12r+1f = 13 bat, 3w×30+12d+2lbw×5+2w(10)+3w(20)+econ6.25(40)=172 bowl, 10 field(catch), 10 common = 205
@@ -1333,8 +1345,8 @@ INSERT INTO league_player_match_scores (league_id, match_id, player_id, match_pl
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000197', '40000000-0000-0000-0000-000000040107', '20000000-0000-0000-0000-000000000008', 27.0, 22.0, 0, 0, 5.0, false, 1, '2026-03-18T00:00:00.000Z'),
   -- Dhawan (Mgr8 active): 55r+6f+2×2s+25m(10)+40m(15) = 55+6+4+10+15=90 bat, 10 common(5+5win) = 100
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000204', '40000000-0000-0000-0000-000000040201', '20000000-0000-0000-0000-000000000008', 100.0, 90.0, 0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
-  -- Arshdeep (Mgr6 active): 3w×30+12d+2lbw×5+2w(10)+3w(20)=142 bowl, 10 common = 152
-  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000013', '40000000-0000-0000-0000-000000040202', '20000000-0000-0000-0000-000000000006', 152.0, 0, 142.0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
+  -- Arshdeep (Mgr6 active): 3w×30+12d+2lbw×5+2w(10)+3w(20)=142 bowl, 60 common(5+5win+50mom) = 202
+  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000013', '40000000-0000-0000-0000-000000040202', '20000000-0000-0000-0000-000000000006', 202.0, 0, 142.0, 0, 60.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- R.Chahar (Mgr8 active): 2w×30+9d-1(wide)+2w(10)=78 bowl, 10 field(catch), 10 common = 98
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000209', '40000000-0000-0000-0000-000000040203', '20000000-0000-0000-0000-000000000008', 98.0, 0, 78.0, 10.0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Jaiswal (Mgr7 active): 42r+5f+1×2s+25m(10)+40m(15)+SR150(30) = 42+5+2+10+15+30=104 bat, 10 field(catch), 10 common = 124
@@ -1343,8 +1355,8 @@ INSERT INTO league_player_match_scores (league_id, match_id, player_id, match_pl
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200004), '30000000-0000-0000-0000-000000000092', '40000000-0000-0000-0000-000000040205', '20000000-0000-0000-0000-000000000008', 93.0, 0, 83.0, 0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
 
   -- Match 200005: RR vs SRH
-  -- Buttler (Mgr6 bench): 68r+7f+3×2s+25m(10)+40m(15)+60m(20)+SR162(30) = 68+7+6+10+15+20+30=156 bat, 20 field(2catch), 10 common = 186
-  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200005), '30000000-0000-0000-0000-000000000046', '40000000-0000-0000-0000-000000050101', '20000000-0000-0000-0000-000000000006', 186.0, 156.0, 0, 20.0, 10.0, false, 1, '2026-03-18T00:00:00.000Z'),
+  -- Buttler (Mgr6 bench): 68r+7f+3×2s+25m(10)+40m(15)+60m(20)+SR162(30) = 156 bat, 20 field(2catch), 60 common(5+5win+50mom) = 236
+  ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200005), '30000000-0000-0000-0000-000000000046', '40000000-0000-0000-0000-000000050101', '20000000-0000-0000-0000-000000000006', 236.0, 156.0, 0, 20.0, 60.0, false, 1, '2026-03-18T00:00:00.000Z'),
   -- Samson (Mgr7 active): 45r+3f+3×2s+25m(10)+40m(15)+SR150(30) = 45+3+6+10+15+30=109 bat, 10 field(stumping), 10 common = 129
   ('10000000-0000-0000-0000-000000000002', (SELECT id FROM cricket_matches WHERE cricbuzz_match_id = 200005), '30000000-0000-0000-0000-000000000014', '40000000-0000-0000-0000-000000050102', '20000000-0000-0000-0000-000000000007', 139.0, 109.0, 0, 20.0, 10.0, true, 1, '2026-03-18T00:00:00.000Z'),
   -- Parag (Mgr6 active): 32r+2f+2×2s+25m(10)+SR145(30) = 32+2+4+10+30=78 bat, 1w×30+3d=33 bowl, 10 common = 121

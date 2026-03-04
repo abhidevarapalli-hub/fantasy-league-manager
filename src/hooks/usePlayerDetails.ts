@@ -539,6 +539,10 @@ export function usePlayerMatchStats(
           fantasy_points?: number | string | null;
           match_state?: string | null;
           is_live_stats?: boolean | null;
+          is_in_playing_11?: boolean | null;
+          is_impact_player?: boolean | null;
+          is_man_of_match?: boolean | null;
+          team_won?: boolean | null;
         }>
       ) {
         const statsMap = new Map<number, PlayerMatchPerformance>();
@@ -569,6 +573,10 @@ export function usePlayerMatchStats(
             fantasyPoints: row.fantasy_points != null ? Number(row.fantasy_points) : undefined,
             matchState: row.match_state ?? undefined,
             isLiveStats: row.is_live_stats ?? false,
+            isInPlaying11: row.is_in_playing_11 ?? undefined,
+            isImpactPlayer: row.is_impact_player ?? undefined,
+            isManOfMatch: row.is_man_of_match ?? undefined,
+            teamWon: row.team_won ?? undefined,
           });
         }
         return statsMap;
