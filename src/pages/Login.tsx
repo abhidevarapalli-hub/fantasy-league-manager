@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { Trophy, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -30,6 +32,13 @@ const Login = () => {
   useEffect(() => {
     // If fully authenticated and has a profile for this context, go to dashboard
     if (!authLoading && user && userProfile?.username) {
+      const isNative = Capacitor.isNativePlatform();
+      if (isNative) {
+        Browser.close().catch(() => {
+          // Ignore errors when not running inside Capacitor Browser
+        });
+      }
+
       // Check if there's a saved redirect from join link
       const redirectPath = sessionStorage.getItem('redirectAfterLogin');
       if (redirectPath) {
@@ -49,13 +58,20 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const isNative = Capacitor.isNativePlatform();
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/leagues`
+          redirectTo: isNative ? 'com.cricfantasy.app://callback' : `${window.location.origin}/leagues`,
+          skipBrowserRedirect: isNative,
         }
       });
       if (error) throw error;
+
+      if (isNative && data?.url) {
+        await Browser.open({ url: data.url, windowName: '_blank' });
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     }

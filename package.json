@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -26,6 +29,12 @@
     "sync:scoring": "cp src/lib/scoring-types.ts supabase/functions/_shared/scoring-types.ts && diff <(grep -v '^import' src/lib/fantasy-points-calculator.ts) <(grep -v '^import' supabase/functions/_shared/fantasy-points-calculator.ts) > /dev/null 2>&1 && echo 'Scoring synced (calculator in sync)' || echo 'WARNING: calculator logic differs between src/lib and _shared — manual sync may be needed'"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/browser": "^8.0.1",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/ios": "^8.1.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
