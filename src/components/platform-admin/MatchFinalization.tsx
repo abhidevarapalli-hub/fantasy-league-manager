@@ -161,8 +161,8 @@ export const MatchFinalization = () => {
     }
   }, []);
 
-  const fetchMoMFromApi = useCallback(async (match: CricketMatch) => {
-    if (!match.cricbuzz_match_id || fetchingMoMRef.current.has(match.id)) return;
+  const fetchMoMFromApi = useCallback(async (match: CricketMatch): Promise<boolean> => {
+    if (!match.cricbuzz_match_id || fetchingMoMRef.current.has(match.id)) return false;
     fetchingMoMRef.current.add(match.id);
     setFetchingMoM(prev => new Set(prev).add(match.id));
     try {
@@ -182,11 +182,15 @@ export const MatchFinalization = () => {
 
       // Fall back to scorecard if leanback didn't have MoM
       if (!momId) {
-        const scorecard = await fetchScorecardDetails(match.cricbuzz_match_id);
-        const potm = scorecard.matchHeader?.playersOfTheMatch?.[0];
-        if (potm) {
-          momId = potm.id.toString();
-          momName = potm.fullName || potm.name;
+        try {
+          const scorecard = await fetchScorecardDetails(match.cricbuzz_match_id);
+          const potm = scorecard.matchHeader?.playersOfTheMatch?.[0];
+          if (potm) {
+            momId = potm.id.toString();
+            momName = potm.fullName || potm.name;
+          }
+        } catch {
+          // Scorecard also failed
         }
       }
 
@@ -198,9 +202,30 @@ export const MatchFinalization = () => {
           }
           return prev;
         });
+
+        // Persist MoM directly to the database
+        await supabase
+          .from('cricket_matches')
+          .update({ man_of_match_id: momId, man_of_match_name: momName })
+          .eq('id', match.id);
+
+        // Set is_man_of_match flag on the player's stats row
+        await supabase
+          .from('match_player_stats')
+          .update({ is_man_of_match: false })
+          .eq('match_id', match.id);
+        await supabase
+          .from('match_player_stats')
+          .update({ is_man_of_match: true })
+          .eq('match_id', match.id)
+          .eq('cricbuzz_player_id', momId);
+
+        return true;
       }
+      return false;
     } catch (error) {
       console.error(`Failed to fetch MoM for match ${match.cricbuzz_match_id}:`, error);
+      return false;
     } finally {
       fetchingMoMRef.current.delete(match.id);
       setFetchingMoM(prev => {
@@ -211,7 +236,7 @@ export const MatchFinalization = () => {
     }
   }, []);
 
-  // Auto-fetch MoM from API for complete matches missing it
+  // Auto-fetch MoM from API for complete matches missing it, persist to DB
   useEffect(() => {
     if (isLoading || matches.length === 0) return;
     let cancelled = false;
@@ -225,20 +250,66 @@ export const MatchFinalization = () => {
     if (matchesMissingMoM.length === 0) return;
 
     const fetchAll = async () => {
+      let populated = 0;
+      const populatedMatchIds: string[] = [];
       for (const match of matchesMissingMoM) {
         if (cancelled) break;
-        await fetchMoMFromApi(match);
+        const success = await fetchMoMFromApi(match);
+        if (success) {
+          populated++;
+          populatedMatchIds.push(match.id);
+        }
         // Rate-limit: 300ms delay between calls
         if (!cancelled) {
           await new Promise(r => setTimeout(r, 300));
         }
+      }
+
+      if (cancelled) return;
+
+      if (populated > 0) {
+        toast.success(`Auto-populated MoM for ${populated} match(es) from API`);
+
+        // Recompute scores for already-finalized matches that just got MoM
+        const finalizedWithNewMoM = populatedMatchIds.filter(matchId => {
+          const lm = leagueMatches.find(l => l.match_id === matchId);
+          return lm?.stats_imported === true;
+        });
+
+        if (finalizedWithNewMoM.length > 0) {
+          toast.info(`Recomputing scores for ${finalizedWithNewMoM.length} finalized match(es)...`);
+          const affectedLeagueIds = new Set<string>();
+          for (const matchId of finalizedWithNewMoM) {
+            const lms = leagueMatches.filter(l => l.match_id === matchId);
+            for (const lm of lms) affectedLeagueIds.add(lm.league_id);
+          }
+
+          for (const leagueId of affectedLeagueIds) {
+            try {
+              const { data: scoringRulesData } = await supabase
+                .from('scoring_rules')
+                .select('rules')
+                .eq('league_id', leagueId)
+                .maybeSingle();
+              const rules = mergeScoringRules(scoringRulesData?.rules as Partial<ScoringRules> | null);
+              await recomputeLeaguePoints(leagueId, rules);
+            } catch (err) {
+              console.error(`Failed to recompute scores for league ${leagueId}:`, err);
+            }
+          }
+          toast.success('Score recomputation complete');
+        }
+
+        // Refresh matches to reflect DB updates
+        fetchMatches();
       }
     };
 
     fetchAll();
 
     return () => { cancelled = true; };
-  }, [isLoading, matches, fetchMoMFromApi]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, matches.length]);
 
   const resultImpliesWinner = (match: CricketMatch): boolean =>
     !!match.result && /\bwon\b/i.test(match.result);
