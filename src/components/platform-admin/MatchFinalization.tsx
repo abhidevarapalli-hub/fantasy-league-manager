@@ -191,7 +191,10 @@ export const MatchFinalization = () => {
 
   const isMatchIncomplete = (match: CricketMatch): boolean => {
     const lm = leagueMatches.find(l => l.match_id === match.id);
-    return lm?.stats_imported === true && (!match.winner_team_id || !match.man_of_match_id);
+    if (lm?.stats_imported !== true) return false;
+    // A match is incomplete only if winner is missing but a result implies one exists
+    const resultImpliesWinner = !!match.result && /\bwon\b/i.test(match.result);
+    return resultImpliesWinner && !match.winner_team_id;
   };
 
   const handleFinalizeMatch = async (match: CricketMatch) => {

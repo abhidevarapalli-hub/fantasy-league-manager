@@ -1963,6 +1963,7 @@ export type Database = {
           rows_inserted: number
         }[]
       }
+      auto_resolve_winner: { Args: { p_match_id: string }; Returns: number }
       batch_update_league_scores: { Args: { p_updates: Json }; Returns: number }
       bulk_activate_stale_matches: {
         Args: never
