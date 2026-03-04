@@ -476,6 +476,35 @@ export async function fetchScorecardDetails(matchId: number): Promise<ScorecardR
   return fetchFromApi<ScorecardResponse>(`/mcenter/v1/${matchId}/scard`);
 }
 
+/**
+ * Leanback response — lightweight match data including MoM
+ */
+export interface LeanbackResponse {
+  matchheaders?: {
+    state?: string;
+    status?: string;
+    momplayers?: {
+      player?: Array<{
+        id: string;
+        name: string;
+        captain: boolean;
+        role: string;
+        keeper: boolean;
+        teamname: string;
+        faceimageid: number;
+      }>;
+    };
+  };
+}
+
+/**
+ * Fetch leanback details (lightweight match data including MoM)
+ * @param matchId - The Cricbuzz match ID
+ */
+export async function fetchLeanbackDetails(matchId: number): Promise<LeanbackResponse> {
+  return fetchFromApi<LeanbackResponse>(`/mcenter/v1/${matchId}/leanback`);
+}
+
 // ============================================
 // Series/Tournament Match Functions
 // ============================================

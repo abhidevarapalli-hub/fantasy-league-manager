@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
 import { mergeScoringRules, type ScoringRules } from '@/lib/scoring-types';
-import { fetchScorecardDetails } from '@/integrations/cricbuzz/client';
+import { fetchScorecardDetails, fetchLeanbackDetails } from '@/integrations/cricbuzz/client';
 import { resolveWinnerFromResult } from '@/lib/match-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -70,6 +70,7 @@ export const MatchFinalization = () => {
   const fetchedMatchIdsRef = useRef<Set<string>>(new Set());
   const [autoMoM, setAutoMoM] = useState<Map<string, { id: string; name: string }>>(new Map());
   const [fetchingMoM, setFetchingMoM] = useState<Set<string>>(new Set());
+  const fetchingMoMRef = useRef<Set<string>>(new Set());
   const [batchFinalizing, setBatchFinalizing] = useState(false);
 
   const fetchMatches = useCallback(async () => {
@@ -161,19 +162,39 @@ export const MatchFinalization = () => {
   }, []);
 
   const fetchMoMFromApi = useCallback(async (match: CricketMatch) => {
-    if (!match.cricbuzz_match_id || fetchingMoM.has(match.id)) return;
+    if (!match.cricbuzz_match_id || fetchingMoMRef.current.has(match.id)) return;
+    fetchingMoMRef.current.add(match.id);
     setFetchingMoM(prev => new Set(prev).add(match.id));
     try {
-      const scorecard = await fetchScorecardDetails(match.cricbuzz_match_id);
-      const potm = scorecard.matchHeader?.playersOfTheMatch?.[0];
-      if (potm) {
-        setAutoMoM(prev => new Map(prev).set(match.id, {
-          id: potm.id.toString(),
-          name: potm.fullName || potm.name,
-        }));
+      // Try leanback first (lightweight, includes MoM)
+      let momId: string | undefined;
+      let momName: string | undefined;
+      try {
+        const leanback = await fetchLeanbackDetails(match.cricbuzz_match_id);
+        const momPlayer = leanback.matchheaders?.momplayers?.player?.[0];
+        if (momPlayer) {
+          momId = momPlayer.id;
+          momName = momPlayer.name;
+        }
+      } catch {
+        // Leanback failed, fall through to scorecard
+      }
+
+      // Fall back to scorecard if leanback didn't have MoM
+      if (!momId) {
+        const scorecard = await fetchScorecardDetails(match.cricbuzz_match_id);
+        const potm = scorecard.matchHeader?.playersOfTheMatch?.[0];
+        if (potm) {
+          momId = potm.id.toString();
+          momName = potm.fullName || potm.name;
+        }
+      }
+
+      if (momId && momName) {
+        setAutoMoM(prev => new Map(prev).set(match.id, { id: momId, name: momName }));
         setSelectedMoM(prev => {
           if (!prev.has(match.id)) {
-            return new Map(prev).set(match.id, potm.id.toString());
+            return new Map(prev).set(match.id, momId);
           }
           return prev;
         });
@@ -181,20 +202,52 @@ export const MatchFinalization = () => {
     } catch (error) {
       console.error(`Failed to fetch MoM for match ${match.cricbuzz_match_id}:`, error);
     } finally {
+      fetchingMoMRef.current.delete(match.id);
       setFetchingMoM(prev => {
         const next = new Set(prev);
         next.delete(match.id);
         return next;
       });
     }
-  }, [fetchingMoM]);
+  }, []);
+
+  // Auto-fetch MoM from API for complete matches missing it
+  useEffect(() => {
+    if (isLoading || matches.length === 0) return;
+    let cancelled = false;
+
+    const matchesMissingMoM = matches.filter(m =>
+      m.state === 'Complete' &&
+      !m.man_of_match_id &&
+      m.cricbuzz_match_id
+    );
+
+    if (matchesMissingMoM.length === 0) return;
+
+    const fetchAll = async () => {
+      for (const match of matchesMissingMoM) {
+        if (cancelled) break;
+        await fetchMoMFromApi(match);
+        // Rate-limit: 300ms delay between calls
+        if (!cancelled) {
+          await new Promise(r => setTimeout(r, 300));
+        }
+      }
+    };
+
+    fetchAll();
+
+    return () => { cancelled = true; };
+  }, [isLoading, matches, fetchMoMFromApi]);
+
+  const resultImpliesWinner = (match: CricketMatch): boolean =>
+    !!match.result && /\bwon\b/i.test(match.result);
 
   const isMatchIncomplete = (match: CricketMatch): boolean => {
     const lm = leagueMatches.find(l => l.match_id === match.id);
     if (lm?.stats_imported !== true) return false;
-    // A match is incomplete only if winner is missing but a result implies one exists
-    const resultImpliesWinner = !!match.result && /\bwon\b/i.test(match.result);
-    return resultImpliesWinner && !match.winner_team_id;
+    if (!resultImpliesWinner(match)) return false;
+    return !match.winner_team_id || !match.man_of_match_id;
   };
 
   const handleFinalizeMatch = async (match: CricketMatch) => {
@@ -532,7 +585,7 @@ export const MatchFinalization = () => {
                                 <Button
                                   size="sm"
                                   onClick={() => handleFinalizeMatch(match)}
-                                  disabled={isFinalizing}
+                                  disabled={isFinalizing || (resultImpliesWinner(match) && !selectedMoM.has(match.id))}
                                   className="h-7 text-xs"
                                 >
                                   {isFinalizing ? (
