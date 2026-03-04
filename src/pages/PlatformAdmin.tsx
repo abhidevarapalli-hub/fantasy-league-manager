@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { GlobalStatsImport } from '@/components/platform-admin/GlobalStatsImport';
 import { GlobalPlayerMapping } from '@/components/platform-admin/GlobalPlayerMapping';
 import { MatchFinalization } from '@/components/platform-admin/MatchFinalization';
-import { WeekFinalization } from '@/components/platform-admin/WeekFinalization';
+import { WeekManagerAdmin } from '@/components/platform-admin/WeekManagerAdmin';
 
 const PlatformAdmin = () => {
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ const PlatformAdmin = () => {
         <GlobalStatsImport />
         <GlobalPlayerMapping />
         <MatchFinalization />
-        <WeekFinalization />
+        <WeekManagerAdmin />
       </div>
     </AppLayout>
   );

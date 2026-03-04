@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Calendar } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
@@ -15,11 +15,13 @@ import {
   RosterConfig,
   CurrentWeekSetting,
   TestDraftStatus,
+  WeekManager,
 } from '@/components/admin';
 
 const Admin = () => {
   const navigate = useNavigate();
   const loading = useGameStore(state => state.loading);
+  const currentLeagueId = useGameStore(state => state.currentLeagueId);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
   // If not league manager, redirect home
@@ -46,6 +48,18 @@ const Admin = () => {
     <AppLayout title="League Manager Settings" subtitle="League management tools">
       <div className="px-4 py-4 space-y-6">
         <CurrentWeekSetting />
+        {currentLeagueId && (
+          <section className="bg-card rounded-xl border border-border p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="w-5 h-5 text-primary" />
+              <h2 className="font-semibold text-foreground">Week Manager</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Assign matches to weeks, auto-generate schedules, and finalize weekly matchups.
+            </p>
+            <WeekManager leagueId={currentLeagueId} />
+          </section>
+        )}
         <TestDraftStatus />
         <ScoreInput />
         <RosterConfig />

@@ -8,3 +8,4 @@ export { DangerZone } from './DangerZone';
 export { RosterConfig } from './RosterConfig';
 export { CurrentWeekSetting } from './CurrentWeekSetting';
 export { TestDraftStatus } from './TestDraftStatus';
+export { WeekManager } from './WeekManager';
