@@ -3,7 +3,7 @@ import { Player } from '@/lib/supabase-types';
 import { sortPlayersByPriority } from '@/lib/player-order';
 import { useDebounce } from '@/hooks/useDebounce';
 
-export type NationalityFilter = 'All' | 'Domestic' | 'International';
+export type NationalityFilter = 'All' | 'Domestic';
 export type RoleFilter = 'All' | 'Batsman' | 'Bowler' | 'All Rounder' | 'Wicket Keeper';
 
 interface UsePlayerFiltersProps {
@@ -53,7 +53,6 @@ export const usePlayerFilters = ({
 
             // Nationality filter
             const matchesNationality = selectedNationality === 'All' ||
-                (selectedNationality === 'International' && player.isInternational) ||
                 (selectedNationality === 'Domestic' && !player.isInternational);
 
             return matchesSearch && matchesTeam && matchesRole && matchesNationality;

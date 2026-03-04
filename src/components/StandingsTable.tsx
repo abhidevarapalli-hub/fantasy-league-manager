@@ -32,20 +32,24 @@ export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }
   const hasLiveStatsMap = new Map(
     standings.map(s => [s.managerId, s.hasLiveStats])
   );
+  const standingsWinsMap = new Map(
+    standings.map(s => [s.managerId, s.wins])
+  );
+  const standingsLossesMap = new Map(
+    standings.map(s => [s.managerId, s.losses])
+  );
 
-  // Sort managers by fantasy points (from database) if available, else by W/L
+  // Sort managers by W/L record first (H2H), then by fantasy points as tiebreaker
   const sortedManagers = [...managers].sort((a, b) => {
+    // Primary sort: wins (from standings RPC, falling back to manager record)
+    const aWins = standingsWinsMap.get(a.id) ?? a.wins ?? 0;
+    const bWins = standingsWinsMap.get(b.id) ?? b.wins ?? 0;
+    if (bWins !== aWins) return bWins - aWins;
+
+    // Secondary sort: total fantasy points
     const aFantasy = fantasyPointsMap.get(a.id) ?? 0;
     const bFantasy = fantasyPointsMap.get(b.id) ?? 0;
-
-    // Primary sort: fantasy points
-    if (bFantasy !== aFantasy) return bFantasy - aFantasy;
-
-    // Secondary sort: wins
-    if (b.wins !== a.wins) return b.wins - a.wins;
-
-    // Tertiary sort: legacy points
-    return b.points - a.points;
+    return bFantasy - aFantasy;
   });
 
   const hasFantasyPoints = standings.some(s => s.totalPoints > 0);
@@ -133,8 +137,8 @@ export const StandingsTable = ({ managers, currentManagerId, loggedInManagerId }
                 <p className="text-xs text-muted-foreground">{manager.name}</p>
               </div>
             </div>
-            <span className="text-center font-medium text-success">{manager.wins}</span>
-            <span className="text-center font-medium text-destructive">{manager.losses}</span>
+            <span className="text-center font-medium text-success">{standingsWinsMap.get(manager.id) ?? manager.wins}</span>
+            <span className="text-center font-medium text-destructive">{standingsLossesMap.get(manager.id) ?? manager.losses}</span>
             <div className="flex items-center justify-center gap-1">
               {loadingStandings ? (
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />

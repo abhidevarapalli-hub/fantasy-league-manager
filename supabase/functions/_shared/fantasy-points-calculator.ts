@@ -1,12 +1,13 @@
 /**
- * Fantasy Points Calculator
- * Calculates fantasy points based on player stats and scoring rules
+ * Fantasy Points Calculator (Shared Edge Function Version)
+ * Calculates fantasy points based on player stats and scoring rules.
+ * This is the edge-function-compatible version of src/lib/fantasy-points-calculator.ts.
+ * Keep in sync using: npm run sync:scoring
  */
 
-import type { ScoringRules } from './scoring-types';
-import type { PlayerMatchStats } from './supabase-types';
+import type { ScoringRules } from './scoring-types.ts';
 
-// Input stats for calculation (subset of PlayerMatchStats)
+// Input stats for calculation
 export interface PlayerStats {
   // Batting
   runs: number;
@@ -258,95 +259,4 @@ export function calculateFantasyPoints(
     fielding,
     total: common.total + batting.total + bowling.total + fielding.total,
   };
-}
-
-/**
- * Calculate fantasy points from PlayerMatchStats
- */
-export function calculatePointsFromMatchStats(
-  matchStats: PlayerMatchStats,
-  rules: ScoringRules
-): PointsBreakdown {
-  const stats: PlayerStats = {
-    runs: matchStats.runs,
-    ballsFaced: matchStats.ballsFaced,
-    fours: matchStats.fours,
-    sixes: matchStats.sixes,
-    isOut: matchStats.isOut,
-    overs: matchStats.overs,
-    maidens: matchStats.maidens,
-    runsConceded: matchStats.runsConceded,
-    wickets: matchStats.wickets,
-    dots: matchStats.dots,
-    wides: matchStats.wides,
-    noBalls: matchStats.noBalls,
-    lbwBowledCount: matchStats.lbwBowledCount,
-    catches: matchStats.catches,
-    stumpings: matchStats.stumpings,
-    runOuts: matchStats.runOuts,
-    isInPlaying11: matchStats.isInPlaying11,
-    isImpactPlayer: matchStats.isImpactPlayer,
-    isManOfMatch: matchStats.isManOfMatch,
-    teamWon: matchStats.teamWon,
-    playerRole: matchStats.playerRole,
-  };
-
-  return calculateFantasyPoints(stats, rules);
-}
-
-/**
- * Format points breakdown as a human-readable string
- */
-export function formatPointsBreakdown(breakdown: PointsBreakdown): string {
-  const lines: string[] = [];
-
-  // Common points
-  if (breakdown.common.total !== 0) {
-    lines.push('Common:');
-    if (breakdown.common.starting11) lines.push(`  Playing XI: +${breakdown.common.starting11}`);
-    if (breakdown.common.matchWinningTeam) lines.push(`  Winning Team: +${breakdown.common.matchWinningTeam}`);
-    if (breakdown.common.impactPlayer) lines.push(`  Impact Player: +${breakdown.common.impactPlayer}`);
-    if (breakdown.common.impactPlayerWinBonus) lines.push(`  Impact Win Bonus: +${breakdown.common.impactPlayerWinBonus}`);
-    if (breakdown.common.manOfTheMatch) lines.push(`  Man of Match: +${breakdown.common.manOfTheMatch}`);
-  }
-
-  // Batting points
-  if (breakdown.batting.total !== 0) {
-    lines.push('Batting:');
-    if (breakdown.batting.runs) lines.push(`  Runs: +${breakdown.batting.runs}`);
-    if (breakdown.batting.fours) lines.push(`  Fours: +${breakdown.batting.fours}`);
-    if (breakdown.batting.sixes) lines.push(`  Sixes: +${breakdown.batting.sixes}`);
-    if (breakdown.batting.milestoneBonus) lines.push(`  Milestone: +${breakdown.batting.milestoneBonus}`);
-    if (breakdown.batting.duckPenalty) lines.push(`  Duck: ${breakdown.batting.duckPenalty}`);
-    if (breakdown.batting.lowScorePenalty) lines.push(`  Low Score: ${breakdown.batting.lowScorePenalty}`);
-    if (breakdown.batting.strikeRateBonus > 0) lines.push(`  Strike Rate Bonus: +${breakdown.batting.strikeRateBonus}`);
-    if (breakdown.batting.strikeRateBonus < 0) lines.push(`  Strike Rate Penalty: ${breakdown.batting.strikeRateBonus}`);
-  }
-
-  // Bowling points
-  if (breakdown.bowling.total !== 0) {
-    lines.push('Bowling:');
-    if (breakdown.bowling.wickets) lines.push(`  Wickets: +${breakdown.bowling.wickets}`);
-    if (breakdown.bowling.milestoneBonus) lines.push(`  Milestone: +${breakdown.bowling.milestoneBonus}`);
-    if (breakdown.bowling.dots) lines.push(`  Dots: +${breakdown.bowling.dots}`);
-    if (breakdown.bowling.lbwBowledBonus) lines.push(`  LBW/Bowled: +${breakdown.bowling.lbwBowledBonus}`);
-    if (breakdown.bowling.maidens) lines.push(`  Maidens: +${breakdown.bowling.maidens}`);
-    if (breakdown.bowling.widePenalty) lines.push(`  Wides: ${breakdown.bowling.widePenalty}`);
-    if (breakdown.bowling.noBallPenalty) lines.push(`  No Balls: ${breakdown.bowling.noBallPenalty}`);
-    if (breakdown.bowling.economyBonus > 0) lines.push(`  Economy Bonus: +${breakdown.bowling.economyBonus}`);
-    if (breakdown.bowling.economyBonus < 0) lines.push(`  Economy Penalty: ${breakdown.bowling.economyBonus}`);
-  }
-
-  // Fielding points
-  if (breakdown.fielding.total !== 0) {
-    lines.push('Fielding:');
-    if (breakdown.fielding.catches) lines.push(`  Catches: +${breakdown.fielding.catches}`);
-    if (breakdown.fielding.stumpings) lines.push(`  Stumpings: +${breakdown.fielding.stumpings}`);
-    if (breakdown.fielding.runOuts) lines.push(`  Run Outs: +${breakdown.fielding.runOuts}`);
-    if (breakdown.fielding.multiCatchBonus) lines.push(`  Multi-Catch: +${breakdown.fielding.multiCatchBonus}`);
-  }
-
-  lines.push(`Total: ${breakdown.total}`);
-
-  return lines.join('\n');
 }

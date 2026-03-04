@@ -99,8 +99,14 @@ export const useDraft = () => {
     const managerCount = managers.length;
     if (managerCount === 0) return null;
 
-    // Inside database, pick_number is just the position within the round (1 to managerCount)
-    return draftPicks.find(p => p.round === round && p.pickNumber === position) || null;
+    // Logic fix: Match by absolute pick number
+    const isRRoundEven = round % 2 === 0;
+    const posInRound = isRRoundEven
+      ? (managerCount - position + 1)
+      : position;
+    const absolutePickNumber = ((round - 1) * managerCount) + posInRound;
+
+    return draftPicks.find(p => p.pickNumber === absolutePickNumber) || null;
   }, [draftPicks, managers.length]);
 
   // Get player for a pick
@@ -474,9 +480,13 @@ export const useDraft = () => {
 
     if (positionsCount === 0) return null;
 
-    const round = Math.floor(currentTotalPicks / positionsCount) + 1;
-    const pickIndexInRound = currentTotalPicks % positionsCount;
+    // This represents the NEXT pick to be made
+    const nextPickIndex = currentTotalPicks;
+    const round = Math.floor(nextPickIndex / positionsCount) + 1;
+    const pickIndexInRound = nextPickIndex % positionsCount;
     const isEvenRound = round % 2 === 0;
+
+    // In snake draft, the position (column) is determined by how many picks are left in the round
     const position = isEvenRound
       ? (positionsCount - pickIndexInRound)
       : (pickIndexInRound + 1);
@@ -644,10 +654,17 @@ export const useDraft = () => {
         const managerId = effectiveDraftOrder.find(o => o.position === emptyPick.position)?.managerId || null;
         const player = sortedPlayers[index]; // Use index to get unique player
 
+        // Calculate absolute pick number for batch insert
+        const isRRoundEven = emptyPick.round % 2 === 0;
+        const posInRound = isRRoundEven
+          ? (totalPositions - emptyPick.position + 1)
+          : emptyPick.position;
+        const absolutePickNumber = ((emptyPick.round - 1) * totalPositions) + posInRound;
+
         return {
           league_id: leagueId,
           round: emptyPick.round,
-          pick_number: emptyPick.position,
+          pick_number: absolutePickNumber,
           manager_id: managerId,
           player_id: player.id,
           is_auto_draft: true,

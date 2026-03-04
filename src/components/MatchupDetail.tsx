@@ -5,6 +5,7 @@ import { useGameStore } from '@/store/useGameStore';
 import { PlayerWithMatches, useMatchupData } from '@/hooks/useMatchupData';
 // calculateFantasyPoints removed as it is now handled in the hook
 import { TEAM_SHORT_TO_COUNTRY } from '@/lib/player-utils';
+import { LeagueConfig, DEFAULT_LEAGUE_CONFIG } from '@/lib/roster-validation';
 import {
     Dialog,
     DialogContent,
@@ -322,7 +323,7 @@ const MatchupRow = ({
 
 type SlotDef = { roleLabel: string; player: PlayerWithMatches | null };
 
-const assignToSlots = (players: PlayerWithMatches[]): SlotDef[] => {
+const assignToSlots = (players: PlayerWithMatches[], config: LeagueConfig = DEFAULT_LEAGUE_CONFIG): SlotDef[] => {
     const unassigned = [...players];
 
     const pullPlayer = (roles: string[]) => {
@@ -332,15 +333,37 @@ const assignToSlots = (players: PlayerWithMatches[]): SlotDef[] => {
     };
 
     const slots: SlotDef[] = [];
-    slots.push({ roleLabel: 'WK', player: pullPlayer(['Wicket Keeper']) });
-    for (let i = 0; i < 3; i++) slots.push({ roleLabel: 'BAT', player: pullPlayer(['Batsman', 'Wicket Keeper']) });
-    for (let i = 0; i < 2; i++) slots.push({ roleLabel: 'AR', player: pullPlayer(['All Rounder']) });
-    for (let i = 0; i < 3; i++) slots.push({ roleLabel: 'BWL', player: pullPlayer(['Bowler']) });
-    for (let i = 0; i < 2; i++) slots.push({ roleLabel: 'FLEX', player: unassigned.length > 0 ? unassigned.shift()! : null });
 
-    while (unassigned.length > 0) {
-        slots.push({ roleLabel: 'FLEX', player: unassigned.shift()! });
+    // 1. Mandatory WK
+    if (config.requireWk) {
+        slots.push({ roleLabel: 'WK', player: pullPlayer(['Wicket Keeper']) });
     }
+
+    // 2. Mandatory BAT/WK
+    const currentBatWk = slots.filter(s => s.roleLabel === 'WK').length;
+    const batWkNeeded = Math.max(0, config.minBatWk - currentBatWk);
+    for (let i = 0; i < batWkNeeded; i++) {
+        slots.push({ roleLabel: 'BAT', player: pullPlayer(['Batsman', 'Wicket Keeper']) });
+    }
+
+    // 3. Mandatory AR
+    for (let i = 0; i < config.minAllRounders; i++) {
+        slots.push({ roleLabel: 'AR', player: pullPlayer(['All Rounder']) });
+    }
+
+    // 4. Mandatory BWL
+    for (let i = 0; i < config.minBowlers; i++) {
+        slots.push({ roleLabel: 'BWL', player: pullPlayer(['Bowler']) });
+    }
+
+    // 5. Flex Slots
+    const totalMandatoryAdded = slots.length;
+    const flexNeeded = Math.max(0, config.activeSize - totalMandatoryAdded);
+    for (let i = 0; i < flexNeeded; i++) {
+        slots.push({ roleLabel: 'FLEX', player: unassigned.length > 0 ? unassigned.shift()! : null });
+    }
+
+
 
     return slots;
 };
@@ -350,19 +373,21 @@ const HeadToHeadSection = ({
     homePlayers,
     awayPlayers,
     onPlayerClick,
-    useSlots = false
+    useSlots = false,
+    config = DEFAULT_LEAGUE_CONFIG
 }: {
     title: string;
     homePlayers: PlayerWithMatches[];
     awayPlayers: PlayerWithMatches[];
     onPlayerClick: (playerId: string) => void;
     useSlots?: boolean;
+    config?: LeagueConfig;
 }) => {
     const rows: { home: PlayerWithMatches | null, away: PlayerWithMatches | null, label: string }[] = [];
 
     if (useSlots) {
-        const homeSlots = assignToSlots(homePlayers);
-        const awaySlots = assignToSlots(awayPlayers);
+        const homeSlots = assignToSlots(homePlayers, config);
+        const awaySlots = assignToSlots(awayPlayers, config);
         const maxCount = Math.max(homeSlots.length, awaySlots.length);
 
         for (let i = 0; i < maxCount; i++) {
@@ -379,7 +404,7 @@ const HeadToHeadSection = ({
         const sortedHome = [...homePlayers].sort((a, b) => sortParams(a) - sortParams(b));
         const sortedAway = [...awayPlayers].sort((a, b) => sortParams(a) - sortParams(b));
 
-        const maxCount = Math.max(sortedHome.length, sortedAway.length);
+        const maxCount = Math.max(sortedHome.length, sortedAway.length, config.benchSize || 0);
         for (let i = 0; i < maxCount; i++) {
             let label = 'UNSET';
             if (sortedHome[i] || sortedAway[i]) {
@@ -426,6 +451,7 @@ export function MatchupDetail({
 }: MatchupDetailProps) {
     const players = useGameStore(state => state.players);
     const currentLeagueId = useGameStore(state => state.currentLeagueId);
+    const leagueConfig = useGameStore(state => state.config);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
     const navigate = useNavigate();
 
@@ -559,6 +585,7 @@ export function MatchupDetail({
                             awayPlayers={awayStarters}
                             onPlayerClick={setSelectedPlayerId}
                             useSlots={true}
+                            config={leagueConfig || undefined}
                         />
 
                         <HeadToHeadSection
@@ -567,6 +594,7 @@ export function MatchupDetail({
                             awayPlayers={awayBench}
                             onPlayerClick={setSelectedPlayerId}
                             useSlots={false}
+                            config={leagueConfig || undefined}
                         />
                     </div>
                 )}

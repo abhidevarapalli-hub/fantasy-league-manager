@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
 import { GlobalStatsImport } from '@/components/platform-admin/GlobalStatsImport';
 import { GlobalPlayerMapping } from '@/components/platform-admin/GlobalPlayerMapping';
+import { MatchFinalization } from '@/components/platform-admin/MatchFinalization';
+import { WeekFinalization } from '@/components/platform-admin/WeekFinalization';
 
 const PlatformAdmin = () => {
   const navigate = useNavigate();
@@ -37,6 +39,8 @@ const PlatformAdmin = () => {
       <div className="px-4 py-4 space-y-6">
         <GlobalStatsImport />
         <GlobalPlayerMapping />
+        <MatchFinalization />
+        <WeekFinalization />
       </div>
     </AppLayout>
   );

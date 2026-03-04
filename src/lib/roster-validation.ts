@@ -425,6 +425,30 @@ export function buildOptimalActive11(allPlayers: Player[], config: LeagueConfig 
     }
   }
 
+  // Post-loop: account for unfilled mandatory slots.
+  // Each unfilled mandatory slot takes up a display position in activeSize,
+  // reducing the effective player capacity. Move excess players to bench.
+  // This allows bench to exceed benchSize to keep total roster intact.
+  let unfilledMandatory = 0;
+  if (config.requireWk && wkCount < 1) unfilledMandatory++;
+  // BAT/WK display slots = max(0, minBatWk - (requireWk ? 1 : 0))
+  // BAT players filled = batWkCount - wkCount (exclude WK contribution)
+  const batSlotsInDisplay = Math.max(0, config.minBatWk - (config.requireWk ? 1 : 0));
+  const batPlayersFilled = batWkCount - wkCount;
+  unfilledMandatory += Math.max(0, batSlotsInDisplay - batPlayersFilled);
+  unfilledMandatory += Math.max(0, config.minAllRounders - arCount);
+  unfilledMandatory += Math.max(0, config.minBowlers - bowlerCount);
+
+  // Only displace players that EXCEED the effective capacity.
+  // Unfilled mandatory slots reduce capacity but don't displace 1:1 —
+  // players in valid AR/flex slots should remain active.
+  const effectiveCapacity = Math.max(0, config.activeSize - unfilledMandatory);
+  const toDisplace = Math.max(0, active.length - effectiveCapacity);
+  for (let i = 0; i < toDisplace; i++) {
+    const displaced = active.pop()!;
+    bench.unshift(displaced);
+  }
+
   return { active, bench };
 }
 

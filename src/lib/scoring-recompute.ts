@@ -34,6 +34,7 @@ interface RecomputeRow {
   is_impact_player: boolean;
   is_man_of_match: boolean;
   team_won: boolean;
+  primary_role: string | null;
 }
 
 interface BatchUpdate {
@@ -92,6 +93,7 @@ export async function recomputeLeaguePoints(
       isImpactPlayer: row.is_impact_player ?? false,
       isManOfMatch: row.is_man_of_match ?? false,
       teamWon: row.team_won ?? false,
+      playerRole: row.primary_role ?? undefined,
     };
 
     const breakdown = calculateFantasyPoints(stats, rules);

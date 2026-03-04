@@ -48,3 +48,6 @@ android/.gradle/
 android/build/
 android/.idea/
 android/local.properties
+
+# Git worktrees
+.worktrees/

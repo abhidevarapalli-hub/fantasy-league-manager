@@ -15,6 +15,8 @@ export interface LiveFantasyStanding {
   livePoints: number;
   finalizedPoints: number;
   hasLiveStats: boolean;
+  wins: number;
+  losses: number;
   rank: number;
 }
 
@@ -70,6 +72,8 @@ export function useLiveFantasyStandings(leagueId: string | null) {
           live_points: number;
           finalized_points: number;
           has_live_stats: boolean;
+          wins: number;
+          losses: number;
           rank: number;
         }) => ({
           managerId: row.manager_id,
@@ -79,6 +83,8 @@ export function useLiveFantasyStandings(leagueId: string | null) {
           livePoints: Number(row.live_points) || 0,
           finalizedPoints: Number(row.finalized_points) || 0,
           hasLiveStats: row.has_live_stats,
+          wins: Number(row.wins) || 0,
+          losses: Number(row.losses) || 0,
           rank: Number(row.rank) || 0,
         })
       );

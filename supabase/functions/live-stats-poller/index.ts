@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { calculateFantasyPoints as calculatePoints, type PlayerStats, type PointsBreakdown } from '../_shared/fantasy-points-calculator.ts';
+import type { ScoringRules } from '../_shared/scoring-types.ts';
 
 const RAPIDAPI_HOST = 'cricbuzz-cricket.p.rapidapi.com';
 
@@ -52,6 +54,26 @@ interface CricbuzzScorecard {
   playersOfTheSeries?: Array<{ id: number; name: string }>;
 }
 
+interface CricbuzzLeanbackPlayer {
+  id: string;
+  name: string;
+  captain: boolean;
+  role: string;
+  keeper: boolean;
+  teamname: string;
+  faceimageid: number;
+}
+
+interface CricbuzzLeanback {
+  matchheaders?: {
+    state?: string;
+    status?: string;
+    momplayers?: {
+      player?: CricbuzzLeanbackPlayer[];
+    };
+  };
+}
+
 interface ParsedPlayerStats {
   cricbuzzPlayerId: number;
   playerName: string;
@@ -75,40 +97,7 @@ interface ParsedPlayerStats {
   teamWon: boolean;
 }
 
-interface ScoringRules {
-  common: {
-    starting11: number;
-    matchWinningTeam: number;
-    impactPlayer: number;
-    impactPlayerWinBonus: number;
-    manOfTheMatch: number;
-  };
-  batting: {
-    runs: number;
-    four: number;
-    six: number;
-    milestones: { runs: number; points: number }[];
-    duckDismissal: number;
-    lowScoreDismissal: number;
-    strikeRateBonuses: { minSR: number; maxSR: number; points: number; minBalls?: number; minRuns?: number }[];
-  };
-  bowling: {
-    wickets: number;
-    milestones: { wickets: number; points: number }[];
-    dotBall: number;
-    lbwOrBowledBonus: number;
-    widePenalty: number;
-    noBallPenalty: number;
-    maidenOver: number;
-    economyRateBonuses: { minER: number; maxER: number; points: number; minOvers?: number }[];
-  };
-  fielding: {
-    catch: number;
-    stumping: number;
-    runOut: number;
-    multiCatchBonus: { count: number; points: number };
-  };
-}
+// ScoringRules imported from _shared/scoring-types.ts
 
 // Parse dismissal to extract fielding credits
 function parseDismissal(outdec: string): {
@@ -297,111 +286,93 @@ function parseScorecard(
   return allStats;
 }
 
-// Points breakdown returned by calculateFantasyPoints
-interface PointsBreakdown {
-  common: { total: number; starting11: number; matchWinningTeam: number; manOfTheMatch: number };
-  batting: { total: number; runs: number; fours: number; sixes: number; milestone: number; dismissal: number; strikeRate: number };
-  bowling: { total: number; wickets: number; milestone: number; dots: number; lbwBowled: number; maidens: number; economy: number };
-  fielding: { total: number; catches: number; stumpings: number; runOuts: number; multiCatchBonus: number };
-}
+// PointsBreakdown and calculateFantasyPoints imported from _shared/fantasy-points-calculator.ts
 
-// Calculate fantasy points for a player
-function calculateFantasyPoints(stats: ParsedPlayerStats, rules: ScoringRules, isManOfMatch: boolean): PointsBreakdown {
-  const breakdown: PointsBreakdown = {
-    common: { total: 0, starting11: 0, matchWinningTeam: 0, manOfTheMatch: 0 },
-    batting: { total: 0, runs: 0, fours: 0, sixes: 0, milestone: 0, dismissal: 0, strikeRate: 0 },
-    bowling: { total: 0, wickets: 0, milestone: 0, dots: 0, lbwBowled: 0, maidens: 0, economy: 0 },
-    fielding: { total: 0, catches: 0, stumpings: 0, runOuts: 0, multiCatchBonus: 0 },
+// Adapter: convert ParsedPlayerStats to shared PlayerStats format
+function toPlayerStats(s: ParsedPlayerStats, isManOfMatch: boolean, playerRole?: string): PlayerStats {
+  return {
+    runs: s.runs ?? 0,
+    ballsFaced: s.ballsFaced ?? 0,
+    fours: s.fours ?? 0,
+    sixes: s.sixes ?? 0,
+    isOut: s.isOut ?? false,
+    overs: s.overs ?? 0,
+    maidens: s.maidens ?? 0,
+    runsConceded: s.runsConceded ?? 0,
+    wickets: s.wickets ?? 0,
+    dots: s.dots ?? 0,
+    wides: 0, // ParsedPlayerStats doesn't track wides
+    noBalls: 0, // ParsedPlayerStats doesn't track noBalls
+    lbwBowledCount: s.lbwBowledCount ?? 0,
+    catches: s.catches ?? 0,
+    stumpings: s.stumpings ?? 0,
+    runOuts: s.runOuts ?? 0,
+    isInPlaying11: s.isInPlaying11 ?? false,
+    isImpactPlayer: false, // Not tracked by poller yet
+    isManOfMatch,
+    teamWon: s.teamWon ?? false,
+    playerRole,
   };
-
-  // Common points
-  if (stats.isInPlaying11) breakdown.common.starting11 = rules.common.starting11;
-  if (stats.teamWon) breakdown.common.matchWinningTeam = rules.common.matchWinningTeam;
-  if (isManOfMatch) breakdown.common.manOfTheMatch = rules.common.manOfTheMatch;
-  breakdown.common.total = breakdown.common.starting11 + breakdown.common.matchWinningTeam + breakdown.common.manOfTheMatch;
-
-  // Batting points
-  breakdown.batting.runs = stats.runs * rules.batting.runs;
-  breakdown.batting.fours = stats.fours * rules.batting.four;
-  breakdown.batting.sixes = stats.sixes * rules.batting.six;
-
-  // Batting milestones — apply only the highest qualifying milestone
-  for (const milestone of rules.batting.milestones) {
-    if (stats.runs >= milestone.runs) {
-      breakdown.batting.milestone = milestone.points;
-    }
-  }
-
-  // Duck penalty
-  if (stats.runs === 0 && stats.isOut) {
-    breakdown.batting.dismissal = rules.batting.duckDismissal;
-  } else if (stats.runs > 0 && stats.runs <= 5 && stats.isOut) {
-    breakdown.batting.dismissal = rules.batting.lowScoreDismissal;
-  }
-
-  // Strike rate bonus/penalty
-  if (stats.ballsFaced > 0) {
-    const strikeRate = (stats.runs / stats.ballsFaced) * 100;
-    for (const srBonus of rules.batting.strikeRateBonuses) {
-      const meetsMinBalls = !srBonus.minBalls || stats.ballsFaced >= srBonus.minBalls;
-      const meetsMinRuns = !srBonus.minRuns || stats.runs >= srBonus.minRuns;
-      if (strikeRate >= srBonus.minSR && strikeRate <= srBonus.maxSR && meetsMinBalls && meetsMinRuns) {
-        breakdown.batting.strikeRate = srBonus.points;
-        break;
-      }
-    }
-  }
-  breakdown.batting.total = breakdown.batting.runs + breakdown.batting.fours + breakdown.batting.sixes
-    + breakdown.batting.milestone + breakdown.batting.dismissal + breakdown.batting.strikeRate;
-
-  // Bowling points
-  breakdown.bowling.wickets = stats.wickets * rules.bowling.wickets;
-
-  // Bowling milestones
-  for (const milestone of rules.bowling.milestones) {
-    if (stats.wickets >= milestone.wickets) {
-      breakdown.bowling.milestone = milestone.points;
-    }
-  }
-
-  breakdown.bowling.dots = stats.dots * rules.bowling.dotBall;
-  breakdown.bowling.lbwBowled = stats.lbwBowledCount * rules.bowling.lbwOrBowledBonus;
-  breakdown.bowling.maidens = stats.maidens * rules.bowling.maidenOver;
-
-  // Economy rate bonus/penalty
-  if (stats.overs >= 1) {
-    const economy = stats.runsConceded / stats.overs;
-    for (const erBonus of rules.bowling.economyRateBonuses) {
-      const meetsMinOvers = !erBonus.minOvers || stats.overs >= erBonus.minOvers;
-      if (economy >= erBonus.minER && economy <= erBonus.maxER && meetsMinOvers) {
-        breakdown.bowling.economy = erBonus.points;
-        break;
-      }
-    }
-  }
-  breakdown.bowling.total = breakdown.bowling.wickets + breakdown.bowling.milestone + breakdown.bowling.dots
-    + breakdown.bowling.lbwBowled + breakdown.bowling.maidens + breakdown.bowling.economy;
-
-  // Fielding points
-  breakdown.fielding.catches = stats.catches * rules.fielding.catch;
-  breakdown.fielding.stumpings = stats.stumpings * rules.fielding.stumping;
-  breakdown.fielding.runOuts = stats.runOuts * rules.fielding.runOut;
-
-  if (stats.catches >= rules.fielding.multiCatchBonus.count) {
-    breakdown.fielding.multiCatchBonus = rules.fielding.multiCatchBonus.points;
-  }
-  breakdown.fielding.total = breakdown.fielding.catches + breakdown.fielding.stumpings
-    + breakdown.fielding.runOuts + breakdown.fielding.multiCatchBonus;
-
-  return breakdown;
 }
 
-// Extract Man of Match from scorecard response
-function extractManOfMatch(scorecard: CricbuzzScorecard): { id: number; name: string } | null {
+// Extract Man of Match from leanback response (primary, more reliable source)
+function extractManOfMatchFromLeanback(leanback: CricbuzzLeanback): { id: number; name: string } | null {
+  const players = leanback.matchheaders?.momplayers?.player;
+  if (players && players.length > 0) {
+    const mom = players[0];
+    const id = parseInt(mom.id, 10);
+    if (!isNaN(id)) {
+      return { id, name: mom.name };
+    }
+  }
+  return null;
+}
+
+// Fallback: extract Man of Match from scorecard response
+function extractManOfMatchFromScorecard(scorecard: CricbuzzScorecard): { id: number; name: string } | null {
   if (scorecard.playersOfTheMatch && scorecard.playersOfTheMatch.length > 0) {
     return scorecard.playersOfTheMatch[0];
   }
   return null;
+}
+
+// Fetch MoM from leanback endpoint with fallback to scorecard field
+async function fetchManOfMatch(
+  cricbuzz_match_id: number,
+  scorecard: CricbuzzScorecard,
+  rapidApiKey: string,
+): Promise<{ id: number; name: string } | null> {
+  // Try leanback endpoint first (reliably has MoM data)
+  try {
+    const leanbackUrl = `https://${RAPIDAPI_HOST}/mcenter/v1/${cricbuzz_match_id}/leanback`;
+    const leanbackResp = await fetch(leanbackUrl, {
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key': rapidApiKey,
+        'X-RapidAPI-Host': RAPIDAPI_HOST,
+      },
+    });
+
+    if (leanbackResp.ok) {
+      const leanback: CricbuzzLeanback = await leanbackResp.json();
+      const mom = extractManOfMatchFromLeanback(leanback);
+      if (mom) {
+        console.log(`MoM from leanback: ${mom.name} (${mom.id})`);
+        return mom;
+      }
+    } else {
+      console.warn(`Leanback API returned ${leanbackResp.status} for match ${cricbuzz_match_id}`);
+    }
+  } catch (err) {
+    console.warn(`Failed to fetch leanback for match ${cricbuzz_match_id}:`, err);
+  }
+
+  // Fallback to scorecard's playersOfTheMatch field
+  const fallback = extractManOfMatchFromScorecard(scorecard);
+  if (fallback) {
+    console.log(`MoM from scorecard fallback: ${fallback.name} (${fallback.id})`);
+  }
+  return fallback;
 }
 
 // Normalize scoring rules from DB format to expected format
@@ -566,21 +537,33 @@ serve(async (req) => {
     const matchState = isMatchComplete ? 'Complete' : 'Live';
 
     // Determine winner from status
-    const winnerMatch = scorecard.status.match(/^(\w+)\s+won/i);
+    const winnerMatch = scorecard.status.match(/^(.+?)\s+won\s+by/i);
     const winnerTeamName = winnerMatch ? winnerMatch[1] : null;
 
     // Parse scorecard
     const parsedStats = parseScorecard(scorecard, winnerTeamName);
 
-    // Extract Man of Match if match is complete
-    const manOfMatch = isMatchComplete ? extractManOfMatch(scorecard) : null;
+    // Extract Man of Match if match is complete (leanback endpoint, with scorecard fallback)
+    const manOfMatch = isMatchComplete ? await fetchManOfMatch(cricbuzz_match_id, scorecard, rapidApiKey) : null;
+
+    // Fetch player roles from master_players for duck exemption logic
+    const cricbuzzIdsForRoles = parsedStats.map(s => s.cricbuzzPlayerId.toString());
+    const { data: playerRolesData } = await supabase
+      .from('master_players')
+      .select('cricbuzz_id, primary_role')
+      .in('cricbuzz_id', cricbuzzIdsForRoles);
+    const roleMap = new Map<string, string>(
+      (playerRolesData ?? [])
+        .filter((p: { cricbuzz_id: string; primary_role: string | null }) => p.primary_role != null)
+        .map((p: { cricbuzz_id: string; primary_role: string }) => [p.cricbuzz_id, p.primary_role])
+    );
 
     // Update cricket_matches state and result BEFORE league processing
     // This ensures state is always updated even if league processing fails
     {
       const { data: currentMatch } = await supabase
         .from('cricket_matches')
-        .select('id, team1_short, team2_short')
+        .select('id, team1_name, team2_name, team1_short, team2_short, team1_id, team2_id')
         .eq('cricbuzz_match_id', cricbuzz_match_id)
         .single();
 
@@ -620,6 +603,21 @@ serve(async (req) => {
         if (isMatchComplete && manOfMatch) {
           updatePayload.man_of_match_id = manOfMatch.id?.toString() || null;
           updatePayload.man_of_match_name = manOfMatch.name || null;
+        }
+
+        // Resolve winner_team_id from match status
+        if (isMatchComplete && winnerTeamName) {
+          const t1 = currentMatch.team1_name?.toLowerCase() ?? '';
+          const t2 = currentMatch.team2_name?.toLowerCase() ?? '';
+          const t1s = currentMatch.team1_short?.toLowerCase() ?? '';
+          const t2s = currentMatch.team2_short?.toLowerCase() ?? '';
+          const winner = winnerTeamName.toLowerCase();
+
+          if (t1 === winner || t1s === winner) {
+            updatePayload.winner_team_id = currentMatch.team1_id;
+          } else if (t2 === winner || t2s === winner) {
+            updatePayload.winner_team_id = currentMatch.team2_id;
+          }
         }
 
         const { error: stateUpdateError } = await supabase
@@ -775,8 +773,9 @@ serve(async (req) => {
           const leaguePlayer = cricbuzzToPlayer.get(cricbuzzId)!;
           const ownership = playerToManager.get(leaguePlayer.playerId);
           const isManOfMatch = manOfMatch?.id === s.cricbuzzPlayerId;
-          const breakdown = calculateFantasyPoints(s, rules, isManOfMatch);
-          const totalPoints = breakdown.common.total + breakdown.batting.total + breakdown.bowling.total + breakdown.fielding.total;
+          const playerStats = toPlayerStats(s, isManOfMatch, roleMap.get(cricbuzzId) ?? undefined);
+          const breakdown = calculatePoints(playerStats, rules);
+          const totalPoints = breakdown.total;
 
           return {
             league_id,
