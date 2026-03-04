@@ -1,0 +1,1 @@
+export { WeekManager } from './WeekManager';

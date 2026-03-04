@@ -48,6 +48,11 @@ import {
   type PollingStatus,
 } from '@/lib/live-polling-service';
 import { SUPPORTED_TOURNAMENTS, type Tournament } from '@/lib/tournaments';
+import {
+  isApiConfigured,
+  fetchSeriesMatches as fetchSeriesMatchesDirect,
+  extractSeriesMatches,
+} from '@/integrations/cricbuzz/client';
 
 interface GlobalMatch {
   id: string;
@@ -221,6 +226,72 @@ export const GlobalStatsImport = () => {
   useEffect(() => {
     fetchGlobalMatches();
   }, [fetchGlobalMatches]);
+
+  // Auto-sync match states from Cricbuzz API on mount (when live API is configured).
+  // This ensures match states (Upcoming → Complete) stay accurate after DB resets.
+  // Uses the Vite proxy (client.ts) which works without edge functions.
+  useEffect(() => {
+    if (!isApiConfigured()) return;
+
+    let cancelled = false;
+    const autoSync = async () => {
+      try {
+        // Get unique series IDs from our matches
+        const { data: rows } = await supabase
+          .from('cricket_matches')
+          .select('series_id')
+          .not('series_id', 'is', null);
+
+        if (!rows || rows.length === 0 || cancelled) return;
+
+        const uniqueSeriesIds = [...new Set(
+          rows.map(r => r.series_id).filter((id): id is number => id != null)
+        )];
+
+        let totalUpdated = 0;
+
+        for (const seriesId of uniqueSeriesIds) {
+          if (cancelled) break;
+          try {
+            const response = await fetchSeriesMatchesDirect(seriesId);
+            const apiMatches = extractSeriesMatches(response);
+
+            for (const { matchInfo } of apiMatches) {
+              const matchState = mapMatchState(matchInfo.state);
+
+              const { error } = await supabase
+                .from('cricket_matches')
+                .update({
+                  state: matchState,
+                  result: matchInfo.status || null,
+                  team1_name: matchInfo.team1.teamName,
+                  team2_name: matchInfo.team2.teamName,
+                  team1_id: matchInfo.team1.teamId,
+                  team2_id: matchInfo.team2.teamId,
+                  team1_short: matchInfo.team1.teamSName,
+                  team2_short: matchInfo.team2.teamSName,
+                })
+                .eq('cricbuzz_match_id', matchInfo.matchId);
+
+              if (!error) totalUpdated++;
+            }
+          } catch (err) {
+            console.error(`[AutoSync] Failed to sync series ${seriesId}:`, err);
+          }
+        }
+
+        if (!cancelled && totalUpdated > 0) {
+          toast.success(`Auto-synced ${totalUpdated} match states from API`);
+          fetchGlobalMatches();
+        }
+      } catch (err) {
+        console.error('[AutoSync] Failed:', err);
+      }
+    };
+
+    autoSync();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch polling statuses for all matches
   const fetchPollingStatuses = useCallback(async () => {
