@@ -1,14 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Wand2, Plus, Loader2, Check, AlertCircle } from 'lucide-react';
+import { Wand2, Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { WeekCard } from './WeekCard';
 import { MatchAssignDialog } from './MatchAssignDialog';
@@ -23,17 +16,9 @@ interface MatchInfo {
   week: number | null;
 }
 
-interface WeekReadiness {
-  total_matches: number;
-  finalized_matches: number;
-  is_ready: boolean;
-}
-
 interface WeekGroup {
   week: number | null;
   matches: MatchInfo[];
-  readiness?: WeekReadiness;
-  isFinalized: boolean;
 }
 
 interface WeekManagerProps {
@@ -43,8 +28,6 @@ interface WeekManagerProps {
 export const WeekManager = ({ leagueId }: WeekManagerProps) => {
   const [weekGroups, setWeekGroups] = useState<WeekGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isFinalizing, setIsFinalizing] = useState(false);
-  const [confirmFinalizeWeek, setConfirmFinalizeWeek] = useState<number | null>(null);
 
   // Dialog state
   const [assignDialogWeek, setAssignDialogWeek] = useState<number | null>(null);
@@ -103,44 +86,14 @@ export const WeekManager = ({ leagueId }: WeekManagerProps) => {
         matches.sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
       }
 
-      // Get distinct non-null weeks for readiness checks
-      const weekNumbers = [...weekMap.keys()].filter((w): w is number => w !== null).sort((a, b) => a - b);
-
-      // Check readiness and finalization for each week
-      const readinessResults = await Promise.all(
-        weekNumbers.map(async (week) => {
-          const [readinessResult, matchupsResult] = await Promise.all([
-            supabase.rpc('check_week_finalization_ready', {
-              p_league_id: leagueId,
-              p_week: week,
-            }),
-            supabase
-              .from('league_matchups')
-              .select('is_finalized')
-              .eq('league_id', leagueId)
-              .eq('week', week),
-          ]);
-
-          const readiness = readinessResult.data?.[0] as WeekReadiness | undefined;
-          const matchups = matchupsResult.data || [];
-          const isFinalized = matchups.length > 0 && matchups.every((m) => m.is_finalized);
-
-          return { week, readiness, isFinalized };
-        })
-      );
-
-      const readinessMap = new Map(readinessResults.map((r) => [r.week, r]));
-
       // Build week groups: numbered weeks first, then unassigned
+      const weekNumbers = [...weekMap.keys()].filter((w): w is number => w !== null).sort((a, b) => a - b);
       const groups: WeekGroup[] = [];
 
       for (const week of weekNumbers) {
-        const r = readinessMap.get(week);
         groups.push({
           week,
           matches: weekMap.get(week) || [],
-          readiness: r?.readiness,
-          isFinalized: r?.isFinalized || false,
         });
       }
 
@@ -150,7 +103,6 @@ export const WeekManager = ({ leagueId }: WeekManagerProps) => {
         groups.push({
           week: null,
           matches: unassigned,
-          isFinalized: false,
         });
       }
 
@@ -166,31 +118,6 @@ export const WeekManager = ({ leagueId }: WeekManagerProps) => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const handleFinalizeWeek = async () => {
-    if (confirmFinalizeWeek === null) return;
-
-    setIsFinalizing(true);
-    try {
-      const { error } = await supabase.rpc('finalize_week', {
-        p_league_id: leagueId,
-        p_week: confirmFinalizeWeek,
-      });
-
-      if (error) {
-        toast.error(`Failed to finalize week: ${error.message}`);
-        return;
-      }
-
-      toast.success(`Week ${confirmFinalizeWeek} finalized successfully`);
-      setConfirmFinalizeWeek(null);
-      await fetchData();
-    } catch {
-      toast.error('Failed to finalize week');
-    } finally {
-      setIsFinalizing(false);
-    }
-  };
 
   const handleAddNewWeek = async () => {
     // Find the next week number
@@ -258,11 +185,8 @@ export const WeekManager = ({ leagueId }: WeekManagerProps) => {
               leagueId={leagueId}
               week={group.week}
               matches={group.matches}
-              readiness={group.readiness}
-              isFinalized={group.isFinalized}
               onMatchRemoved={fetchData}
               onAddMatchesClick={(week) => setAssignDialogWeek(week)}
-              onFinalizeClick={(week) => setConfirmFinalizeWeek(week)}
             />
           ))}
         </div>
@@ -290,51 +214,6 @@ export const WeekManager = ({ leagueId }: WeekManagerProps) => {
         onApplied={fetchData}
       />
 
-      {/* Finalize Confirmation Dialog */}
-      <Dialog
-        open={confirmFinalizeWeek !== null}
-        onOpenChange={(open) => {
-          if (!open) setConfirmFinalizeWeek(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Finalize Week {confirmFinalizeWeek}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              This will calculate final scores with C/VC multipliers, determine matchup winners,
-              and update W/L standings.
-            </p>
-            <p className="text-sm text-yellow-600 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              This action cannot be undone.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmFinalizeWeek(null)}
-              disabled={isFinalizing}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleFinalizeWeek} disabled={isFinalizing}>
-              {isFinalizing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Finalizing...
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Confirm Finalize
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

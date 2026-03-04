@@ -50,7 +50,7 @@ export const WeekManagerAdmin = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          Assign matches to weeks, auto-generate schedules, and finalize weekly matchups.
+          Assign matches to weeks and organize league schedules.
         </p>
 
         <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>

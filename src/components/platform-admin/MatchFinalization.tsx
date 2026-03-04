@@ -42,26 +42,13 @@ interface CricketMatch {
   winner_team_id: number | null;
 }
 
-interface LeagueMatch {
-  match_id: string;
-  league_id: string;
-  week: number | null;
-  stats_imported: boolean | null;
-}
-
 interface MatchPlayer {
   cricbuzz_player_id: string;
   player_name: string;
 }
 
-interface WeekGroup {
-  week: number | null;
-  matches: CricketMatch[];
-}
-
 export const MatchFinalization = () => {
   const [matches, setMatches] = useState<CricketMatch[]>([]);
-  const [leagueMatches, setLeagueMatches] = useState<LeagueMatch[]>([]);
   const [matchPlayers, setMatchPlayers] = useState<Map<string, MatchPlayer[]>>(new Map());
   const [selectedMoM, setSelectedMoM] = useState<Map<string, string>>(new Map());
   const [selectedWinner, setSelectedWinner] = useState<Map<string, number>>(new Map());
@@ -83,23 +70,14 @@ export const MatchFinalization = () => {
 
       if (matchesError) throw matchesError;
 
-      const { data: leagueMatchesData, error: leagueMatchesError } = await supabase
-        .from('league_matches')
-        .select('match_id, league_id, week, stats_imported');
-
-      if (leagueMatchesError) throw leagueMatchesError;
-
       setMatches(matchesData || []);
-      setLeagueMatches(leagueMatchesData || []);
 
-      // Pre-select existing MoM and winner values
       const momMap = new Map<string, string>();
       const winnerMap = new Map<string, number>();
       for (const m of matchesData || []) {
         if (m.man_of_match_id) momMap.set(m.id, m.man_of_match_id);
         if (m.winner_team_id) winnerMap.set(m.id, m.winner_team_id);
       }
-      // Auto-resolve winners from result text for matches that don't have one
       for (const m of matchesData || []) {
         if (!m.winner_team_id && m.result) {
           const autoWinner = resolveWinnerFromResult(m.result, m.team1_name, m.team2_name, m.team1_id, m.team2_id);
@@ -166,7 +144,6 @@ export const MatchFinalization = () => {
     fetchingMoMRef.current.add(match.id);
     setFetchingMoM(prev => new Set(prev).add(match.id));
     try {
-      // Try leanback first (lightweight, includes MoM)
       let momId: string | undefined;
       let momName: string | undefined;
       try {
@@ -177,10 +154,9 @@ export const MatchFinalization = () => {
           momName = momPlayer.name;
         }
       } catch {
-        // Leanback failed, fall through to scorecard
+        // Leanback failed
       }
 
-      // Fall back to scorecard if leanback didn't have MoM
       if (!momId) {
         try {
           const scorecard = await fetchScorecardDetails(match.cricbuzz_match_id);
@@ -203,13 +179,11 @@ export const MatchFinalization = () => {
           return prev;
         });
 
-        // Persist MoM directly to the database
         await supabase
           .from('cricket_matches')
           .update({ man_of_match_id: momId, man_of_match_name: momName })
           .eq('id', match.id);
 
-        // Set is_man_of_match flag on the player's stats row
         await supabase
           .from('match_player_stats')
           .update({ is_man_of_match: false })
@@ -236,7 +210,6 @@ export const MatchFinalization = () => {
     }
   }, []);
 
-  // Auto-fetch MoM from API for complete matches missing it, persist to DB
   useEffect(() => {
     if (isLoading || matches.length === 0) return;
     let cancelled = false;
@@ -251,15 +224,10 @@ export const MatchFinalization = () => {
 
     const fetchAll = async () => {
       let populated = 0;
-      const populatedMatchIds: string[] = [];
       for (const match of matchesMissingMoM) {
         if (cancelled) break;
         const success = await fetchMoMFromApi(match);
-        if (success) {
-          populated++;
-          populatedMatchIds.push(match.id);
-        }
-        // Rate-limit: 300ms delay between calls
+        if (success) populated++;
         if (!cancelled) {
           await new Promise(r => setTimeout(r, 300));
         }
@@ -269,38 +237,6 @@ export const MatchFinalization = () => {
 
       if (populated > 0) {
         toast.success(`Auto-populated MoM for ${populated} match(es) from API`);
-
-        // Recompute scores for already-finalized matches that just got MoM
-        const finalizedWithNewMoM = populatedMatchIds.filter(matchId => {
-          const lm = leagueMatches.find(l => l.match_id === matchId);
-          return lm?.stats_imported === true;
-        });
-
-        if (finalizedWithNewMoM.length > 0) {
-          toast.info(`Recomputing scores for ${finalizedWithNewMoM.length} finalized match(es)...`);
-          const affectedLeagueIds = new Set<string>();
-          for (const matchId of finalizedWithNewMoM) {
-            const lms = leagueMatches.filter(l => l.match_id === matchId);
-            for (const lm of lms) affectedLeagueIds.add(lm.league_id);
-          }
-
-          for (const leagueId of affectedLeagueIds) {
-            try {
-              const { data: scoringRulesData } = await supabase
-                .from('scoring_rules')
-                .select('rules')
-                .eq('league_id', leagueId)
-                .maybeSingle();
-              const rules = mergeScoringRules(scoringRulesData?.rules as Partial<ScoringRules> | null);
-              await recomputeLeaguePoints(leagueId, rules);
-            } catch (err) {
-              console.error(`Failed to recompute scores for league ${leagueId}:`, err);
-            }
-          }
-          toast.success('Score recomputation complete');
-        }
-
-        // Refresh matches to reflect DB updates
         fetchMatches();
       }
     };
@@ -314,9 +250,11 @@ export const MatchFinalization = () => {
   const resultImpliesWinner = (match: CricketMatch): boolean =>
     !!match.result && /\bwon\b/i.test(match.result);
 
+  const isMatchFinalized = (match: CricketMatch): boolean =>
+    match.man_of_match_id !== null && match.winner_team_id !== null;
+
   const isMatchIncomplete = (match: CricketMatch): boolean => {
-    const lm = leagueMatches.find(l => l.match_id === match.id);
-    if (lm?.stats_imported !== true) return false;
+    if (match.state !== 'Complete') return false;
     if (!resultImpliesWinner(match)) return false;
     return !match.winner_team_id || !match.man_of_match_id;
   };
@@ -336,9 +274,14 @@ export const MatchFinalization = () => {
 
       if (rpcError) throw rpcError;
 
-      const leaguesWithMatch = leagueMatches.filter(lm => lm.match_id === match.id);
+      const { data: leaguesWithMatch, error: leagueError } = await supabase
+        .from('league_matches')
+        .select('league_id')
+        .eq('match_id', match.id);
 
-      if (leaguesWithMatch.length === 0) {
+      if (leagueError) throw leagueError;
+
+      if (!leaguesWithMatch || leaguesWithMatch.length === 0) {
         toast.success('Match finalized (no leagues affected)');
         fetchMatches();
         return;
@@ -384,36 +327,8 @@ export const MatchFinalization = () => {
     }
   };
 
-  const groupMatchesByWeek = (): WeekGroup[] => {
-    const weekMap = new Map<number | null, CricketMatch[]>();
-
-    for (const match of matches) {
-      const lm = leagueMatches.find(l => l.match_id === match.id);
-      const week = lm?.week ?? null;
-
-      if (!weekMap.has(week)) weekMap.set(week, []);
-      weekMap.get(week)!.push(match);
-    }
-
-    const groups: WeekGroup[] = Array.from(weekMap.entries()).map(([week, matches]) => ({
-      week,
-      matches,
-    }));
-
-    groups.sort((a, b) => {
-      if (a.week === null) return 1;
-      if (b.week === null) return -1;
-      return a.week - b.week;
-    });
-
-    return groups;
-  };
-
   const getStatusBadge = (match: CricketMatch) => {
-    const lm = leagueMatches.find(l => l.match_id === match.id);
-    const isFinalized = lm?.stats_imported === true;
-
-    if (isFinalized && isMatchIncomplete(match)) {
+    if (isMatchFinalized(match) && isMatchIncomplete(match)) {
       return (
         <Badge className="bg-orange-500">
           <AlertCircle className="w-3 h-3 mr-1" />
@@ -422,7 +337,7 @@ export const MatchFinalization = () => {
       );
     }
 
-    if (isFinalized) {
+    if (isMatchFinalized(match)) {
       return (
         <Badge className="bg-green-500">
           <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -447,22 +362,16 @@ export const MatchFinalization = () => {
     );
   };
 
-  const isMatchFinalized = (matchId: string): boolean => {
-    const lm = leagueMatches.find(l => l.match_id === matchId);
-    return lm?.stats_imported === true;
-  };
+  const needsFinalization = (match: CricketMatch): boolean =>
+    match.state === 'Complete' && (!isMatchFinalized(match) || isMatchIncomplete(match));
 
-  const getAutoFinalizableMatches = (groupMatches: CricketMatch[]): CricketMatch[] => {
-    return groupMatches.filter(m => {
-      const isComplete = m.state === 'Complete';
-      const isFin = isMatchFinalized(m.id);
-      const isInc = isMatchIncomplete(m);
-      return isComplete && (!isFin || isInc) && selectedWinner.has(m.id) && selectedMoM.has(m.id);
-    });
-  };
+  const getAutoFinalizableMatches = (matchList: CricketMatch[]): CricketMatch[] =>
+    matchList.filter(m =>
+      needsFinalization(m) && selectedWinner.has(m.id) && selectedMoM.has(m.id)
+    );
 
-  const handleBatchFinalize = async (groupMatches: CricketMatch[]) => {
-    const finalizeable = getAutoFinalizableMatches(groupMatches);
+  const handleBatchFinalize = async (matchList: CricketMatch[]) => {
+    const finalizeable = getAutoFinalizableMatches(matchList);
     if (finalizeable.length === 0) return;
     setBatchFinalizing(true);
     for (const match of finalizeable) {
@@ -471,7 +380,166 @@ export const MatchFinalization = () => {
     setBatchFinalizing(false);
   };
 
-  const weekGroups = groupMatchesByWeek();
+  // Group matches by status instead of by week
+  const pendingMatches = matches.filter(m => needsFinalization(m));
+  const finalizedMatches = matches.filter(m => isMatchFinalized(m) && !isMatchIncomplete(m));
+  const otherMatches = matches.filter(m => !needsFinalization(m) && !(isMatchFinalized(m) && !isMatchIncomplete(m)));
+
+  const renderMatchTable = (matchList: CricketMatch[]) => (
+    <div className="border rounded-lg overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Match</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Man of the Match</TableHead>
+            <TableHead>Winner</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {matchList.map(match => {
+            const canFinalize = needsFinalization(match);
+            const isIncomplete = isMatchIncomplete(match);
+            const finalized = isMatchFinalized(match);
+            const players = matchPlayers.get(match.id) || [];
+            const isFinalizing = finalizingMatchId === match.id;
+
+            return (
+              <TableRow key={match.id}>
+                <TableCell className="font-medium">
+                  <span className="text-sm">
+                    {match.team1_name && match.team2_name
+                      ? `${match.team1_name} vs ${match.team2_name}`
+                      : match.match_description || `Match #${match.cricbuzz_match_id}`}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs text-muted-foreground">
+                    {match.match_date
+                      ? format(new Date(match.match_date), 'MMM d, yyyy')
+                      : 'TBD'}
+                  </span>
+                </TableCell>
+                <TableCell>{getStatusBadge(match)}</TableCell>
+                <TableCell>
+                  {canFinalize ? (
+                    <Select
+                      value={selectedMoM.get(match.id) || ''}
+                      onValueChange={(value) => {
+                        setSelectedMoM(prev => new Map(prev).set(match.id, value));
+                      }}
+                      onOpenChange={(open) => {
+                        if (open) {
+                          if (players.length === 0) fetchMatchPlayers(match.id);
+                          if (!selectedMoM.has(match.id) && !autoMoM.has(match.id)) {
+                            fetchMoMFromApi(match);
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[180px] h-8 text-xs">
+                        <SelectValue placeholder={
+                          fetchingMoM.has(match.id)
+                            ? "Fetching from API..."
+                            : "Select player..."
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {players.length === 0 ? (
+                          <div className="p-2 text-xs text-muted-foreground">
+                            Loading players...
+                          </div>
+                        ) : (
+                          players.map(player => (
+                            <SelectItem
+                              key={player.cricbuzz_player_id}
+                              value={player.cricbuzz_player_id}
+                            >
+                              {player.player_name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-xs">{match.man_of_match_name || '-'}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {canFinalize ? (
+                    <Select
+                      value={selectedWinner.get(match.id)?.toString() || ''}
+                      onValueChange={(value) => {
+                        setSelectedWinner(prev => new Map(prev).set(match.id, parseInt(value)));
+                      }}
+                    >
+                      <SelectTrigger className="w-[180px] h-8 text-xs">
+                        <SelectValue placeholder="Select winner..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">No Winner / Tie</SelectItem>
+                        {match.team1_id && match.team1_name && (
+                          <SelectItem value={match.team1_id.toString()}>
+                            {match.team1_name}
+                          </SelectItem>
+                        )}
+                        {match.team2_id && match.team2_name && (
+                          <SelectItem value={match.team2_id.toString()}>
+                            {match.team2_name}
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-xs">
+                      {match.winner_team_id === match.team1_id
+                        ? match.team1_name
+                        : match.winner_team_id === match.team2_id
+                        ? match.team2_name
+                        : finalized
+                        ? 'No Winner / Tie'
+                        : '-'}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {canFinalize ? (
+                    <Button
+                      size="sm"
+                      onClick={() => handleFinalizeMatch(match)}
+                      disabled={isFinalizing || (resultImpliesWinner(match) && !selectedMoM.has(match.id))}
+                      className="h-7 text-xs"
+                    >
+                      {isFinalizing ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          {isIncomplete ? 'Updating...' : 'Finalizing...'}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          {isIncomplete ? 'Update' : 'Finalize'}
+                        </>
+                      )}
+                    </Button>
+                  ) : finalized ? (
+                    <Badge variant="outline" className="text-xs">
+                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                      Done
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -507,17 +575,17 @@ export const MatchFinalization = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {weekGroups.map(group => (
-              <div key={group.week ?? 'no-week'} className="space-y-2">
+            {pendingMatches.length > 0 && (
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-sm text-muted-foreground">
-                    {group.week !== null ? `Week ${group.week}` : 'Unassigned'}
+                    Pending Finalization ({pendingMatches.length})
                   </h3>
-                  {getAutoFinalizableMatches(group.matches).length > 0 && (
+                  {getAutoFinalizableMatches(pendingMatches).length > 0 && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleBatchFinalize(group.matches)}
+                      onClick={() => handleBatchFinalize(pendingMatches)}
                       disabled={batchFinalizing}
                       className="h-7 text-xs"
                     >
@@ -527,167 +595,32 @@ export const MatchFinalization = () => {
                           Finalizing...
                         </>
                       ) : (
-                        `Finalize All (${getAutoFinalizableMatches(group.matches).length})`
+                        `Finalize All (${getAutoFinalizableMatches(pendingMatches).length})`
                       )}
                     </Button>
                   )}
                 </div>
-
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Match</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Man of the Match</TableHead>
-                        <TableHead>Winner</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {group.matches.map(match => {
-                        const isComplete = match.state === 'Complete';
-                        const isFinalized = isMatchFinalized(match.id);
-                        const isIncomplete = isMatchIncomplete(match);
-                        const players = matchPlayers.get(match.id) || [];
-                        const isFinalizing = finalizingMatchId === match.id;
-
-                        return (
-                          <TableRow key={match.id}>
-                            <TableCell className="font-medium">
-                              <span className="text-sm">
-                                {match.team1_name && match.team2_name
-                                  ? `${match.team1_name} vs ${match.team2_name}`
-                                  : match.match_description || `Match #${match.cricbuzz_match_id}`}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-xs text-muted-foreground">
-                                {match.match_date
-                                  ? format(new Date(match.match_date), 'MMM d, yyyy')
-                                  : 'TBD'}
-                              </span>
-                            </TableCell>
-                            <TableCell>{getStatusBadge(match)}</TableCell>
-                            <TableCell>
-                              {isComplete && (!isFinalized || isIncomplete) ? (
-                                <Select
-                                  value={selectedMoM.get(match.id) || ''}
-                                  onValueChange={(value) => {
-                                    setSelectedMoM(prev => new Map(prev).set(match.id, value));
-                                  }}
-                                  onOpenChange={(open) => {
-                                    if (open) {
-                                      if (players.length === 0) fetchMatchPlayers(match.id);
-                                      if (!selectedMoM.has(match.id) && !autoMoM.has(match.id)) {
-                                        fetchMoMFromApi(match);
-                                      }
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger className="w-[180px] h-8 text-xs">
-                                    <SelectValue placeholder={
-                                      fetchingMoM.has(match.id)
-                                        ? "Fetching from API..."
-                                        : "Select player..."
-                                    } />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {players.length === 0 ? (
-                                      <div className="p-2 text-xs text-muted-foreground">
-                                        Loading players...
-                                      </div>
-                                    ) : (
-                                      players.map(player => (
-                                        <SelectItem
-                                          key={player.cricbuzz_player_id}
-                                          value={player.cricbuzz_player_id}
-                                        >
-                                          {player.player_name}
-                                        </SelectItem>
-                                      ))
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <span className="text-xs">{match.man_of_match_name || '-'}</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {isComplete && (!isFinalized || isIncomplete) ? (
-                                <Select
-                                  value={selectedWinner.get(match.id)?.toString() || ''}
-                                  onValueChange={(value) => {
-                                    setSelectedWinner(prev => new Map(prev).set(match.id, parseInt(value)));
-                                  }}
-                                >
-                                  <SelectTrigger className="w-[180px] h-8 text-xs">
-                                    <SelectValue placeholder="Select winner..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="0">No Winner / Tie</SelectItem>
-                                    {match.team1_id && match.team1_name && (
-                                      <SelectItem value={match.team1_id.toString()}>
-                                        {match.team1_name}
-                                      </SelectItem>
-                                    )}
-                                    {match.team2_id && match.team2_name && (
-                                      <SelectItem value={match.team2_id.toString()}>
-                                        {match.team2_name}
-                                      </SelectItem>
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <span className="text-xs">
-                                  {match.winner_team_id === match.team1_id
-                                    ? match.team1_name
-                                    : match.winner_team_id === match.team2_id
-                                    ? match.team2_name
-                                    : isFinalized
-                                    ? 'No Winner / Tie'
-                                    : '-'}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {isComplete && (!isFinalized || isIncomplete) ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleFinalizeMatch(match)}
-                                  disabled={isFinalizing || (resultImpliesWinner(match) && !selectedMoM.has(match.id))}
-                                  className="h-7 text-xs"
-                                >
-                                  {isFinalizing ? (
-                                    <>
-                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                      {isIncomplete ? 'Updating...' : 'Finalizing...'}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                                      {isIncomplete ? 'Update' : 'Finalize'}
-                                    </>
-                                  )}
-                                </Button>
-                              ) : isFinalized ? (
-                                <Badge variant="outline" className="text-xs">
-                                  <CheckCircle2 className="w-3 h-3 mr-1" />
-                                  Done
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                {renderMatchTable(pendingMatches)}
               </div>
-            ))}
+            )}
+
+            {finalizedMatches.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm text-muted-foreground">
+                  Finalized ({finalizedMatches.length})
+                </h3>
+                {renderMatchTable(finalizedMatches)}
+              </div>
+            )}
+
+            {otherMatches.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm text-muted-foreground">
+                  Upcoming / Live ({otherMatches.length})
+                </h3>
+                {renderMatchTable(otherMatches)}
+              </div>
+            )}
           </div>
         )}
 
@@ -696,7 +629,7 @@ export const MatchFinalization = () => {
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-muted-foreground mt-0.5" />
               <p className="text-xs text-muted-foreground">
-                Finalizing a match sets Man of the Match, marks stats as imported, and
+                Finalizing a match sets Man of the Match and Winner, then
                 recomputes fantasy points for all affected leagues.
               </p>
             </div>

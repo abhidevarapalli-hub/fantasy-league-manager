@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Calendar } from 'lucide-react';
+import { RefreshCw, Calendar, Trophy } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
@@ -16,6 +16,7 @@ import {
   CurrentWeekSetting,
   TestDraftStatus,
   WeekManager,
+  WeekFinalization,
 } from '@/components/admin';
 
 const Admin = () => {
@@ -55,9 +56,21 @@ const Admin = () => {
               <h2 className="font-semibold text-foreground">Week Manager</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-3">
-              Assign matches to weeks, auto-generate schedules, and finalize weekly matchups.
+              Assign matches to weeks and organize your league schedule.
             </p>
             <WeekManager leagueId={currentLeagueId} />
+          </section>
+        )}
+        {currentLeagueId && (
+          <section className="bg-card rounded-xl border border-border p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Trophy className="w-5 h-5 text-primary" />
+              <h2 className="font-semibold text-foreground">Week Finalization</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Finalize weekly matchups to calculate C/VC scores, determine winners, and update standings.
+            </p>
+            <WeekFinalization leagueId={currentLeagueId} />
           </section>
         )}
         <TestDraftStatus />
