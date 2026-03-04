@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { GlobalStatsImport } from '@/components/platform-admin/GlobalStatsImport';
 import { GlobalPlayerMapping } from '@/components/platform-admin/GlobalPlayerMapping';
 import { MatchFinalization } from '@/components/platform-admin/MatchFinalization';
+import { BackfillScores } from '@/components/platform-admin/BackfillScores';
 import { WeekManagerAdmin } from '@/components/platform-admin/WeekManagerAdmin';
 
 const PlatformAdmin = () => {
@@ -40,6 +41,7 @@ const PlatformAdmin = () => {
         <GlobalStatsImport />
         <GlobalPlayerMapping />
         <MatchFinalization />
+        <BackfillScores />
         <WeekManagerAdmin />
       </div>
     </AppLayout>
