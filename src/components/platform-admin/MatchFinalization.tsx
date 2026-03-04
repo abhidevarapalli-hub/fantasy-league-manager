@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
 import { mergeScoringRules, type ScoringRules } from '@/lib/scoring-types';
+import { fetchScorecardDetails } from '@/integrations/cricbuzz/client';
+import { resolveWinnerFromResult } from '@/lib/match-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -66,6 +68,9 @@ export const MatchFinalization = () => {
   const [finalizingMatchId, setFinalizingMatchId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const fetchedMatchIdsRef = useRef<Set<string>>(new Set());
+  const [autoMoM, setAutoMoM] = useState<Map<string, { id: string; name: string }>>(new Map());
+  const [fetchingMoM, setFetchingMoM] = useState<Set<string>>(new Set());
+  const [batchFinalizing, setBatchFinalizing] = useState(false);
 
   const fetchMatches = useCallback(async () => {
     setIsLoading(true);
@@ -93,6 +98,14 @@ export const MatchFinalization = () => {
         if (m.man_of_match_id) momMap.set(m.id, m.man_of_match_id);
         if (m.winner_team_id) winnerMap.set(m.id, m.winner_team_id);
       }
+      // Auto-resolve winners from result text for matches that don't have one
+      for (const m of matchesData || []) {
+        if (!m.winner_team_id && m.result) {
+          const autoWinner = resolveWinnerFromResult(m.result, m.team1_name, m.team2_name, m.team1_id, m.team2_id);
+          if (autoWinner) winnerMap.set(m.id, autoWinner);
+        }
+      }
+
       setSelectedMoM(momMap);
       setSelectedWinner(winnerMap);
     } catch (error) {
@@ -147,14 +160,43 @@ export const MatchFinalization = () => {
     }
   }, []);
 
-  const handleFinalizeMatch = async (match: CricketMatch) => {
-    const momId = selectedMoM.get(match.id);
-    const winnerId = selectedWinner.get(match.id);
-
-    if (!momId || winnerId == null) {
-      toast.error('Please select both Man of the Match and Winner');
-      return;
+  const fetchMoMFromApi = useCallback(async (match: CricketMatch) => {
+    if (!match.cricbuzz_match_id || fetchingMoM.has(match.id)) return;
+    setFetchingMoM(prev => new Set(prev).add(match.id));
+    try {
+      const scorecard = await fetchScorecardDetails(match.cricbuzz_match_id);
+      const potm = scorecard.matchHeader?.playersOfTheMatch?.[0];
+      if (potm) {
+        setAutoMoM(prev => new Map(prev).set(match.id, {
+          id: potm.id.toString(),
+          name: potm.fullName || potm.name,
+        }));
+        setSelectedMoM(prev => {
+          if (!prev.has(match.id)) {
+            return new Map(prev).set(match.id, potm.id.toString());
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to fetch MoM for match ${match.cricbuzz_match_id}:`, error);
+    } finally {
+      setFetchingMoM(prev => {
+        const next = new Set(prev);
+        next.delete(match.id);
+        return next;
+      });
     }
+  }, [fetchingMoM]);
+
+  const isMatchIncomplete = (match: CricketMatch): boolean => {
+    const lm = leagueMatches.find(l => l.match_id === match.id);
+    return lm?.stats_imported === true && (!match.winner_team_id || !match.man_of_match_id);
+  };
+
+  const handleFinalizeMatch = async (match: CricketMatch) => {
+    const momId = selectedMoM.get(match.id) || null;
+    const winnerId = selectedWinner.get(match.id) ?? null;
 
     setFinalizingMatchId(match.id);
 
@@ -244,6 +286,15 @@ export const MatchFinalization = () => {
     const lm = leagueMatches.find(l => l.match_id === match.id);
     const isFinalized = lm?.stats_imported === true;
 
+    if (isFinalized && isMatchIncomplete(match)) {
+      return (
+        <Badge className="bg-orange-500">
+          <AlertCircle className="w-3 h-3 mr-1" />
+          Incomplete
+        </Badge>
+      );
+    }
+
     if (isFinalized) {
       return (
         <Badge className="bg-green-500">
@@ -272,6 +323,25 @@ export const MatchFinalization = () => {
   const isMatchFinalized = (matchId: string): boolean => {
     const lm = leagueMatches.find(l => l.match_id === matchId);
     return lm?.stats_imported === true;
+  };
+
+  const getAutoFinalizableMatches = (groupMatches: CricketMatch[]): CricketMatch[] => {
+    return groupMatches.filter(m => {
+      const isComplete = m.state === 'Complete';
+      const isFin = isMatchFinalized(m.id);
+      const isInc = isMatchIncomplete(m);
+      return isComplete && (!isFin || isInc) && selectedWinner.has(m.id) && selectedMoM.has(m.id);
+    });
+  };
+
+  const handleBatchFinalize = async (groupMatches: CricketMatch[]) => {
+    const finalizeable = getAutoFinalizableMatches(groupMatches);
+    if (finalizeable.length === 0) return;
+    setBatchFinalizing(true);
+    for (const match of finalizeable) {
+      await handleFinalizeMatch(match);
+    }
+    setBatchFinalizing(false);
   };
 
   const weekGroups = groupMatchesByWeek();
@@ -312,9 +382,29 @@ export const MatchFinalization = () => {
           <div className="space-y-6">
             {weekGroups.map(group => (
               <div key={group.week ?? 'no-week'} className="space-y-2">
-                <h3 className="font-semibold text-sm text-muted-foreground">
-                  {group.week !== null ? `Week ${group.week}` : 'Unassigned'}
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm text-muted-foreground">
+                    {group.week !== null ? `Week ${group.week}` : 'Unassigned'}
+                  </h3>
+                  {getAutoFinalizableMatches(group.matches).length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleBatchFinalize(group.matches)}
+                      disabled={batchFinalizing}
+                      className="h-7 text-xs"
+                    >
+                      {batchFinalizing ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Finalizing...
+                        </>
+                      ) : (
+                        `Finalize All (${getAutoFinalizableMatches(group.matches).length})`
+                      )}
+                    </Button>
+                  )}
+                </div>
 
                 <div className="border rounded-lg overflow-hidden">
                   <Table>
@@ -332,6 +422,7 @@ export const MatchFinalization = () => {
                       {group.matches.map(match => {
                         const isComplete = match.state === 'Complete';
                         const isFinalized = isMatchFinalized(match.id);
+                        const isIncomplete = isMatchIncomplete(match);
                         const players = matchPlayers.get(match.id) || [];
                         const isFinalizing = finalizingMatchId === match.id;
 
@@ -353,20 +444,27 @@ export const MatchFinalization = () => {
                             </TableCell>
                             <TableCell>{getStatusBadge(match)}</TableCell>
                             <TableCell>
-                              {isComplete && !isFinalized ? (
+                              {isComplete && (!isFinalized || isIncomplete) ? (
                                 <Select
                                   value={selectedMoM.get(match.id) || ''}
                                   onValueChange={(value) => {
                                     setSelectedMoM(prev => new Map(prev).set(match.id, value));
                                   }}
                                   onOpenChange={(open) => {
-                                    if (open && players.length === 0) {
-                                      fetchMatchPlayers(match.id);
+                                    if (open) {
+                                      if (players.length === 0) fetchMatchPlayers(match.id);
+                                      if (!selectedMoM.has(match.id) && !autoMoM.has(match.id)) {
+                                        fetchMoMFromApi(match);
+                                      }
                                     }
                                   }}
                                 >
                                   <SelectTrigger className="w-[180px] h-8 text-xs">
-                                    <SelectValue placeholder="Select player..." />
+                                    <SelectValue placeholder={
+                                      fetchingMoM.has(match.id)
+                                        ? "Fetching from API..."
+                                        : "Select player..."
+                                    } />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {players.length === 0 ? (
@@ -390,7 +488,7 @@ export const MatchFinalization = () => {
                               )}
                             </TableCell>
                             <TableCell>
-                              {isComplete && !isFinalized ? (
+                              {isComplete && (!isFinalized || isIncomplete) ? (
                                 <Select
                                   value={selectedWinner.get(match.id)?.toString() || ''}
                                   onValueChange={(value) => {
@@ -427,7 +525,7 @@ export const MatchFinalization = () => {
                               )}
                             </TableCell>
                             <TableCell>
-                              {isComplete && !isFinalized ? (
+                              {isComplete && (!isFinalized || isIncomplete) ? (
                                 <Button
                                   size="sm"
                                   onClick={() => handleFinalizeMatch(match)}
@@ -437,12 +535,12 @@ export const MatchFinalization = () => {
                                   {isFinalizing ? (
                                     <>
                                       <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                      Finalizing...
+                                      {isIncomplete ? 'Updating...' : 'Finalizing...'}
                                     </>
                                   ) : (
                                     <>
                                       <CheckCircle2 className="w-3 h-3 mr-1" />
-                                      Finalize
+                                      {isIncomplete ? 'Update' : 'Finalize'}
                                     </>
                                   )}
                                 </Button>

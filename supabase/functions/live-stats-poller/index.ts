@@ -465,7 +465,7 @@ serve(async (req) => {
     const matchState = isMatchComplete ? 'Complete' : 'Live';
 
     // Determine winner from status
-    const winnerMatch = scorecard.status.match(/^(\w+)\s+won/i);
+    const winnerMatch = scorecard.status.match(/^(.+?)\s+won\s+by/i);
     const winnerTeamName = winnerMatch ? winnerMatch[1] : null;
 
     // Parse scorecard
@@ -491,7 +491,7 @@ serve(async (req) => {
     {
       const { data: currentMatch } = await supabase
         .from('cricket_matches')
-        .select('id, team1_short, team2_short')
+        .select('id, team1_name, team2_name, team1_short, team2_short, team1_id, team2_id')
         .eq('cricbuzz_match_id', cricbuzz_match_id)
         .single();
 
@@ -531,6 +531,21 @@ serve(async (req) => {
         if (isMatchComplete && manOfMatch) {
           updatePayload.man_of_match_id = manOfMatch.id?.toString() || null;
           updatePayload.man_of_match_name = manOfMatch.name || null;
+        }
+
+        // Resolve winner_team_id from match status
+        if (isMatchComplete && winnerTeamName) {
+          const t1 = currentMatch.team1_name?.toLowerCase() ?? '';
+          const t2 = currentMatch.team2_name?.toLowerCase() ?? '';
+          const t1s = currentMatch.team1_short?.toLowerCase() ?? '';
+          const t2s = currentMatch.team2_short?.toLowerCase() ?? '';
+          const winner = winnerTeamName.toLowerCase();
+
+          if (t1 === winner || t1s === winner) {
+            updatePayload.winner_team_id = currentMatch.team1_id;
+          } else if (t2 === winner || t2s === winner) {
+            updatePayload.winner_team_id = currentMatch.team2_id;
+          }
         }
 
         const { error: stateUpdateError } = await supabase
