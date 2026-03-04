@@ -36,3 +36,6 @@ supabase/.env.local
 # Claude
 .claude/*
 .playwright-mcp/*
+
+# Git worktrees
+.worktrees/
