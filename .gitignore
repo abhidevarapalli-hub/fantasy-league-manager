@@ -36,3 +36,15 @@ supabase/.env.local
 # Claude
 .claude/*
 .playwright-mcp/*
+# iOS / Xcode
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+*.xcuserstate
+ios/Pods/
+ios/.DS_Store
+
+# Android
+android/.gradle/
+android/build/
+android/.idea/
+android/local.properties

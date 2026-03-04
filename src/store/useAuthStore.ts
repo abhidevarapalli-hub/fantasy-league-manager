@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
+import { App } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 
 interface ManagerProfile {
     id: string;
@@ -199,8 +202,47 @@ export const useAuthStore = create<AuthState>()(
                 if (get().isInitialized) return;
 
                 set({ isLoading: true });
+                const isNative = Capacitor.isNativePlatform();
 
                 try {
+                    if (isNative) {
+                        // Handle deep links from OAuth redirect (iOS/Android)
+                        // When Google OAuth completes and redirects to com.cricfantasy.app://callback#access_token=...,
+                        // Capacitor's App listener captures it. We parse tokens from the hash
+                        // and set the session directly in Supabase.
+                        App.addListener('appUrlOpen', async (event: { url: string }) => {
+                            const url = event.url;
+                            console.log('[Auth] Deep link received:', url);
+
+                            if (url.includes('callback')) {
+                                // Extract the hash portion (access_token, refresh_token, expires_in, etc.)
+                                const hashIndex = url.indexOf('#');
+                                if (hashIndex > -1) {
+                                    const hashContent = url.substring(hashIndex + 1); // Remove the # prefix
+                                    const params = new URLSearchParams(hashContent);
+                                    const accessToken = params.get('access_token');
+                                    const refreshToken = params.get('refresh_token');
+
+                                    if (accessToken && refreshToken) {
+                                        console.log('[Auth] Processing OAuth callback, setting session directly');
+                                        const { error } = await supabase.auth.setSession({
+                                            access_token: accessToken,
+                                            refresh_token: refreshToken,
+                                        });
+
+                                        if (error) {
+                                            console.error('[Auth] Failed to set session from deep link:', error);
+                                        }
+                                    } else {
+                                        console.error('[Auth] Missing access_token or refresh_token in callback URL');
+                                    }
+                                } else {
+                                    console.error('[Auth] OAuth callback did not contain hash fragment');
+                                }
+                            }
+                        });
+                    }
+
                     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
                     if (sessionError) {
@@ -221,6 +263,12 @@ export const useAuthStore = create<AuthState>()(
                     supabase.auth.onAuthStateChange(async (_event, session) => {
                         set({ session, user: session?.user || null });
                         if (session?.user) {
+                            if (isNative) {
+                                Browser.close().catch(() => {
+                                    // Ignore errors when browser is not open
+                                });
+                            }
+
                             // Use setTimeout to avoid blocking the auth event loop (deadlock fix)
                             setTimeout(() => {
                                 get().refreshProfile().catch(e =>
