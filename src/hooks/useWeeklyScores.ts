@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
 import { calculateFantasyPoints } from '@/lib/fantasy-points-calculator';
-import { DEFAULT_SCORING_RULES } from '@/lib/scoring-types';
 import { Manager } from '@/lib/supabase-types';
 import { useGameStore } from '@/store/useGameStore';
 
@@ -8,6 +7,7 @@ export function useWeeklyScores(leagueId: string | null, week: number, managers:
     const weeklyStats = useGameStore(state => state.weeklyStats);
     const weeklyRosters = useGameStore(state => state.weeklyRosters);
     const fetchWeeklyData = useGameStore(state => state.fetchWeeklyData);
+    const scoringRules = useGameStore(state => state.scoringRules);
     const [loading, setLoading] = useState(false);
 
     // Fetch data if not present
@@ -62,7 +62,7 @@ export function useWeeklyScores(leagueId: string | null, week: number, managers:
                             catches: stat.catches || 0,
                             stumpings: stat.stumpings || 0,
                             runOuts: stat.runOuts || 0,
-                        }, DEFAULT_SCORING_RULES).total;
+                        }, scoringRules).total;
 
                         const points = isCaptain ? pointsRaw * 2 : isViceCaptain ? pointsRaw * 1.5 : pointsRaw;
                         managerTotal += points;
@@ -74,7 +74,7 @@ export function useWeeklyScores(leagueId: string | null, week: number, managers:
         });
 
         return managerScores;
-    }, [leagueId, week, managers, weeklyStats, weeklyRosters]);
+    }, [leagueId, week, managers, weeklyStats, weeklyRosters, scoringRules]);
 
     return { scores, loading: loading || !weeklyStats[week] };
 }

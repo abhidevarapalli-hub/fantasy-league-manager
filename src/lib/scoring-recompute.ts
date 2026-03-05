@@ -6,7 +6,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { calculateFantasyPoints, type PlayerStats, type PointsBreakdown } from './fantasy-points-calculator';
-import type { ScoringRules } from './scoring-types';
+import { mergeScoringRules, sanitizeScoringRules, type ScoringRules } from './scoring-types';
 
 const BATCH_SIZE = 500;
 
@@ -123,4 +123,24 @@ export async function recomputeLeaguePoints(
   }
 
   return totalUpdated;
+}
+
+/**
+ * Fetch scoring rules for a league, sanitize, merge with defaults, and recompute all scores.
+ * Consolidates the repeated fetch+sanitize+merge+recompute pattern used across admin UIs.
+ */
+export async function fetchRulesAndRecompute(leagueId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('scoring_rules')
+    .select('rules')
+    .eq('league_id', leagueId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to fetch scoring rules: ${error.message}`);
+
+  const sanitized = data?.rules
+    ? sanitizeScoringRules(data.rules as unknown as ScoringRules)
+    : null;
+  const rules = mergeScoringRules(sanitized as Partial<ScoringRules> | null);
+  return recomputeLeaguePoints(leagueId, rules);
 }

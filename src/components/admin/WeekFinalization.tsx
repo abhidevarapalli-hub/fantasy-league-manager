@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchRulesAndRecompute } from '@/lib/scoring-recompute';
 
 interface WeekReadiness {
   total_matches: number;
@@ -105,6 +106,10 @@ export const WeekFinalization = ({ leagueId }: WeekFinalizationProps) => {
 
     setIsFinalizing(true);
     try {
+      // Recompute league scores before finalization to ensure total_points are fresh
+      toast.info('Recomputing league scores...');
+      await fetchRulesAndRecompute(leagueId);
+
       const { error } = await supabase.rpc('finalize_week', {
         p_league_id: leagueId,
         p_week: confirmFinalizeWeek,

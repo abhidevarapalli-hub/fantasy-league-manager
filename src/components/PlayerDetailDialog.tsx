@@ -692,7 +692,7 @@ export function PlayerDetailDialog({
                                     const hasStats = matchItem.runs !== undefined || matchItem.wickets !== undefined;
                                     const stats = hasStats ? matchItem : undefined;
                                     const fpts = hasStats
-                                        ? (matchItem.fantasyPoints ?? calculateFantasyPoints(getPlayerStatsForCalc(stats), scoringRules).total)
+                                        ? calculateFantasyPoints(getPlayerStatsForCalc(stats), scoringRules).total
                                         : 0;
 
                                     const opponentShort = matchItem.opponentShort;

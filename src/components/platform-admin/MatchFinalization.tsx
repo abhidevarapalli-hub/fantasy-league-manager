@@ -3,8 +3,7 @@ import { format } from 'date-fns';
 import { Trophy, CheckCircle2, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
-import { mergeScoringRules, type ScoringRules } from '@/lib/scoring-types';
+import { fetchRulesAndRecompute } from '@/lib/scoring-recompute';
 import { fetchScorecardDetails, fetchLeanbackDetails } from '@/integrations/cricbuzz/client';
 import { resolveWinnerFromResult } from '@/lib/match-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -290,18 +289,7 @@ export const MatchFinalization = () => {
       toast.info('Recomputing league scores...');
 
       const results = await Promise.allSettled(
-        leaguesWithMatch.map(async (lm) => {
-          const { data: scoringRulesData, error: scoringError } = await supabase
-            .from('scoring_rules')
-            .select('rules')
-            .eq('league_id', lm.league_id)
-            .maybeSingle();
-
-          if (scoringError) throw scoringError;
-
-          const rules = mergeScoringRules(scoringRulesData?.rules as Partial<ScoringRules> | null);
-          await recomputeLeaguePoints(lm.league_id, rules);
-        })
+        leaguesWithMatch.map((lm) => fetchRulesAndRecompute(lm.league_id))
       );
 
       const successCount = results.filter(r => r.status === 'fulfilled').length;

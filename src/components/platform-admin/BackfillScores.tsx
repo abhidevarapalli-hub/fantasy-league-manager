@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { DatabaseBackup, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
-import { mergeScoringRules, type ScoringRules } from '@/lib/scoring-types';
+import { fetchRulesAndRecompute } from '@/lib/scoring-recompute';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -150,16 +149,7 @@ export const BackfillScores = () => {
 
       // Step 2: Recompute fantasy points
       toast.info('Recomputing fantasy points...');
-      const { data: scoringRulesData, error: scoringError } = await supabase
-        .from('scoring_rules')
-        .select('rules')
-        .eq('league_id', selectedLeagueId)
-        .maybeSingle();
-
-      if (scoringError) throw scoringError;
-
-      const rules = mergeScoringRules(scoringRulesData?.rules as Partial<ScoringRules> | null);
-      const updatedCount = await recomputeLeaguePoints(selectedLeagueId, rules);
+      const updatedCount = await fetchRulesAndRecompute(selectedLeagueId);
 
       toast.success(`Backfill complete! ${rowsInserted} rows created, ${updatedCount} scores recomputed.`);
 
