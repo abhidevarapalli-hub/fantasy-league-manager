@@ -141,11 +141,11 @@ const Leagues = () => {
     return (
         <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center relative overflow-hidden font-sans">
             {/* Background Floodlights / Effects */}
-            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-            <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-secondary/20 rounded-full blur-[100px] translate-x-1/3 pointer-events-none"></div>
+            <div className="absolute top-0 left-0 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-primary/20 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+            <div className="absolute top-1/4 right-0 w-[250px] h-[250px] sm:w-[400px] sm:h-[400px] bg-secondary/20 rounded-full blur-[100px] translate-x-1/3 pointer-events-none"></div>
 
             {/* Top Bar Navigation */}
-            <div className="w-full max-w-6xl px-6 py-5 flex justify-between items-center z-50">
+            <div className="w-full max-w-6xl px-4 sm:px-6 py-3 sm:py-5 flex justify-between items-center z-50">
                 <div className="flex items-center">
                     <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic">
                         CRIC<span className="text-primary">FANTASY</span>
@@ -183,25 +183,25 @@ const Leagues = () => {
                 </div>
             </div>
 
-            <div className="max-w-6xl w-full px-4 sm:px-6 pb-20 space-y-10 z-10">
+            <div className="max-w-6xl w-full px-4 sm:px-6 pb-20 space-y-6 sm:space-y-10 z-10">
 
                 {/* Section 1: The Ultimate Draft Hero */}
-                <section className="relative w-full rounded-[2rem] p-[1px] bg-gradient-to-b from-primary/50 via-primary/10 to-transparent overflow-visible sm:mt-2">
-                    <div className="relative bg-[#051A25]/90 backdrop-blur-3xl w-full rounded-[1.8rem] sm:rounded-[2rem] py-8 px-5 sm:py-12 sm:px-10 flex flex-col md:flex-row items-center md:items-start justify-between overflow-hidden shadow-2xl gap-8 md:gap-6">
+                <section className="relative w-full rounded-2xl sm:rounded-[2rem] p-[1px] bg-gradient-to-b from-primary/50 via-primary/10 to-transparent overflow-visible">
+                    <div className="relative bg-[#051A25]/90 backdrop-blur-3xl w-full rounded-[22px] sm:rounded-[2rem] py-5 px-4 sm:py-12 sm:px-10 flex flex-col md:flex-row items-center md:items-start justify-between overflow-hidden shadow-2xl gap-4 md:gap-6">
                         {/* Abstract Background Elements */}
                         <div className="absolute top-0 right-0 w-[30rem] h-[30rem] bg-gradient-to-bl from-primary/30 to-transparent blur-3xl rounded-full opacity-60 pointer-events-none translate-x-1/3 -translate-y-1/3"></div>
                         <div className="absolute bottom-0 left-0 w-[20rem] h-[20rem] bg-gradient-to-tr from-secondary/20 to-transparent blur-2xl rounded-full opacity-40 pointer-events-none -translate-x-1/2 translate-y-1/2"></div>
 
                         {/* Left Content */}
-                        <div className="relative z-20 flex-1 flex flex-col items-center md:items-start text-center md:text-left space-y-6 max-w-xl w-full">
-                            <h2 className="text-3xl sm:text-5xl lg:text-5xl font-black tracking-tighter text-white uppercase italic leading-[1.1] drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                        <div className="relative z-20 flex-1 flex flex-col items-center md:items-start text-center md:text-left space-y-4 sm:space-y-6 max-w-xl w-full">
+                            <h2 className="text-2xl sm:text-5xl lg:text-5xl font-black tracking-tighter text-white uppercase italic leading-[1.1] drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
                                 THE ULTIMATE <br />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-primary-foreground to-secondary drop-shadow-[0_0_15px_rgba(34,211,238,0.5)] pr-2">DRAFT IS HERE</span>
                             </h2>
 
                             {/* "Friend League Lobby" Floating Card OR empty space for unauthenticated */}
                             {user && (
-                                <div className="relative bg-white/5 border border-white/20 backdrop-blur-xl rounded-2xl p-4 sm:p-5 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] flex flex-col gap-3 w-full sm:w-72 transform md:-rotate-2 md:hover:rotate-0 transition-transform duration-500">
+                                <div className="relative bg-white/5 border border-white/20 backdrop-blur-xl rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] flex flex-col gap-2 sm:gap-3 w-full sm:w-72 transform md:-rotate-2 md:hover:rotate-0 transition-transform duration-500">
                                     <div className="flex justify-between items-center">
                                         <h4 className="text-white text-sm font-bold tracking-wide">Friend League Lobby</h4>
                                         <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_10px_rgba(74,222,128,1)]"></div>
@@ -231,18 +231,18 @@ const Leagues = () => {
                                 </div>
                             )}
 
-                            <div className="space-y-4 pt-1 w-full flex flex-col items-center md:items-start">
+                            <div className="space-y-3 sm:space-y-4 pt-1 w-full flex flex-col items-center md:items-start">
                                 {user ? (
                                     <Button
                                         onClick={() => navigate('/leagues/create')}
-                                        className="relative group bg-gradient-to-r from-primary to-[#a855f7] hover:from-primary hover:to-[#9333ea] text-white font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] rounded-full px-6 py-6 sm:px-8 sm:py-6 text-xs sm:text-sm border border-white/20 shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:shadow-[0_0_40px_rgba(139,92,246,0.8)] transition-all active:scale-95 overflow-hidden w-full sm:w-auto hover:animate-pulse"
+                                        className="relative group bg-gradient-to-r from-primary to-[#a855f7] hover:from-primary hover:to-[#9333ea] text-white font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] rounded-full px-5 py-5 sm:px-8 sm:py-6 text-xs sm:text-sm border border-white/20 shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:shadow-[0_0_40px_rgba(139,92,246,0.8)] transition-all active:scale-95 overflow-hidden w-full sm:w-auto hover:animate-pulse"
                                     >
                                         <span className="relative z-10 drop-shadow-md">Create Private League</span>
                                     </Button>
                                 ) : (
                                     <Button
                                         onClick={() => navigate('/login')}
-                                        className="relative group bg-gradient-to-r from-primary to-[#a855f7] hover:from-primary hover:to-[#9333ea] text-white font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] rounded-full px-6 py-6 sm:px-8 sm:py-6 text-xs sm:text-sm border border-white/20 shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:shadow-[0_0_40px_rgba(139,92,246,0.8)] transition-all overflow-hidden w-full sm:w-auto flex items-center justify-center gap-3"
+                                            className="relative group bg-gradient-to-r from-primary to-[#a855f7] hover:from-primary hover:to-[#9333ea] text-white font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] rounded-full px-5 py-5 sm:px-8 sm:py-6 text-xs sm:text-sm border border-white/20 shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:shadow-[0_0_40px_rgba(139,92,246,0.8)] transition-all overflow-hidden w-full sm:w-auto flex items-center justify-center gap-3"
                                     >
                                         <svg className="w-5 h-5 bg-white rounded-full p-0.5 shrink-0 relative z-10" viewBox="0 0 24 24">
                                             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -253,14 +253,14 @@ const Leagues = () => {
                                         <span className="relative z-10 drop-shadow-md">Sign In to Create League</span>
                                     </Button>
                                 )}
-                                <p className="text-xs sm:text-sm lg:text-base text-white/70 font-semibold tracking-wide max-w-sm text-center md:text-left">
+                                <p className="text-[11px] sm:text-sm lg:text-base text-white/70 font-semibold tracking-wide max-w-sm text-center md:text-left">
                                     NFL-style draft. <span className="text-white/90">No duplicate players.</span> Beat your friends.
                                 </p>
                             </div>
                         </div>
 
-                        {/* Right Visual element - 3D Cricket Ball with trail */}
-                        <div className="relative w-48 h-48 sm:w-[250px] sm:h-[250px] shrink-0 z-30 flex items-center justify-center md:-translate-y-4">
+                        {/* Right Visual element - 3D Cricket Ball with trail (hidden on mobile) */}
+                        <div className="relative hidden sm:flex w-[250px] h-[250px] shrink-0 z-30 items-center justify-center md:-translate-y-4">
                             {/* Neon glow behind ball */}
                             <div className="absolute inset-0 bg-primary/30 blur-[50px] rounded-full mix-blend-screen animate-pulse pointer-events-none"></div>
 
@@ -282,14 +282,14 @@ const Leagues = () => {
                             </svg>
 
                             {/* Ball itself */}
-                            <div className="relative w-24 h-24 sm:w-36 sm:h-36 z-20 hover:scale-105 transition-transform duration-500 cursor-pointer animate-[bounce_4s_ease-in-out_infinite]">
+                            <div className="relative w-36 h-36 z-20 hover:scale-105 transition-transform duration-500 cursor-pointer animate-[bounce_4s_ease-in-out_infinite]">
                                 <div className="absolute inset-0 rounded-full shadow-[inset_-10px_-10px_20px_rgba(0,0,0,0.6),inset_8px_8px_15px_rgba(255,255,255,0.4),0_0_30px_rgba(220,38,38,0.5)] bg-gradient-to-tr from-[#991b1b] via-[#dc2626] to-[#f87171] rotate-12">
                                     {/* CSS Seam details */}
                                     <div className="absolute top-1/2 left-0 w-full h-1 border-t-2 border-b-2 border-white/40 border-dashed transform -translate-y-1/2 rounded-[50%] skew-y-12 shadow-[0_0_4px_rgba(255,255,255,0.5)]"></div>
                                     <div className="absolute top-1/2 left-0 w-full h-px bg-white/30 transform -translate-y-1/2 rounded-[50%] skew-y-12"></div>
                                 </div>
                                 {/* Additional highlight */}
-                                <div className="absolute top-2 left-4 w-8 h-4 sm:w-16 sm:h-8 bg-white/40 rounded-full blur-md transform -rotate-45"></div>
+                                <div className="absolute top-2 left-4 w-16 h-8 bg-white/40 rounded-full blur-md transform -rotate-45"></div>
                             </div>
                         </div>
                     </div>
@@ -299,9 +299,9 @@ const Leagues = () => {
 
                 {/* Section 2: Your Leagues (Horizontal Scroll) */}
                 {user && (
-                    <section className="space-y-5">
-                        <div className="flex items-center justify-between px-2">
-                            <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-white uppercase italic">Your Leagues</h3>
+                    <section className="space-y-3 sm:space-y-5">
+                        <div className="flex items-center justify-between px-1 sm:px-2">
+                            <h3 className="text-xl sm:text-3xl font-bold tracking-tight text-white uppercase italic">Your Leagues</h3>
                             {/* Pagination dots indicator could go here */}
                             <div className="flex gap-1">
                                 <div className="w-4 h-1 bg-primary rounded-full"></div>
@@ -310,7 +310,77 @@ const Leagues = () => {
                             </div>
                         </div>
 
-                        <div className="flex overflow-x-auto gap-4 sm:gap-6 pb-6 pt-2 snap-x px-2 scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0">
+                        {/* Mobile: stacked vertical list */}
+                        <div className="flex flex-col gap-2.5 sm:hidden">
+                            {/* Create New League Row */}
+                            <div
+                                onClick={() => navigate(user ? '/leagues/create' : '/login')}
+                                className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-dashed border-white/15 hover:border-primary/50 hover:bg-white/10 cursor-pointer transition-all group"
+                            >
+                                <div className="w-11 h-11 rounded-xl border-2 border-dashed border-primary/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
+                                    <PlusCircle className="w-5 h-5 text-primary" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-sm text-white tracking-wide">Create New League</p>
+                                    <p className="text-xs text-white/40">Create & invite friends</p>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-white/30 shrink-0" />
+                            </div>
+
+                            {/* Existing Leagues */}
+                            {loading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="w-6 h-6 animate-spin text-primary/50" />
+                                </div>
+                            ) : (
+                                leagues.map((league) => {
+                                    const fillPercentage = Math.min(((league.active_player_count ?? 1) / league.manager_count) * 100, 100);
+                                    return (
+                                        <div
+                                            key={league.id}
+                                            onClick={() => navigate(`/${league.id}`)}
+                                            className="flex items-center gap-3 p-3 rounded-2xl border border-white/10 bg-gradient-to-r from-white/[0.06] to-transparent backdrop-blur-md hover:border-primary/50 active:scale-[0.98] transition-all cursor-pointer group relative overflow-hidden"
+                                        >
+                                            <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors pointer-events-none"></div>
+                                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-purple-900 border border-white/20 flex items-center justify-center shadow-lg shrink-0">
+                                                <span className="text-lg font-black italic">{league.name.charAt(0)}</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0 z-10">
+                                                <h4 className="font-bold text-sm text-white tracking-tight truncate">{league.name}</h4>
+                                                {league.tournament_name && (
+                                                    <p className="text-[10px] text-primary font-semibold uppercase tracking-wider truncate">{league.tournament_name}</p>
+                                                )}
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <span className="text-[10px] font-bold text-white/60">{league.active_player_count ?? 1}/{league.manager_count} JOINED</span>
+                                                    <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden max-w-[80px]">
+                                                        <div
+                                                            className="h-full bg-gradient-to-r from-primary to-[#b182ff] rounded-full"
+                                                            style={{ width: `${fillPercentage}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1 z-10 shrink-0">
+                                                {user?.id === league.league_manager_id && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-full"
+                                                        onClick={(e) => handleDeleteLeague(e, league.id)}
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                )}
+                                                <ChevronRight className="w-4 h-4 text-white/30" />
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* Desktop: horizontal scroll cards */}
+                        <div className="hidden sm:flex overflow-x-auto gap-6 pb-6 pt-2 snap-x scrollbar-hide">
                             {/* Create New League Card */}
                             <div
                                 onClick={() => navigate(user ? '/leagues/create' : '/login')}
@@ -321,13 +391,7 @@ const Leagues = () => {
                                 </div>
                                 <div className="text-center">
                                     <p className="font-bold text-lg text-white tracking-wide uppercase">New League</p>
-                                    {user ? (
-                                        <p className="text-sm text-white/50">Create & invite</p>
-                                    ) : (
-                                        <Button variant="outline" size="sm" className="mt-3 bg-transparent border-primary/50 text-white hover:bg-primary/20 hover:text-white rounded-full text-xs h-8 px-4 transition-colors">
-                                            Sign In to Create
-                                        </Button>
-                                    )}
+                                    <p className="text-sm text-white/50">Create & invite</p>
                                 </div>
                             </div>
 
@@ -345,12 +409,9 @@ const Leagues = () => {
                                             onClick={() => navigate(`/${league.id}`)}
                                             className="snap-start shrink-0 w-64 h-72 rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.08] to-transparent backdrop-blur-md hover:border-primary/60 hover:-translate-y-2 transition-all cursor-pointer flex flex-col p-6 group relative overflow-hidden"
                                         >
-                                            {/* Colored glow effect on hover */}
                                             <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors pointer-events-none"></div>
-
                                             <div className="flex justify-between items-start mb-6 z-10">
                                                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-900 border border-white/20 flex items-center justify-center shadow-lg pt-1">
-                                                    {/* Placeholder for vibrant icon */}
                                                     <span className="text-2xl font-black italic">{league.name.charAt(0)}</span>
                                                 </div>
                                                 {user?.id === league.league_manager_id && (
@@ -364,7 +425,6 @@ const Leagues = () => {
                                                     </Button>
                                                 )}
                                             </div>
-
                                             <div className="mt-auto space-y-4 z-10">
                                                 <div>
                                                     <h4 className="font-bold text-xl text-white tracking-tight line-clamp-1">{league.name}</h4>
@@ -372,7 +432,6 @@ const Leagues = () => {
                                                         <p className="text-xs text-primary font-semibold uppercase tracking-wider mt-1">{league.tournament_name}</p>
                                                     )}
                                                 </div>
-
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between text-xs font-bold text-white/80">
                                                         <span>{league.active_player_count ?? 1}/{league.manager_count} JOINED</span>
@@ -395,25 +454,25 @@ const Leagues = () => {
                 )}
 
                 {/* Section 2: Draft Academy Hero Banner */}
-                <section className="relative overflow-hidden rounded-3xl p-[1px] bg-gradient-to-r from-primary/50 to-secondary/50 shadow-[0_10px_40px_-10px_rgba(139,92,246,0.3)]">
-                    <div className="relative bg-card/80 backdrop-blur-xl h-full w-full rounded-[23px] p-6 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 overflow-hidden">
+                <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-[1px] bg-gradient-to-r from-primary/50 to-secondary/50 shadow-[0_10px_40px_-10px_rgba(139,92,246,0.3)]">
+                    <div className="relative bg-card/80 backdrop-blur-xl h-full w-full rounded-[22px] sm:rounded-[23px] p-5 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 overflow-hidden">
                         {/* Decorative inner glow */}
                         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none"></div>
 
-                        <div className="space-y-4 max-w-lg relative z-10 text-center sm:text-left">
-                            <h2 className="text-4xl sm:text-5xl font-black tracking-tighter text-white uppercase italic drop-shadow-md">
+                        <div className="space-y-3 sm:space-y-4 max-w-lg relative z-10 text-center sm:text-left">
+                            <h2 className="text-2xl sm:text-5xl font-black tracking-tighter text-white uppercase italic drop-shadow-md">
                                 DRAFT <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary pr-2">ACADEMY</span>
                             </h2>
-                            <p className="text-base sm:text-lg text-white/70 font-medium">
+                            <p className="text-sm sm:text-lg text-white/70 font-medium">
                                 Level up your strategy. Learn the insider tips and tricks to dominate your fantasy cricket league this season.
                             </p>
-                            <Button className="mt-2 bg-primary hover:bg-primary/80 text-white shadow-[0_0_20px_rgba(139,92,246,0.5)] border border-primary/50 font-bold uppercase tracking-widest rounded-full px-8 py-6 text-sm transition-all hover:scale-105 active:scale-95">
+                            <Button className="mt-1 sm:mt-2 bg-primary hover:bg-primary/80 text-white shadow-[0_0_20px_rgba(139,92,246,0.5)] border border-primary/50 font-bold uppercase tracking-widest rounded-full px-6 py-5 sm:px-8 sm:py-6 text-xs sm:text-sm transition-all hover:scale-105 active:scale-95">
                                 Start Learning
                             </Button>
                         </div>
 
                         {/* Visual element for Cricket Bat & Ball */}
-                        <div className="relative w-40 h-40 sm:w-56 sm:h-56 shrink-0 z-10 flex items-center justify-center group cursor-default">
+                        <div className="relative hidden sm:flex w-56 h-56 shrink-0 z-10 items-center justify-center group cursor-default">
                             <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full group-hover:bg-primary/30 transition-colors duration-500"></div>
                             {/* SVG Cricket Bat and Ball */}
                             <svg viewBox="0 0 100 100" className="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-[0_0_15px_rgba(139,92,246,0.4)] group-hover:drop-shadow-[0_0_25px_rgba(34,211,238,0.6)] group-hover:scale-105 group-hover:-rotate-3 transition-all duration-500 will-change-transform">
@@ -464,26 +523,26 @@ const Leagues = () => {
                 </section>
 
                 {/* Section 3: Mock Draft Arena */}
-                <section className="space-y-5">
+                <section className="space-y-3 sm:space-y-5">
                     {/* Futuristic Banner */}
-                    <div className="relative rounded-[2rem] border-2 border-[#22D3EE] p-8 sm:p-12 bg-[#051A25] shadow-[0_0_20px_rgba(34,211,238,0.15),inset_0_0_20px_rgba(34,211,238,0.1)] overflow-hidden group">
+                    <div className="relative rounded-2xl sm:rounded-[2rem] border-2 border-[#22D3EE] p-5 sm:p-12 bg-[#051A25] shadow-[0_0_20px_rgba(34,211,238,0.15),inset_0_0_20px_rgba(34,211,238,0.1)] overflow-hidden group">
                         {/* Background tech pattern overlay */}
                         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #22D3EE 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-[#22D3EE]/10 blur-[80px] pointer-events-none"></div>
+                        <div className="absolute top-0 right-0 w-40 h-40 sm:w-64 sm:h-64 bg-[#22D3EE]/10 blur-[80px] pointer-events-none"></div>
 
-                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
-                            <div className="flex items-center gap-6">
+                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-8 text-center md:text-left">
+                            <div className="flex items-center gap-4 sm:gap-6">
                                 <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-[#22D3EE]/10 border border-[#22D3EE]/30 items-center justify-center shrink-0">
                                     <Bot className="w-10 h-10 text-[#22D3EE]" />
                                 </div>
                                 <div className="space-y-1">
-                                    <h3 className="text-3xl sm:text-4xl font-black tracking-tighter text-white uppercase italic">Mock Draft <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-[#22D3EE] pr-2">Arena</span></h3>
-                                    <p className="text-[#22D3EE]/60 font-medium">Test your drafting strategy against advanced AI managers.</p>
+                                    <h3 className="text-2xl sm:text-4xl font-black tracking-tighter text-white uppercase italic">Mock Draft <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-[#22D3EE] pr-2">Arena</span></h3>
+                                    <p className="text-xs sm:text-base text-[#22D3EE]/60 font-medium">Test your drafting strategy against advanced AI managers.</p>
                                 </div>
                             </div>
                             <Button
                                 onClick={() => navigate('/mock-draft/setup')}
-                                className="bg-[#22D3EE] hover:bg-[#15b8d3] text-[#051A25] font-black uppercase tracking-widest rounded-full px-8 py-6 text-sm sm:text-base border-none shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(34,211,238,0.6)]"
+                                className="bg-[#22D3EE] hover:bg-[#15b8d3] text-[#051A25] font-black uppercase tracking-widest rounded-full px-6 py-5 sm:px-8 sm:py-6 text-xs sm:text-base border-none shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(34,211,238,0.6)] w-full sm:w-auto"
                             >
                                 Practice Now
                             </Button>

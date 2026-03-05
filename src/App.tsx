@@ -31,6 +31,7 @@ import PlatformAdmin from "@/pages/PlatformAdmin";
 import NotFound from "./pages/NotFound";
 import MockDraftSetup from "./pages/MockDraftSetup";
 import MockDraft from "./pages/MockDraft";
+import Matchup from "./pages/Matchup";
 
 
 
@@ -140,6 +141,7 @@ const AppRoutes = () => {
 
       <Route element={<ProtectedRoute><LeagueLayout /></ProtectedRoute>}>
         <Route path="/:leagueId" element={<Dashboard />} />
+        <Route path="/:leagueId/matchup" element={<Matchup />} />
         <Route path="/:leagueId/players" element={<Players />} />
         <Route path="/:leagueId/activity" element={<Activity />} />
         <Route path="/:leagueId/trades" element={<Trades />} />

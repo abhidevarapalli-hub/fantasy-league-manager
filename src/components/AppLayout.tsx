@@ -1,9 +1,9 @@
 import { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { UserMenu } from '@/components/UserMenu';
+import { MobileTabBar } from '@/components/MobileTabBar';
 
 
 interface AppLayoutProps {
@@ -19,15 +19,18 @@ export function AppLayout({ children, title, subtitle, headerActions }: AppLayou
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="flex min-h-screen w-full">
-        <AppSidebar />
+        {/* Sidebar: desktop only */}
+        <div className="hidden md:block">
+          <AppSidebar />
+        </div>
 
         <div className="flex-1 flex flex-col min-w-0">
           <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border pt-[env(safe-area-inset-top)]">
-            {/* Bottom Bar - Page Content Info */}
+            {/* Top Bar - Page Content Info */}
             <div className="flex items-center justify-between px-4 py-3 min-h-[4rem]">
               <div className="min-w-0 flex-1 flex items-center gap-3">
                 {leagueId && (
-                  <SidebarTrigger className="h-8 w-8 flex-shrink-0 md:hidden" />
+                  <SidebarTrigger className="h-8 w-8 flex-shrink-0 hidden md:flex" />
                 )}
                 <div className="min-w-0">
                   <h1 className="text-xl font-bold text-foreground tracking-tight mb-1">{title}</h1>
@@ -48,6 +51,9 @@ export function AppLayout({ children, title, subtitle, headerActions }: AppLayou
               </div>
             </div>
           </header>
+
+          {/* Mobile tab bar: below header, above content */}
+          <MobileTabBar />
 
           <main className="flex-1 overflow-auto">
             {children}

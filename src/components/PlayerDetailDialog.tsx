@@ -705,7 +705,9 @@ export function PlayerDetailDialog({
                                             onClick={() => hasStats && setSelectedMatch(matchItem)}
                                             className={cn(
                                                 "flex w-full min-w-[550px] md:min-w-full transition-colors border-b border-white/[0.03] group",
-                                                index % 2 === 0 ? "bg-transparent" : "bg-white/[0.01]",
+                                                stats?.isManOfMatch
+                                                    ? "bg-amber-500/[0.08] border-amber-500/10"
+                                                    : index % 2 === 0 ? "bg-transparent" : "bg-white/[0.01]",
                                                 isUpcoming && "opacity-30",
                                                 hasStats ? "cursor-pointer hover:bg-white/[0.06]" : "cursor-default"
                                             )}

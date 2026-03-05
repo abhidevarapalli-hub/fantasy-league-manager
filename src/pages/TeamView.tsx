@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowUpDown, Trophy, Lock, Info, Plus, Shield } from 'lucide-react';
+import { ArrowLeft, Users, UserMinus, AlertCircle, Plane, ArrowUpDown, Trophy, Lock, Info, Plus, Shield, Crown } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { PlayerCard } from '@/components/PlayerCard';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import {
   getActiveRosterSlots,
@@ -402,6 +403,61 @@ const TeamView = () => {
                 <>You can view this team but cannot make changes</>
               )}
             </p>
+          </div>
+        )}
+
+        {/* Captain / Vice-Captain Selectors (only when editable) */}
+        {canEdit && activePlayers.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            {/* Captain Selector */}
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-amber-400 uppercase tracking-wider">
+                <Crown className="w-3.5 h-3.5" />
+                Captain <span className="text-amber-400/50 font-normal normal-case">(2× pts)</span>
+              </label>
+              <Select
+                value={manager.captainId || ''}
+                onValueChange={(value) => handleSetCaptain(value)}
+              >
+                <SelectTrigger className="h-9 bg-amber-500/10 border-amber-500/30 text-foreground text-sm rounded-lg">
+                  <SelectValue placeholder="Select Captain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activePlayers
+                    .filter(p => p.id !== manager.viceCaptainId)
+                    .map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Vice-Captain Selector */}
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <Shield className="w-3.5 h-3.5" />
+                Vice-Capt <span className="text-slate-400/50 font-normal normal-case">(1.5× pts)</span>
+              </label>
+              <Select
+                value={manager.viceCaptainId || ''}
+                onValueChange={(value) => handleSetViceCaptain(value)}
+              >
+                <SelectTrigger className="h-9 bg-slate-500/10 border-slate-500/30 text-foreground text-sm rounded-lg">
+                  <SelectValue placeholder="Select Vice-Captain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activePlayers
+                    .filter(p => p.id !== manager.captainId)
+                    .map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
 

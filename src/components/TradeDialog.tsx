@@ -199,39 +199,41 @@ interface TradePlayerCardProps {
 }
 
 const TradePlayerCard = ({ player, selected, onToggle, direction }: TradePlayerCardProps) => {
-  const isDarkTeam = ['KKR', 'RCB', 'MI', 'GT', 'PBKS', 'DC'].includes(player.team);
 
   return (
     <button
       onClick={onToggle}
       className={cn(
-        'w-full flex items-center gap-2 p-2 rounded-lg border transition-all text-left',
+        'w-full flex items-center gap-2 p-2.5 rounded-lg border transition-all text-left relative overflow-hidden',
         teamCardColors[player.team] || 'bg-card border-border',
         selected && direction === 'out' && 'ring-2 ring-secondary',
         selected && direction === 'in' && 'ring-2 ring-primary'
       )}
     >
-      <div className="flex-1 min-w-0">
-        <p className={cn('text-sm font-medium truncate', isDarkTeam ? 'text-white' : 'text-black')}>
+      {/* Dark overlay for consistent text readability */}
+      <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+
+      <div className="flex-1 min-w-0 relative z-10">
+        <p className="text-sm font-semibold truncate text-white">
           {player.name}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-black/30 text-white border-white/30 font-bold">
             {player.team}
           </Badge>
-          <span className={cn('text-[10px]', isDarkTeam ? 'text-white/70' : 'text-black/70')}>
+          <span className="text-[10px] text-white/80 font-medium">
             {player.role}
           </span>
         </div>
       </div>
       <div
         className={cn(
-          'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0',
+          'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 relative z-10',
           selected
             ? direction === 'out'
               ? 'bg-secondary border-secondary'
               : 'bg-primary border-primary'
-            : 'border-muted-foreground/50'
+            : 'border-white/50'
         )}
       >
         {selected && <Check className="w-3 h-3 text-white" />}

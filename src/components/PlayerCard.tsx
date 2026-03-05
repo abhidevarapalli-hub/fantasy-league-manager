@@ -10,6 +10,7 @@ import { getTeamColors } from '@/lib/team-colors';
 interface PlayerCardProps {
   player: Player;
   onAdd?: () => void;
+  onDrop?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onSwap?: () => void;
@@ -40,6 +41,7 @@ const roleStyles: Record<string, string> = {
 export const PlayerCard = ({
   player,
   onAdd,
+  onDrop,
   onMoveUp,
   onMoveDown,
   onSwap,
@@ -97,17 +99,65 @@ export const PlayerCard = ({
         <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/10 pointer-events-none" />
       )}
 
-      {/* Player Avatar - Lazy loaded with initials fallback */}
-      <LazyPlayerAvatar
-        name={player.name}
-        imageId={player.imageId}
-        cachedUrl={player.cachedUrl}
-        className={cn(
-          "w-10 h-10 border-2 shadow-sm shrink-0",
-          teamColors.text === 'text-white' ? "border-white/20" : "border-black/10"
-        )}
-        fallbackClassName={cn("bg-black/20", teamColors.text)}
-      />
+      {/* Left-side action button (Add / Trade / Drop) */}
+      {showActions && (onAdd || onTrade || onDrop) && (
+        <div className="shrink-0 z-10">
+          {!isOwned && onAdd && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-white bg-emerald-500/40 hover:bg-emerald-500/60 border border-emerald-400/30 rounded-lg"
+              onClick={onAdd}
+              title="Add player"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          )}
+          {onTrade && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-white bg-secondary/20 hover:bg-secondary/40 border border-white/10 rounded-lg"
+              onClick={onTrade}
+              title="Propose trade"
+            >
+              <Repeat className="w-4 h-4" />
+            </Button>
+          )}
+          {onDrop && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-white bg-red-500/40 hover:bg-red-500/60 border border-red-400/30 rounded-lg"
+              onClick={onDrop}
+              title="Drop player"
+            >
+              <Minus className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      )}
+      {/* Player Avatar + Team Badge */}
+      <div className="flex flex-col items-center shrink-0 gap-0.5">
+        <LazyPlayerAvatar
+          name={player.name}
+          imageId={player.imageId}
+          cachedUrl={player.cachedUrl}
+          className={cn(
+            "w-10 h-10 border-2 shadow-sm",
+            teamColors.text === 'text-white' ? "border-white/20" : "border-black/10"
+          )}
+          fallbackClassName={cn("bg-black/20", teamColors.text)}
+        />
+        <span
+          className={cn(
+            "px-1.5 py-0 text-[8px] font-bold rounded border bg-black/40 backdrop-blur-sm shadow-sm leading-relaxed",
+            teamColors.text === 'text-white' ? "text-white border-white/10" : "text-white border-black/10"
+          )}
+        >
+          {player.team}
+        </span>
+      </div>
 
       <div className="flex-1 min-w-0 z-10">
         <div className="flex items-center gap-1.5 leading-tight">
@@ -141,16 +191,16 @@ export const PlayerCard = ({
           )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <span
-            className={cn(
-              "px-1.5 py-0.5 text-[9px] font-bold rounded border bg-black/40 backdrop-blur-sm shadow-sm",
-              teamColors.text === 'text-white' ? "text-white border-white/10" : "text-white border-black/10"
-            )}
-          >
-            {player.team}
-          </span>
+          {managerName && (
+            <div className={cn(
+              "px-1.5 py-0.5 text-[9px] font-bold rounded-md border backdrop-blur-sm shadow-sm uppercase tracking-tight",
+              "bg-indigo-600/80 border-indigo-400/50 text-white"
+            )}>
+              {managerName}
+            </div>
+          )}
           <span className={cn(
-            "text-[10px] opacity-70",
+            "text-[10px] opacity-70 hidden sm:inline",
             teamColors.text
           )}>{player.role}</span>
         </div>
@@ -193,14 +243,7 @@ export const PlayerCard = ({
 
       {/* Ownership / Action Area */}
       <div className="flex items-center gap-2 z-10">
-        {managerName && (
-          <div className={cn(
-            "px-2 py-0.5 text-[9px] md:text-[10px] font-bold rounded-lg shadow-lg border backdrop-blur-md uppercase tracking-tight",
-            "bg-indigo-600 border-indigo-400 text-white shrink-0"
-          )}>
-            {managerName}
-          </div>
-        )}
+
 
         {showActions && (
           <div className="flex items-center gap-1">
@@ -208,7 +251,7 @@ export const PlayerCard = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 text-amber-300 bg-amber-500/20 hover:bg-amber-500/40 border border-amber-400/30 font-black text-sm shadow-sm"
+                className="hidden sm:inline-flex h-10 w-10 text-amber-300 bg-amber-500/20 hover:bg-amber-500/40 border border-amber-400/30 font-black text-sm shadow-sm"
                 onClick={onSetCaptain}
                 title="Set as Captain (2× points)"
               >
@@ -219,7 +262,7 @@ export const PlayerCard = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 text-slate-300 bg-slate-500/20 hover:bg-slate-500/40 border border-slate-400/30 font-black text-sm shadow-sm"
+                className="hidden sm:inline-flex h-10 w-10 text-slate-300 bg-slate-500/20 hover:bg-slate-500/40 border border-slate-400/30 font-black text-sm shadow-sm"
                 onClick={onSetViceCaptain}
                 title="Set as Vice-Captain (1.5× points)"
               >
@@ -230,52 +273,11 @@ export const PlayerCard = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 text-white bg-secondary/20 hover:bg-secondary/40 border border-white/10"
+                className="hidden sm:inline-flex h-10 w-10 text-white bg-secondary/20 hover:bg-secondary/40 border border-white/10"
                 onClick={onTrade}
                 title="Propose trade"
               >
                 <Repeat className="w-5 h-5" />
-              </Button>
-            )}
-            {onSwap && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 text-white bg-black/20 hover:bg-black/40 border border-white/10"
-                onClick={onSwap}
-                title="Swap player"
-              >
-                <ArrowUpDown className="w-5 h-5" />
-              </Button>
-            )}
-            {onMoveUp && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 text-white bg-black/20 hover:bg-black/40 border border-white/10"
-                onClick={onMoveUp}
-              >
-                <ArrowUp className="w-5 h-5" />
-              </Button>
-            )}
-            {onMoveDown && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 text-white bg-black/20 hover:bg-black/40 border border-white/10"
-                onClick={onMoveDown}
-              >
-                <ArrowDown className="w-5 h-5" />
-              </Button>
-            )}
-            {!isOwned && onAdd && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 text-white bg-emerald-500/40 hover:bg-emerald-500/60 border border-emerald-400/30"
-                onClick={onAdd}
-              >
-                <Plus className="w-5 h-5" />
               </Button>
             )}
           </div>
