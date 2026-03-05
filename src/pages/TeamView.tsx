@@ -106,6 +106,47 @@ const TeamView = () => {
     return sortedManagers.findIndex(m => m.id === manager.id) + 1;
   }, [managers, manager]);
 
+  // Find this manager's matchup for the selected week
+  const weekMatchup = useMemo(() => {
+    if (!teamId) return null;
+    return schedule.find(
+      m => m.week === selectedRosterWeek && (m.home === teamId || m.away === teamId)
+    ) || null;
+  }, [schedule, selectedRosterWeek, teamId]);
+
+  // Compute calculated team score from player stats (for detecting admin adjustments)
+  const calculatedTeamScore = useMemo(() => {
+    if (!weekMatchup || !weekMatchup.modifiedBy || !weekMatchup.completed || !manager) return null;
+    const statsData = weeklyStats[selectedRosterWeek];
+    if (!statsData) return null;
+
+    const activeIds = new Set(manager.activeRoster);
+    let total = 0;
+    for (const pid of activeIds) {
+      const player = players.find(p => p.id === pid);
+      if (!player) continue;
+      const playerStats = statsData.filter(s => s.playerId === pid);
+      const rawPts = playerStats.reduce((sum, stat) => {
+        return sum + calculateFantasyPoints({
+          runs: stat.runs || 0, ballsFaced: stat.ballsFaced || 0,
+          fours: stat.fours || 0, sixes: stat.sixes || 0,
+          isOut: stat.isOut, isInPlaying11: stat.isInPlaying11,
+          isImpactPlayer: stat.isImpactPlayer, isManOfMatch: stat.isManOfMatch,
+          teamWon: stat.teamWon, wickets: stat.wickets || 0,
+          overs: stat.overs || 0, maidens: stat.maidens || 0,
+          runsConceded: stat.runsConceded || 0, dots: stat.dots || 0,
+          wides: stat.wides || 0, noBalls: stat.noBalls || 0,
+          lbwBowledCount: stat.lbwBowledCount || 0, catches: stat.catches || 0,
+          stumpings: stat.stumpings || 0, runOuts: stat.runOuts || 0,
+        }, scoringRules).total;
+      }, 0);
+      const isCaptain = manager.captainId === pid;
+      const isViceCaptain = manager.viceCaptainId === pid;
+      total += isCaptain ? rawPts * 2 : isViceCaptain ? rawPts * 1.5 : rawPts;
+    }
+    return total;
+  }, [weekMatchup, manager, players, weeklyStats, selectedRosterWeek, scoringRules]);
+
   // Ensure weekly data is fetched
   useEffect(() => {
     if (currentLeagueId && selectedRosterWeek) {
@@ -405,6 +446,29 @@ const TeamView = () => {
             </p>
           </div>
         )}
+
+        {/* Admin Score Adjustment Banner */}
+        {weekMatchup?.modifiedBy && weekMatchup.completed && (() => {
+          const isHome = weekMatchup.home === teamId;
+          const storedScore = isHome ? (weekMatchup.homeScore ?? 0) : (weekMatchup.awayScore ?? 0);
+          const opponentId = isHome ? weekMatchup.away : weekMatchup.home;
+          const opponent = managers.find(m => m.id === opponentId);
+          const delta = calculatedTeamScore != null ? storedScore - calculatedTeamScore : null;
+          return (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <Info className="w-4 h-4 text-amber-500 shrink-0" />
+              <div className="text-sm text-amber-600 dark:text-amber-400">
+                <span className="font-medium">Score adjusted</span>
+                {opponent && <span className="text-amber-500/80"> vs {opponent.teamName}</span>}
+                {delta != null && delta !== 0 && (
+                  <span className="font-bold tabular-nums ml-1">
+                    ({delta > 0 ? '+' : ''}{delta.toFixed(1)} pts)
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Captain / Vice-Captain Selectors (only when editable) */}
         {canEdit && activePlayers.length > 0 && (

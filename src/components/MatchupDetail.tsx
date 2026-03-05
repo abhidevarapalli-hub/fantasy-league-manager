@@ -514,7 +514,11 @@ export function MatchupDetail({
                             <p className="text-sm text-muted-foreground truncate">{homeManager?.name || "-"}</p>
                             <div className="flex items-baseline gap-2 mt-1">
                                 <span className="text-3xl font-bold">
-                                    {matchupData.loading ? "-" : (matchupData.data?.homeScore || 0).toFixed(1)}
+                                    {matchupData.loading ? "-" : (
+                                        match.completed
+                                            ? (match.homeScore ?? 0).toFixed(1)
+                                            : (matchupData.data?.homeScore || 0).toFixed(1)
+                                    )}
                                 </span>
                                 {homeManager && (
                                     <span className="text-xs text-muted-foreground">
@@ -531,6 +535,25 @@ export function MatchupDetail({
                                 <Trophy className="w-5 h-5 text-amber-400" />
                             ) : (
                                 <Clock className="w-5 h-5 text-muted-foreground" />
+                            )}
+                            {match.modifiedBy && match.completed && matchupData.data && (
+                                <div className="flex flex-col items-center gap-0.5 mt-1">
+                                    <span className="text-[9px] font-bold text-amber-500 whitespace-nowrap">
+                                        Adjusted
+                                    </span>
+                                    {(() => {
+                                        const homeDelta = (match.homeScore ?? 0) - (matchupData.data.homeScore ?? 0);
+                                        const awayDelta = (match.awayScore ?? 0) - (matchupData.data.awayScore ?? 0);
+                                        const hasDelta = homeDelta !== 0 || awayDelta !== 0;
+                                        if (!hasDelta) return null;
+                                        const fmt = (d: number) => `${d > 0 ? '+' : ''}${d.toFixed(1)}`;
+                                        return (
+                                            <span className="text-[8px] text-amber-500/70 whitespace-nowrap tabular-nums">
+                                                {fmt(homeDelta)} / {fmt(awayDelta)}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
                             )}
                         </div>
 
@@ -555,7 +578,11 @@ export function MatchupDetail({
                                     </span>
                                 )}
                                 <span className="text-3xl font-bold">
-                                    {matchupData.loading ? "-" : (matchupData.data?.awayScore || 0).toFixed(1)}
+                                    {matchupData.loading ? "-" : (
+                                        match.completed
+                                            ? (match.awayScore ?? 0).toFixed(1)
+                                            : (matchupData.data?.awayScore || 0).toFixed(1)
+                                    )}
                                 </span>
                             </div>
                         </div>
