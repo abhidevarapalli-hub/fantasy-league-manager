@@ -130,12 +130,18 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
 };
 
 /**
- * Sanitize scoring rules by converting empty strings to 0 recursively.
- * Used before saving to the database.
+ * Sanitize scoring rules by converting numeric strings to actual numbers recursively.
+ * HTML inputs return string values even for type="number", so "30" must become 30
+ * to prevent string concatenation bugs in score calculations (e.g. 14 + "10" = "1410").
  */
 export function sanitizeScoringRules(rules: ScoringRules): ScoringRules {
   const sanitize = (obj: unknown): unknown => {
-    if (typeof obj !== 'object' || obj === null) return obj === '' ? 0 : obj;
+    if (typeof obj === 'string') {
+      if (obj === '') return 0;
+      const num = Number(obj);
+      return isNaN(num) ? obj : num;
+    }
+    if (typeof obj !== 'object' || obj === null) return obj;
     if (Array.isArray(obj)) return obj.map(sanitize);
     const newObj: Record<string, unknown> = {};
     for (const key in obj as Record<string, unknown>) {

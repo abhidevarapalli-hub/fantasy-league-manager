@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Json } from '@/integrations/supabase/types';
 import { Player, Manager, Activity, PlayerTransaction, PlayerMatchStats, CricketMatch } from '@/lib/supabase-types';
 import { DEFAULT_LEAGUE_CONFIG, canAddToActive, buildOptimalActive11, isRoleCompatible, getActiveRosterSlots, PlayerRole } from '@/lib/roster-validation';
-import { DEFAULT_SCORING_RULES, mergeScoringRules } from '@/lib/scoring-types';
+import { DEFAULT_SCORING_RULES, mergeScoringRules, sanitizeScoringRules, ScoringRules } from '@/lib/scoring-types';
 import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
 import { toast } from 'sonner';
 import { GameState } from './gameStore/types';
@@ -773,11 +773,13 @@ export const useGameStore = create<GameState>()(
         }
 
         try {
+          const sanitized = sanitizeScoringRules(rules);
+
           // Upsert to scoring_rules table
           const { error } = await supabase
             .from('scoring_rules')
             .upsert(
-              { league_id: currentLeagueId, rules: rules as unknown as Json },
+              { league_id: currentLeagueId, rules: sanitized as unknown as Json },
               { onConflict: 'league_id' }
             );
 
@@ -786,11 +788,11 @@ export const useGameStore = create<GameState>()(
             return { success: false, error: error.message };
           }
 
-          set({ scoringRules: rules });
+          set({ scoringRules: sanitized });
 
           // Recompute all historical scores with the new rules
           try {
-            await recomputeLeaguePoints(currentLeagueId, rules);
+            await recomputeLeaguePoints(currentLeagueId, sanitized);
           } catch (recomputeError) {
             console.error('Error recomputing league points:', recomputeError);
             return { success: true, error: 'Rules saved but recompute failed' };
@@ -1128,7 +1130,9 @@ export const useGameStore = create<GameState>()(
             .maybeSingle();
 
           if (scoringRulesData?.rules) {
-            set({ scoringRules: mergeScoringRules(scoringRulesData.rules as Record<string, unknown>) });
+            set({ scoringRules: mergeScoringRules(
+              sanitizeScoringRules(scoringRulesData.rules as unknown as ScoringRules) as Partial<ScoringRules>
+            )});
           }
 
           const parallelFetchStart = performance.now();

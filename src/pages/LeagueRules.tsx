@@ -12,8 +12,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { ScoringRules as ScoringRulesType, sanitizeScoringRules } from '@/lib/scoring-types';
-import { recomputeLeaguePoints } from '@/lib/scoring-recompute';
+import { ScoringRules as ScoringRulesType } from '@/lib/scoring-types';
 import { ScoringRulesForm } from '@/components/ScoringRulesForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -21,7 +20,6 @@ import { cn } from '@/lib/utils';
 const LeagueRules = () => {
   const scoringRules = useGameStore((state) => state.scoringRules);
   const updateScoringRules = useGameStore((state) => state.updateScoringRules);
-  const currentLeagueId = useGameStore((state) => state.currentLeagueId);
   const gameLoading = useGameStore((state) => state.loading);
   const config = useGameStore((state) => state.config);
   const draftState = useGameStore((state) => state.draftState);
@@ -90,10 +88,8 @@ const LeagueRules = () => {
   const handleSave = async () => {
     if (isReadOnly) return;
 
-    const sanitizedRules = sanitizeScoringRules(rules);
-
     setSaving(true);
-    const scoringResult = await updateScoringRules(sanitizedRules);
+    const scoringResult = await updateScoringRules(rules);
 
     // Also update draft timer and roster config if changed
     let configResult = { success: true };
@@ -127,17 +123,6 @@ const LeagueRules = () => {
         toast.warning(scoringResult.error);
       } else {
         toast.success('League rules updated successfully');
-        // Recompute all scores with the new rules
-        if (currentLeagueId) {
-          try {
-            toast.info('Recalculating scores with new rules...');
-            const rowsUpdated = await recomputeLeaguePoints(currentLeagueId, sanitizedRules);
-            toast.success(`Scores recalculated (${rowsUpdated} records updated)`);
-          } catch (recomputeError) {
-            console.error('Recompute failed:', recomputeError);
-            toast.error('Rules saved but score recalculation failed. Try refreshing.');
-          }
-        }
       }
       setHasChanges(false);
     } else {
