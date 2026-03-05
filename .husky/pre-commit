@@ -3,6 +3,24 @@
 echo "Running pre-commit checks..."
 echo ""
 
+# 0. Check for untracked migration files when committing Supabase-related code
+UNTRACKED_MIGRATIONS=$(git ls-files --others --exclude-standard supabase/migrations/)
+if [ -n "$UNTRACKED_MIGRATIONS" ]; then
+  # Check if any staged files touch Supabase types, RPC calls, or migration-dependent code
+  STAGED_FILES=$(git diff --cached --name-only)
+  HAS_SUPABASE_CHANGES=$(echo "$STAGED_FILES" | grep -E '(supabase/|types\.ts|\.sql)' || true)
+  if [ -n "$HAS_SUPABASE_CHANGES" ]; then
+    echo "WARNING: Untracked migration files detected while committing Supabase-related changes:"
+    echo "$UNTRACKED_MIGRATIONS" | sed 's/^/  /'
+    echo ""
+    echo "These migrations won't be deployed to production. Stage them with:"
+    echo "  git add $UNTRACKED_MIGRATIONS"
+    echo ""
+    echo "COMMIT BLOCKED. Add the migration files or remove them if unneeded."
+    exit 1
+  fi
+fi
+
 # 1. Lint
 echo "=> ESLint..."
 npm run lint
