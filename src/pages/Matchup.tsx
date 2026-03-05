@@ -347,7 +347,11 @@ const Matchup = () => {
             <p className="text-sm text-muted-foreground truncate">{homeManager?.name || '-'}</p>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-bold">
-                {matchupData.loading ? '-' : (matchupData.data?.homeScore || 0).toFixed(1)}
+                {matchupData.loading ? '-' : (
+                  currentMatch.completed
+                    ? (currentMatch.homeScore ?? 0).toFixed(1)
+                    : (matchupData.data?.homeScore || 0).toFixed(1)
+                )}
               </span>
               {homeManager && (
                 <span className="text-xs text-muted-foreground">
@@ -365,6 +369,11 @@ const Matchup = () => {
             ) : (
               <Clock className="w-5 h-5 text-muted-foreground" />
             )}
+            {currentMatch.modifiedBy && (
+              <span className="text-[9px] text-amber-500/80 whitespace-nowrap">
+                Admin adjusted
+              </span>
+            )}
           </div>
 
           {/* Away Team */}
@@ -380,7 +389,11 @@ const Matchup = () => {
                 </span>
               )}
               <span className="text-3xl font-bold">
-                {matchupData.loading ? '-' : (matchupData.data?.awayScore || 0).toFixed(1)}
+                {matchupData.loading ? '-' : (
+                  currentMatch.completed
+                    ? (currentMatch.awayScore ?? 0).toFixed(1)
+                    : (matchupData.data?.awayScore || 0).toFixed(1)
+                )}
               </span>
             </div>
           </div>

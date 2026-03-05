@@ -44,6 +44,9 @@ interface MatchupRow {
   manager2_score: number | null;
   winner_id: string | null;
   is_finalized: boolean;
+  modified_by: string | null;
+  modified_at: string | null;
+  modifier_name?: string | null;
 }
 
 interface WeekInfo {
@@ -72,6 +75,7 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
 
   const managers = useGameStore((state) => state.managers);
   const addActivity = useGameStore((state) => state.addActivity);
+  const fetchAllData = useGameStore((state) => state.fetchAllData);
 
   const getManagerName = useCallback(
     (managerId: string | null) => {
@@ -107,7 +111,7 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
       const weekNumbers = [...weekCounts.keys()].sort((a, b) => a - b);
 
       // Fetch readiness, finalization status, and matchup scores for each week
-      const weekInfos = await Promise.all(
+      const weekResults = await Promise.all(
         weekNumbers.map(async (week) => {
           const [readinessResult, matchupsResult] = await Promise.all([
             supabase.rpc('check_week_finalization_ready', {
@@ -117,26 +121,50 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
             supabase
               .from('league_matchups')
               .select(
-                'id, manager1_id, manager2_id, manager1_score, manager2_score, winner_id, is_finalized'
+                'id, manager1_id, manager2_id, manager1_score, manager2_score, winner_id, is_finalized, modified_by, modified_at'
               )
               .eq('league_id', leagueId)
               .eq('week', week),
           ]);
 
           const readiness = readinessResult.data?.[0] as WeekReadiness | undefined;
-          const matchups = (matchupsResult.data || []) as MatchupRow[];
-          const isFinalized =
-            matchups.length > 0 && matchups.every((m) => m.is_finalized);
+          const rawMatchups = (matchupsResult.data || []) as MatchupRow[];
 
-          return {
-            week,
-            matchCount: weekCounts.get(week) || 0,
-            readiness,
-            isFinalized,
-            matchups,
-          };
+          return { week, readiness, rawMatchups };
         })
       );
+
+      // Batch-resolve modifier names across all weeks in a single query
+      const allModifierIds = [...new Set(
+        weekResults.flatMap(r => r.rawMatchups.map(m => m.modified_by).filter(Boolean))
+      )] as string[];
+      let profileMap: Record<string, string> = {};
+      if (allModifierIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', allModifierIds);
+        profileMap = Object.fromEntries(
+          (profiles || []).map(p => [p.id, p.full_name || 'Admin'])
+        );
+      }
+
+      const weekInfos = weekResults.map(({ week, readiness, rawMatchups }) => {
+        const matchups = rawMatchups.map(m => ({
+          ...m,
+          modifier_name: m.modified_by ? (profileMap[m.modified_by] || 'Admin') : null,
+        }));
+        const isFinalized =
+          matchups.length > 0 && matchups.every((m) => m.is_finalized);
+
+        return {
+          week,
+          matchCount: weekCounts.get(week) || 0,
+          readiness,
+          isFinalized,
+          matchups,
+        };
+      });
 
       setWeeks(weekInfos);
     } catch (error) {
@@ -211,7 +239,7 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
     setIsSavingScores(true);
     try {
       // Build updates first, then execute in parallel
-      const updates: { matchup: MatchupRow; newHome: number; newAway: number | null; winnerId: string | null }[] = [];
+      const updates: { matchup: MatchupRow; newHome: number; newAway: number | null }[] = [];
 
       for (const matchup of weekInfo.matchups) {
         const edited = editedScores[matchup.id];
@@ -225,14 +253,7 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
         // Skip if no actual change
         if (newHome === matchup.manager1_score && newAway === matchup.manager2_score) continue;
 
-        // Determine new winner
-        let winnerId: string | null = null;
-        if (matchup.manager2_id && newAway !== null) {
-          if (newHome > newAway) winnerId = matchup.manager1_id;
-          else if (newAway > newHome) winnerId = matchup.manager2_id;
-        }
-
-        updates.push({ matchup, newHome, newAway, winnerId });
+        updates.push({ matchup, newHome, newAway });
       }
 
       if (updates.length === 0) {
@@ -242,17 +263,15 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
         return;
       }
 
-      // Execute all updates in parallel
+      // Execute all updates via RPC (cascades W/L + sets attribution)
       const results = await Promise.all(
-        updates.map(({ matchup, newHome, newAway, winnerId }) =>
+        updates.map(({ matchup, newHome, newAway }) =>
           supabase
-            .from('league_matchups')
-            .update({
-              manager1_score: newHome,
-              manager2_score: newAway,
-              winner_id: winnerId,
+            .rpc('admin_update_matchup_scores', {
+              p_matchup_id: matchup.id,
+              p_manager1_score: newHome,
+              p_manager2_score: newAway ?? null,
             })
-            .eq('id', matchup.id)
             .then(({ error }) => ({ matchup, newHome, newAway, error }))
         )
       );
@@ -278,7 +297,8 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
 
       setEditingWeek(null);
       setEditedScores({});
-      await fetchWeeks();
+      // Refresh both admin-local state and global store so Dashboard/Matchup see updates
+      await Promise.all([fetchWeeks(), fetchAllData(leagueId)]);
     } catch {
       toast.error('Failed to save scores');
     } finally {
@@ -444,8 +464,8 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
                         const edited = editedScores[matchup.id];
 
                         return (
+                          <div key={matchup.id} className="space-y-1">
                           <div
-                            key={matchup.id}
                             className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2"
                           >
                             {/* Home manager */}
@@ -530,6 +550,13 @@ export const WeekScoresFinalization = ({ leagueId }: WeekScoresFinalizationProps
                             <span className="text-sm font-medium text-foreground flex-1 truncate">
                               {getManagerName(matchup.manager2_id)}
                             </span>
+                          </div>
+                          {matchup.modifier_name && (
+                            <p className="text-[10px] text-amber-500/80 text-right px-1">
+                              Edited by {matchup.modifier_name}
+                              {matchup.modified_at && ` on ${new Date(matchup.modified_at).toLocaleDateString()}`}
+                            </p>
+                          )}
                           </div>
                         );
                       })}

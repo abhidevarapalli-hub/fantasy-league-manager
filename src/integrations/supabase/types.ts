@@ -476,6 +476,8 @@ export type Database = {
           manager1_score: number | null
           manager2_id: string | null
           manager2_score: number | null
+          modified_at: string | null
+          modified_by: string | null
           week: number
           winner_id: string | null
         }
@@ -488,6 +490,8 @@ export type Database = {
           manager1_score?: number | null
           manager2_id?: string | null
           manager2_score?: number | null
+          modified_at?: string | null
+          modified_by?: string | null
           week: number
           winner_id?: string | null
         }
@@ -500,6 +504,8 @@ export type Database = {
           manager1_score?: number | null
           manager2_id?: string | null
           manager2_score?: number | null
+          modified_at?: string | null
+          modified_by?: string | null
           week?: number
           winner_id?: string | null
         }
@@ -1954,6 +1960,14 @@ export type Database = {
           p_man_of_match_cricbuzz_id?: string
           p_match_id: string
           p_winner_team_id?: number
+        }
+        Returns: undefined
+      }
+      admin_update_matchup_scores: {
+        Args: {
+          p_manager1_score: number
+          p_manager2_score?: number
+          p_matchup_id: string
         }
         Returns: undefined
       }

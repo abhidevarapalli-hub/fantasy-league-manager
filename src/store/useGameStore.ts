@@ -1297,7 +1297,16 @@ export const useGameStore = create<GameState>()(
                 get().addManager(mapDbManager(payload.new as Tables<"managers">));
               }
             }
-            else if (payload.eventType === "UPDATE") get().updateManager(payload.new.id, mapDbManager(payload.new as Tables<"managers">));
+            else if (payload.eventType === "UPDATE") {
+              // Merge DB fields into existing manager to preserve roster data
+              // (mapDbManager returns empty rosters since they live in manager_roster)
+              const existing = get().managers.find(m => m.id === payload.new.id);
+              const dbFields = mapDbManager(payload.new as Tables<"managers">);
+              get().updateManager(payload.new.id, existing
+                ? { ...existing, wins: dbFields.wins, losses: dbFields.losses, points: dbFields.points, name: dbFields.name, teamName: dbFields.teamName }
+                : dbFields
+              );
+            }
             else if (payload.eventType === "DELETE") get().removeManager(payload.old.id);
           })
           // Subscribe to manager_roster changes - refetch managers when rosters change

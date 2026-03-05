@@ -74,6 +74,8 @@ export const mapDbMatchup = (db: Tables<"league_matchups">): Match => ({
   homeScore: db.manager1_score ?? undefined,
   awayScore: db.manager2_score ?? undefined,
   completed: db.is_finalized ?? false,
+  modifiedBy: db.modified_by ?? null,
+  modifiedAt: db.modified_at ?? null,
 });
 
 // Alias for transition

@@ -35,6 +35,8 @@ export interface DbLeagueMatchup {
   winner_id: string | null;
   is_finalized: boolean;
   created_at: string | null;
+  modified_by: string | null;
+  modified_at: string | null;
 }
 
 // Keep backward-compatible alias
@@ -93,6 +95,8 @@ export interface Match {
   homeScore?: number;
   awayScore?: number;
   completed: boolean;
+  modifiedBy?: string | null;
+  modifiedAt?: string | null;
 }
 
 export interface Activity {
@@ -138,6 +142,8 @@ export const mapDbMatchup = (db: DbLeagueMatchup): Match => ({
   homeScore: db.manager1_score ?? undefined,
   awayScore: db.manager2_score ?? undefined,
   completed: db.is_finalized,
+  modifiedBy: db.modified_by ?? null,
+  modifiedAt: db.modified_at ?? null,
 });
 
 // Alias for transition

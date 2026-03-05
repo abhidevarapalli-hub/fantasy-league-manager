@@ -62,6 +62,18 @@ Key characteristics:
 - Look for servers before starting a new server, kill old ones if a new one needs to start
 - Consider database schema changes with future scalability in mind
 
+### Scoring Data Flow & Cascade Rules
+- Source of truth for individual player scores: `league_player_match_scores`
+- Source of truth for matchup aggregates (finalized weeks): `league_matchups`
+- Source of truth for W/L records: `managers.wins` / `managers.losses`
+- When matchup scores change, W/L on `managers` must be updated in the same transaction
+- Frontend must use stored `league_matchups` scores for finalized weeks, not recalculate
+- All admin score overrides must go through `admin_update_matchup_scores()` RPC (never direct table update)
+- Admin overrides must set `modified_by` and `modified_at` for attribution
+- After any admin score edit, call `fetchAllData()` to refresh the global Zustand store so Dashboard/Matchup pages see changes immediately
+- The `managers` realtime handler must MERGE DB fields (wins/losses/points/name) into existing state, never fully replace — `mapDbManager` returns empty rosters since they live in `manager_roster`
+- Any operation that writes to `league_matchups` or `managers` must ensure all downstream views (Dashboard schedule, Matchup header, Standings table) reflect the change; realtime subscriptions + explicit `fetchAllData()` calls are the mechanism
+
 ### Supabase Type Safety
 - CI runs `npx tsc -p tsconfig.app.json --noEmit` — this is stricter than a plain `tsc --noEmit` since it uses the app-specific config
 - **After any database schema change** (new columns, new RPC functions, altered tables), you must:

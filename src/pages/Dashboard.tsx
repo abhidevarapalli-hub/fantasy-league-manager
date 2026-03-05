@@ -86,11 +86,17 @@ const Dashboard = () => {
   const { scores: calculatedScores } = useWeeklyScores(leagueId || null, selectedWeek, managers);
 
   // Merge calculated scores into the schedule
+  // For finalized matchups, trust stored scores (may have admin overrides)
+  // For non-finalized matchups, use recalculated scores for live updates
   const displayMatches = useMemo(() => {
     return schedule.map(match => ({
       ...match,
-      homeScore: calculatedScores[match.home] ?? match.homeScore,
-      awayScore: calculatedScores[match.away] ?? match.awayScore
+      homeScore: match.completed && match.homeScore != null
+        ? match.homeScore
+        : (calculatedScores[match.home] ?? match.homeScore),
+      awayScore: match.completed && match.awayScore != null
+        ? match.awayScore
+        : (calculatedScores[match.away] ?? match.awayScore),
     }));
   }, [schedule, calculatedScores]);
 

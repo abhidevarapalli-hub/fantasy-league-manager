@@ -95,6 +95,11 @@ export const ScheduleGrid = ({ matches, managers, selectedWeek }: ScheduleGridPr
                                 {/* VS / Status Middle */}
                                 <div className="flex flex-col items-center justify-center shrink-0 px-2">
                                     <span className="text-muted-foreground font-bold text-sm opacity-50">VS</span>
+                                    {match.modifiedBy && (
+                                        <span className="text-[8px] text-amber-500/80 mt-1 whitespace-nowrap">
+                                            Adjusted
+                                        </span>
+                                    )}
                                 </div>
 
                                 {/* Away Team (Right) */}

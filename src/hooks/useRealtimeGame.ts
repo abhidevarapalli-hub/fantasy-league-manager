@@ -45,6 +45,8 @@ const mapDbMatchup = (db: Tables<"league_matchups">): Match => ({
   homeScore: db.manager1_score ?? undefined,
   awayScore: db.manager2_score ?? undefined,
   completed: db.is_finalized ?? false,
+  modifiedBy: db.modified_by ?? null,
+  modifiedAt: db.modified_at ?? null,
 });
 
 const mapDbSchedule = mapDbMatchup;
@@ -200,8 +202,14 @@ export const useRealtimeGame = (leagueId?: string) => {
             return [...prev, mapDbManager(payload.new as Tables<"managers">)];
           });
         } else if (payload.eventType === "UPDATE") {
+          // Merge DB fields into existing manager to preserve roster data
+          // (mapDbManager returns empty rosters since they live in manager_roster)
           setManagers((prev) =>
-            prev.map((m) => (m.id === payload.new.id ? mapDbManager(payload.new as Tables<"managers">) : m)),
+            prev.map((m) => {
+              if (m.id !== payload.new.id) return m;
+              const dbFields = mapDbManager(payload.new as Tables<"managers">);
+              return { ...m, wins: dbFields.wins, losses: dbFields.losses, points: dbFields.points, name: dbFields.name, teamName: dbFields.teamName };
+            }),
           );
         } else if (payload.eventType === "DELETE") {
           setManagers((prev) => prev.filter((m) => m.id !== payload.old.id));
