@@ -1,4 +1,3 @@
-export { ScoreInput } from './ScoreInput';
 export { AddNewPlayer } from './AddNewPlayer';
 export { RemovePlayer } from './RemovePlayer';
 export { RosterManagement } from './RosterManagement';
@@ -9,4 +8,4 @@ export { RosterConfig } from './RosterConfig';
 export { CurrentWeekSetting } from './CurrentWeekSetting';
 export { TestDraftStatus } from './TestDraftStatus';
 export { WeekManager } from './WeekManager';
-export { WeekFinalization } from './WeekFinalization';
+export { WeekScoresFinalization } from './WeekScoresFinalization';

@@ -5,7 +5,6 @@ import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppLayout } from '@/components/AppLayout';
 import {
-  ScoreInput,
   AddNewPlayer,
   RemovePlayer,
   RosterManagement,
@@ -16,7 +15,7 @@ import {
   CurrentWeekSetting,
   TestDraftStatus,
   WeekManager,
-  WeekFinalization,
+  WeekScoresFinalization,
 } from '@/components/admin';
 
 const Admin = () => {
@@ -65,16 +64,15 @@ const Admin = () => {
           <section className="bg-card rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 mb-4">
               <Trophy className="w-5 h-5 text-primary" />
-              <h2 className="font-semibold text-foreground">Week Finalization</h2>
+              <h2 className="font-semibold text-foreground">Week Scores & Finalization</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-3">
-              Finalize weekly matchups to calculate C/VC scores, determine winners, and update standings.
+              Finalize weekly matchups, view scores, and manually adjust if needed.
             </p>
-            <WeekFinalization leagueId={leagueId} />
+            <WeekScoresFinalization leagueId={leagueId} />
           </section>
         )}
         <TestDraftStatus />
-        <ScoreInput />
         <RosterConfig />
         <AddNewPlayer />
         <RemovePlayer />
