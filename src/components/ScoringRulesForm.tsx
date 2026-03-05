@@ -408,9 +408,25 @@ export const ScoringRulesForm = ({
         </TabsContent>
       )}
 
-      {/* SCORING TAB */}
-      <TabsContent value="scoring" className="space-y-8">
-        {/* MATCH POINTS (previously common) */}
+      <TabsContent value="scoring" className="space-y-6">
+        <Tabs defaultValue="general" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="general" className="gap-1.5 text-xs sm:text-sm">
+              <Globe className="w-4 h-4" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="batting" className="gap-1.5 text-xs sm:text-sm">
+              <Zap className="w-4 h-4" />
+              Batting
+            </TabsTrigger>
+            <TabsTrigger value="bowling" className="gap-1.5 text-xs sm:text-sm">
+              <Target className="w-4 h-4" />
+              Bowling
+            </TabsTrigger>
+          </TabsList>
+
+          {/* GENERAL SUB-TAB */}
+          <TabsContent value="general" className="space-y-8">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -457,7 +473,60 @@ export const ScoringRulesForm = ({
           </CardContent>
         </Card>
 
-        {/* BATTING RULES */}
+            {/* Fielding section - part of General */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Regular Fielding</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <NumericField
+                  label="Catch Points"
+                  value={rules.fielding?.catch}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'catch', val)}
+                  disabled={disabled}
+                />
+                <NumericField
+                  label="Stumping Points"
+                  value={rules.fielding?.stumping}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'stumping', val)}
+                  disabled={disabled}
+                />
+                <NumericField
+                  label="Run Out Points"
+                  value={rules.fielding?.runOut}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'runOut', val)}
+                  disabled={disabled}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Fielding Bonuses</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <NumericField
+                  label="Multi-Catch Threshold"
+                  value={rules.fielding?.multiCatchBonus?.count}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'multiCatchBonus', { ...rules.fielding?.multiCatchBonus, count: val })}
+                  description="Number of catches for bonus"
+                  disabled={disabled}
+                />
+                <NumericField
+                  label="Bonus Points"
+                  value={rules.fielding?.multiCatchBonus?.points}
+                  onChange={(val: NumericValue) => updateNestedField('fielding', 'multiCatchBonus', { ...rules.fielding?.multiCatchBonus, points: val })}
+                  description="Additional points for reaching threshold"
+                  disabled={disabled}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* BATTING SUB-TAB */}
+          <TabsContent value="batting" className="space-y-8">
+
+            {/* BATTING RULES */}
         <Card>
           <CardHeader>
             <CardTitle>Basic Batting</CardTitle>
@@ -546,6 +615,8 @@ export const ScoringRulesForm = ({
           </CardContent>
         </Card>
 
+
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -611,6 +682,10 @@ export const ScoringRulesForm = ({
             ))}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          {/* BOWLING SUB-TAB */}
+          <TabsContent value="bowling" className="space-y-8">
         <Card>
           <CardHeader>
             <CardTitle>Basic Bowling</CardTitle>
@@ -758,53 +833,8 @@ export const ScoringRulesForm = ({
             ))}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Regular Fielding</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <NumericField
-              label="Catch Points"
-              value={rules.fielding?.catch}
-              onChange={(val: NumericValue) => updateNestedField('fielding', 'catch', val)}
-              disabled={disabled}
-            />
-            <NumericField
-              label="Stumping Points"
-              value={rules.fielding?.stumping}
-              onChange={(val: NumericValue) => updateNestedField('fielding', 'stumping', val)}
-              disabled={disabled}
-            />
-            <NumericField
-              label="Run Out Points"
-              value={rules.fielding?.runOut}
-              onChange={(val: NumericValue) => updateNestedField('fielding', 'runOut', val)}
-              disabled={disabled}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Fielding Bonuses</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <NumericField
-              label="Multi-Catch Threshold"
-              value={rules.fielding?.multiCatchBonus?.count}
-              onChange={(val: NumericValue) => updateNestedField('fielding', 'multiCatchBonus', { ...rules.fielding?.multiCatchBonus, count: val })}
-              description="Number of catches for bonus"
-              disabled={disabled}
-            />
-            <NumericField
-              label="Bonus Points"
-              value={rules.fielding?.multiCatchBonus?.points}
-              onChange={(val: NumericValue) => updateNestedField('fielding', 'multiCatchBonus', { ...rules.fielding?.multiCatchBonus, points: val })}
-              description="Additional points for reaching threshold"
-              disabled={disabled}
-            />
-          </CardContent>
-        </Card>
+          </TabsContent>
+        </Tabs>
       </TabsContent>
     </Tabs>
   );

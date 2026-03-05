@@ -190,7 +190,7 @@ describe('Fantasy Points Calculator', () => {
       // ER = 12 (above 10), bowled 2+ overs
       const stats = createStats({ overs: 4, runsConceded: 48 });
       const result = calculateFantasyPoints(stats, DEFAULT_SCORING_RULES);
-      expect(result.bowling.economyBonus).toBe(-15);
+      expect(result.bowling.economyBonus).toBe(-20); // ER 12-15 tier
     });
   });
 
@@ -350,15 +350,15 @@ describe('Fantasy Points Calculator', () => {
       });
       const result = calculateFantasyPoints(stats, DEFAULT_SCORING_RULES);
 
-      // Bowling: 2 (dots) + (-15) economy penalty = -13
+      // Bowling: 2 (dots) + (-30) economy penalty = -28
       expect(result.bowling.dots).toBe(2);
-      expect(result.bowling.economyBonus).toBe(-15); // ER = 22.3
+      expect(result.bowling.economyBonus).toBe(-30); // ER = 22.3 (15+ tier)
 
       // Common: 5 (playing) + 5 (winning) = 10
       expect(result.common.total).toBe(10);
 
-      // Total = 10 + (-13) = -3
-      expect(result.total).toBe(-3);
+      // Total = 10 + (-28) = -18
+      expect(result.total).toBe(-18);
     });
 
     it('calculates MoM bonus correctly', () => {

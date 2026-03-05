@@ -99,9 +99,9 @@ export const PlayerCard = ({
         <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/10 pointer-events-none" />
       )}
 
-      {/* Left-side action button (Add / Trade / Drop) */}
-      {showActions && (onAdd || onTrade || onDrop) && (
-        <div className="shrink-0 z-10">
+      {/* Left-side action button (Add / Trade / Drop / Move to Bench) */}
+      {showActions && (onAdd || onTrade || onDrop || onMoveDown) && (
+        <div className="shrink-0 z-10 flex flex-col gap-1">
           {!isOwned && onAdd && (
             <Button
               variant="ghost"
@@ -133,6 +133,17 @@ export const PlayerCard = ({
               title="Drop player"
             >
               <Minus className="w-4 h-4" />
+            </Button>
+          )}
+          {onMoveDown && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-white bg-sky-500/40 hover:bg-sky-500/60 border border-sky-400/30 rounded-lg"
+              onClick={onMoveDown}
+              title="Move to bench"
+            >
+              <ArrowDown className="w-4 h-4" />
             </Button>
           )}
         </div>
@@ -175,12 +186,12 @@ export const PlayerCard = ({
           </p>
           {captainBadge && (
             <span className={cn(
-              "px-1.5 py-0.5 text-[9px] font-black rounded-full border shadow-sm leading-none",
+              "px-2 py-0.5 text-[11px] font-black rounded-md border-2 shadow-md leading-none tracking-wide",
               captainBadge === 'C'
-                ? "bg-amber-500/30 text-amber-300 border-amber-400/50"
-                : "bg-slate-400/30 text-slate-300 border-slate-400/50"
+                ? "bg-amber-500/50 text-amber-200 border-amber-400/70"
+                : "bg-slate-500/50 text-slate-200 border-slate-400/60"
             )}>
-              {captainBadge}
+              {captainBadge === 'C' ? 'C' : 'VC'}
             </span>
           )}
           {player.isInternational && (
@@ -241,48 +252,7 @@ export const PlayerCard = ({
         </div>
       )}
 
-      {/* Ownership / Action Area */}
-      <div className="flex items-center gap-2 z-10">
 
-
-        {showActions && (
-          <div className="flex items-center gap-1">
-            {onSetCaptain && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden sm:inline-flex h-10 w-10 text-amber-300 bg-amber-500/20 hover:bg-amber-500/40 border border-amber-400/30 font-black text-sm shadow-sm"
-                onClick={onSetCaptain}
-                title="Set as Captain (2× points)"
-              >
-                C
-              </Button>
-            )}
-            {onSetViceCaptain && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden sm:inline-flex h-10 w-10 text-slate-300 bg-slate-500/20 hover:bg-slate-500/40 border border-slate-400/30 font-black text-sm shadow-sm"
-                onClick={onSetViceCaptain}
-                title="Set as Vice-Captain (1.5× points)"
-              >
-                VC
-              </Button>
-            )}
-            {onTrade && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden sm:inline-flex h-10 w-10 text-white bg-secondary/20 hover:bg-secondary/40 border border-white/10"
-                onClick={onTrade}
-                title="Propose trade"
-              >
-                <Repeat className="w-5 h-5" />
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 };

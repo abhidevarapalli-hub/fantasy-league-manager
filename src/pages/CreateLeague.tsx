@@ -19,11 +19,11 @@ import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DEFAULT_SCORING_RULES, ScoringRules as ScoringRulesType, sanitizeScoringRules } from '@/lib/scoring-types';
 import type { Json } from '@/integrations/supabase/types';
-import { ScoringRulesForm } from '@/components/ScoringRulesForm';
+
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
-const STEP_LABELS = ['League Name', 'General Rules', 'Roster Configuration', 'Draft Settings', 'Scoring Rules', 'Team Identity'] as const;
+const STEP_LABELS = ['League Name', 'General Rules', 'Roster Configuration', 'Draft Settings', 'Team Identity'] as const;
 
 const CreateLeague = () => {
     const navigate = useNavigate();
@@ -436,7 +436,7 @@ const CreateLeague = () => {
                             <Trophy className="w-8 h-8 text-primary" />
                         </div>
                         <h1 className="text-4xl font-extrabold tracking-tight">Create New League</h1>
-                        <p className="text-muted-foreground text-lg italic">Step {step} of 6: {STEP_LABELS[step - 1]}</p>
+                        <p className="text-muted-foreground text-lg italic">Step {step} of 5: {STEP_LABELS[step - 1]}</p>
                     </div>
 
                     <Card className="border-2 border-primary/10 shadow-xl overflow-hidden glass-morphism">
@@ -446,16 +446,14 @@ const CreateLeague = () => {
                                     : step === 2 ? 'League Settings'
                                         : step === 3 ? 'Roster Requirements'
                                             : step === 4 ? 'Draft Settings'
-                                                : step === 5 ? 'Scoring Rules'
-                                                    : 'League Manager Setup'}
+                                                : 'League Manager Setup'}
                             </CardTitle>
                             <CardDescription>
                                 {step === 1 ? 'Choose a unique name for your competition.'
                                     : step === 2 ? 'Set the core structure of your league.'
                                         : step === 3 ? 'Configure team sizes and positional limits.'
                                             : step === 4 ? 'Set the parameters for your live draft.'
-                                                : step === 5 ? 'Configure how fantasy points are awarded. You can change these later.'
-                                                    : `Logged in as @${userProfile?.username || 'user'}. Choose your team name for this league.`}
+                                                : `Logged in as @${userProfile?.username || 'user'}. Choose your team name for this league.`}
                             </CardDescription>
                         </CardHeader>
 
@@ -733,11 +731,9 @@ const CreateLeague = () => {
                                 </div>
                             )}
 
-                            {step === 5 && (
-                                <ScoringRulesForm rules={scoringRules} onChange={setScoringRules} showTabs={false} />
-                            )}
 
-                            {step === 6 && (
+
+                            {step === 5 && (
                                 <div className="space-y-6">
                                     <div className="space-y-2">
                                         <Label htmlFor="teamName" className="text-base font-semibold">Your Team Name</Label>
@@ -768,22 +764,21 @@ const CreateLeague = () => {
 
                             <Button
                                 className="flex-1 h-12 text-lg font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
-                                onClick={() => step < 6 ? setStep(step + 1) : handleCreateLeague()}
+                                onClick={() => step < 5 ? setStep(step + 1) : handleCreateLeague()}
                                 disabled={
                                     loading ||
                                     (step === 1 && !leagueName) ||
                                     (step === 3 && !validationResult.isValid) ||
-                                    (step === 6 && !teamName)
+                                    (step === 5 && !teamName)
                                 }
                             >
                                 {loading ? (
                                     'Creating League...'
-                                ) : step < 6 ? (
+                                ) : step < 5 ? (
                                     <>
                                         {step === 1 ? 'Next: General Rules'
                                             : step === 2 ? 'Next: Roster Limits'
-                                                : step === 3 ? 'Next: Draft Settings'
-                                                    : step === 4 ? 'Next: Scoring Rules'
+                                                    : step === 3 ? 'Next: Draft Settings'
                                                         : 'Next: Team Setup'}
                                         <ChevronRight className="w-5 h-5 ml-2" />
                                     </>

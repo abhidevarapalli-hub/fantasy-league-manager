@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { RefreshCw, UserPlus, Copy, Check, ChevronDown } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { RefreshCw, UserPlus, Copy, Check, ChevronDown, BookOpen, Settings } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useParams } from 'react-router-dom';
 import { StandingsTable } from '@/components/StandingsTable';
 import { ScheduleGrid } from '@/components/ScheduleGrid';
 import { AppLayout } from '@/components/AppLayout';
@@ -21,6 +21,7 @@ import { useWeeklyScores } from '@/hooks/useWeeklyScores';
 
 const Dashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
+  const navigate = useNavigate();
 
   // Zustand selectors - only subscribe to what we need
   const managers = useGameStore(state => state.managers);
@@ -157,6 +158,53 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Scoring Rules CTA - shown before draft is finalized */}
+        {!draftState?.isFinalized && (
+          isLeagueManager ? (
+            <Card className="border-2 border-amber-500/30 bg-amber-500/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-amber-500" />
+                  Review & Customize Scoring Rules
+                </CardTitle>
+                <CardDescription>
+                  As League Manager, you can modify fantasy point values, strike rate bonuses, economy rate penalties, and more before the draft begins.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  onClick={() => navigate(`/${leagueId}/rules`)}
+                  className="bg-amber-500 hover:bg-amber-600 text-black font-bold"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Review & Edit Rules
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border border-border/50 bg-muted/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-muted-foreground" />
+                  Scoring Rules
+                </CardTitle>
+                <CardDescription>
+                  Review the scoring rules before the draft to understand how fantasy points are calculated.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/${leagueId}/rules`)}
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  View Rules
+                </Button>
+              </CardContent>
+            </Card>
+          )
         )}
 
         {/* Schedule Section */}

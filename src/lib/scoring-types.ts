@@ -96,7 +96,13 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
     lowScoreDismissal: -5,
     strikeRateBonuses: [
       { minSR: 0, maxSR: 99.99, points: -30, minBalls: 10 },
-      { minSR: 200.01, maxSR: 999.99, points: 30, minRuns: 10 },
+      { minSR: 100.01, maxSR: 110, points: -20, minBalls: 10 },
+      { minSR: 110.01, maxSR: 120, points: -10, minBalls: 10 },
+      { minSR: 120.01, maxSR: 140, points: 0, minRuns: 20 },
+      { minSR: 140.01, maxSR: 160, points: 10, minRuns: 20 },
+      { minSR: 160.01, maxSR: 180, points: 15, minRuns: 20 },
+      { minSR: 180.01, maxSR: 200, points: 20, minRuns: 20 },
+      { minSR: 200.01, maxSR: 999.99, points: 30, minRuns: 20 },
     ],
   },
   bowling: {
@@ -115,7 +121,14 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
     maidenOver: 40,
     economyRateBonuses: [
       { minER: 0, maxER: 3.99, points: 40, minOvers: 2 },
-      { minER: 10.01, maxER: 99.99, points: -15, minOvers: 2 },
+      { minER: 4, maxER: 5.99, points: 30, minOvers: 2 },
+      { minER: 6, maxER: 6.99, points: 20, minOvers: 2 },
+      { minER: 7, maxER: 7.99, points: 10, minOvers: 2 },
+      { minER: 8, maxER: 8.99, points: 0, minOvers: 2 },
+      { minER: 9, maxER: 9.99, points: -5, minOvers: 2 },
+      { minER: 10, maxER: 11.99, points: -15, minOvers: 2 },
+      { minER: 12, maxER: 14.99, points: -20, minOvers: 2 },
+      { minER: 15, maxER: 99.99, points: -30, minOvers: 2 },
     ],
   },
   fielding: {

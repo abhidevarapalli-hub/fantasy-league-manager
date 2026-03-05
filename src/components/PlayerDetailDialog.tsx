@@ -505,7 +505,7 @@ export function PlayerDetailDialog({
                                 )}
 
                                 {/* Bowling Breakdown */}
-                                {breakdownData.bowling.total !== 0 && (
+                                {(selectedMatch.overs ?? 0) > 0 || (selectedMatch.wickets ?? 0) > 0 ? (
                                     <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl overflow-hidden">
                                         <div className="bg-rose-500/10 px-4 py-2 font-bold text-[10px] uppercase tracking-widest text-rose-400 flex justify-between items-center">
                                             <span>Bowling</span>
@@ -564,7 +564,7 @@ export function PlayerDetailDialog({
                                             )}
                                         </div>
                                     </div>
-                                )}
+                                ) : null}
 
                                 {/* Fielding Breakdown */}
                                 {breakdownData.fielding.total !== 0 && (
