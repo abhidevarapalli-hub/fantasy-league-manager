@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trophy, Users, Shield, Layout, Save, ChevronRight, Globe, Zap, Timer } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Shield, Layout, Save, ChevronRight, Globe, Zap, Timer, CalendarDays, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -43,6 +44,47 @@ const CreateLeague = () => {
     const [draftDate, setDraftDate] = useState('');
     const [draftTime, setDraftTime] = useState('');
 
+    // Generate date options (Mar 12 - Mar 27, 2026) and time options (30-min intervals)
+    const draftDateOptions = useMemo(() => {
+        const now = new Date();
+        const options: { value: string; label: string; disabled: boolean }[] = [];
+        for (let day = 12; day <= 27; day++) {
+            const date = new Date(2026, 2, day); // month is 0-indexed, 2 = March
+            const value = `2026-03-${String(day).padStart(2, '0')}`;
+            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+            const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+            const suffix = day === 12 ? 'th' : day === 13 ? 'th' : day === 21 ? 'st' : day === 22 ? 'nd' : day === 23 ? 'rd' : 'th';
+            const label = `${dayName}, ${monthName} ${day}${suffix}`;
+            // Disable if the entire day has passed (compare date only)
+            const endOfDay = new Date(2026, 2, day, 23, 59, 59);
+            const disabled = endOfDay < now;
+            options.push({ value, label, disabled });
+        }
+        return options;
+    }, []);
+
+    const draftTimeOptions = useMemo(() => {
+        const now = new Date();
+        const options: { value: string; label: string; disabled: boolean }[] = [];
+        for (let hour = 0; hour < 24; hour++) {
+            for (const min of [0, 30]) {
+                const h12 = hour % 12 || 12;
+                const ampm = hour < 12 ? 'AM' : 'PM';
+                const label = `${h12}:${String(min).padStart(2, '0')} ${ampm}`;
+                const value = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+                // Disable if selected date is today and this time has passed
+                let disabled = false;
+                if (draftDate) {
+                    const [y, m, d] = draftDate.split('-').map(Number);
+                    const selectedDate = new Date(y, m - 1, d, hour, min);
+                    disabled = selectedDate < now;
+                }
+                options.push({ value, label, disabled });
+            }
+        }
+        return options;
+    }, [draftDate]);
+
     // Position Minimums (Defaults for Size 11)
     const [minBatWk, setMinBatWk] = useState(4);
     const [requireWk, setRequireWk] = useState(true);
@@ -56,6 +98,20 @@ const CreateLeague = () => {
         setMinAllRounders(defaults.minAllRounders);
         setRequireWk(true);
     }, [activeSize]);
+
+    // Adjust default roster sizes based on manager count
+    useEffect(() => {
+        if (managerCount >= 12) {
+            setActiveSize(7);
+            setBenchSize(2);
+        } else if (managerCount >= 10) {
+            setActiveSize(8);
+            setBenchSize(2);
+        } else {
+            setActiveSize(11);
+            setBenchSize(3);
+        }
+    }, [managerCount]);
 
     // Tournament Selection (default to IPL)
     const [selectedTournament, setSelectedTournament] = useState<Tournament>(
@@ -129,7 +185,8 @@ const CreateLeague = () => {
                 .insert({
                     ...baseLeagueData,
                     tournament_id: selectedTournament.id,
-                    tournament_name: selectedTournament.name
+                    tournament_name: selectedTournament.name,
+                    draft_scheduled_at: draftDate && draftTime ? new Date(`${draftDate}T${draftTime}:00`).toISOString() : null,
                 })
                 .select()
                 .single();
@@ -674,22 +731,50 @@ const CreateLeague = () => {
                                 <div className="space-y-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="space-y-4">
-                                            <Label className="font-semibold text-base">Draft Date</Label>
-                                            <Input
-                                                type="date"
-                                                value={draftDate}
-                                                onChange={(e) => setDraftDate(e.target.value)}
-                                                className="bg-background/50 border-primary/20 focus:border-primary text-lg h-12"
-                                            />
+                                            <Label className="font-semibold text-base flex items-center gap-2">
+                                                <CalendarDays className="w-4 h-4 text-primary" />
+                                                Draft Date
+                                            </Label>
+                                            <Select value={draftDate} onValueChange={(v) => {
+                                                setDraftDate(v);
+                                                // Clear time if switching to today and the currently selected time is in the past
+                                                if (draftTime) {
+                                                    const [y, m, d] = v.split('-').map(Number);
+                                                    const [hh, mm] = draftTime.split(':').map(Number);
+                                                    if (new Date(y, m - 1, d, hh, mm) < new Date()) {
+                                                        setDraftTime('');
+                                                    }
+                                                }
+                                            }}>
+                                                <SelectTrigger className="bg-background/50 border-primary/20 focus:border-primary text-base h-12">
+                                                    <SelectValue placeholder="Select a date" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {draftDateOptions.map((opt) => (
+                                                        <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+                                                            {opt.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                         <div className="space-y-4">
-                                            <Label className="font-semibold text-base">Draft Time</Label>
-                                            <Input
-                                                type="time"
-                                                value={draftTime}
-                                                onChange={(e) => setDraftTime(e.target.value)}
-                                                className="bg-background/50 border-primary/20 focus:border-primary text-lg h-12"
-                                            />
+                                            <Label className="font-semibold text-base flex items-center gap-2">
+                                                <Clock className="w-4 h-4 text-primary" />
+                                                Draft Time
+                                            </Label>
+                                            <Select value={draftTime} onValueChange={setDraftTime}>
+                                                <SelectTrigger className="bg-background/50 border-primary/20 focus:border-primary text-base h-12">
+                                                    <SelectValue placeholder="Select a time" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {draftTimeOptions.map((opt) => (
+                                                        <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+                                                            {opt.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
@@ -769,6 +854,7 @@ const CreateLeague = () => {
                                     loading ||
                                     (step === 1 && !leagueName) ||
                                     (step === 3 && !validationResult.isValid) ||
+                                    (step === 4 && (!draftDate || !draftTime)) ||
                                     (step === 5 && !teamName)
                                 }
                             >

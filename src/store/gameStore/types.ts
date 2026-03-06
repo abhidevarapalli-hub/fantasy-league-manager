@@ -42,6 +42,7 @@ export interface GameState {
   draftPicks: DraftPick[];
   draftOrder: DraftOrder[];
   draftState: DraftState | null;
+  draftScheduledAt: string | null;
   loading: boolean;
   currentLeagueId: string | null;
   isInitializing: boolean;
@@ -70,6 +71,7 @@ export interface GameState {
   setDraftPicks: (picks: DraftPick[]) => void;
   setDraftOrder: (order: DraftOrder[]) => void;
   setDraftState: (state: DraftState | null) => void;
+  setDraftScheduledAt: (draftScheduledAt: string | null) => void;
   setCurrentLeagueId: (id: string | null) => void;
   setIsInitializing: (isInitializing: boolean) => void;
   setInitializedLeagueId: (id: string | null) => void;

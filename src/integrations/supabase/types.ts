@@ -734,6 +734,7 @@ export type Database = {
           tournament_id: number | null
           tournament_name: string | null
           updated_at: string
+          draft_scheduled_at: string | null
         }
         Insert: {
           active_size?: number
@@ -762,6 +763,7 @@ export type Database = {
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
+          draft_scheduled_at?: string | null
         }
         Update: {
           active_size?: number
@@ -790,6 +792,7 @@ export type Database = {
           tournament_id?: number | null
           tournament_name?: string | null
           updated_at?: string
+          draft_scheduled_at?: string | null
         }
         Relationships: []
       }

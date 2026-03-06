@@ -40,6 +40,7 @@ export const useGameStore = create<GameState>()(
       draftPicks: [],
       draftOrder: [],
       draftState: null,
+      draftScheduledAt: null,
       loading: true,
       currentLeagueId: null,
       isInitializing: false,
@@ -68,6 +69,7 @@ export const useGameStore = create<GameState>()(
       setDraftPicks: (draftPicks) => set({ draftPicks }),
       setDraftOrder: (draftOrder) => set({ draftOrder }),
       setDraftState: (draftState) => set({ draftState }),
+      setDraftScheduledAt: (draftScheduledAt) => set({ draftScheduledAt }),
       setCurrentLeagueId: (currentLeagueId) => set({ currentLeagueId }),
       setIsInitializing: (isInitializing) => set({ isInitializing }),
       setInitializedLeagueId: (initializedLeagueId) => set({ initializedLeagueId }),
@@ -1123,6 +1125,7 @@ export const useGameStore = create<GameState>()(
               leagueName: leagueData.name as string,
               leagueOwnerId: leagueData.league_manager_id as string,
               tournamentId: (leagueData.tournament_id as number) || null,
+              draftScheduledAt: (leagueData.draft_scheduled_at as string) || null,
               currentWeek: dbCurrentWeek,
               selectedRosterWeek: dbCurrentWeek + 1,
               config: {

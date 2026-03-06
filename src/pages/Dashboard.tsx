@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { RefreshCw, UserPlus, Copy, Check, ChevronDown, BookOpen, Settings } from 'lucide-react';
+import { RefreshCw, UserPlus, Copy, Check, ChevronDown, BookOpen, Settings, Monitor } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { StandingsTable } from '@/components/StandingsTable';
@@ -19,6 +19,26 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useWeeklyScores } from '@/hooks/useWeeklyScores';
 
+interface CountdownTime {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  total: number;
+}
+
+function getCountdown(target: Date): CountdownTime {
+  const now = new Date();
+  const total = Math.max(0, target.getTime() - now.getTime());
+  return {
+    days: Math.floor(total / (1000 * 60 * 60 * 24)),
+    hours: Math.floor((total / (1000 * 60 * 60)) % 24),
+    minutes: Math.floor((total / (1000 * 60)) % 60),
+    seconds: Math.floor((total / 1000) % 60),
+    total,
+  };
+}
+
 const Dashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
   const navigate = useNavigate();
@@ -31,12 +51,35 @@ const Dashboard = () => {
   const loading = useGameStore(state => state.loading);
   const draftState = useGameStore(state => state.draftState);
   const leagueName = useGameStore(state => state.leagueName);
+  const draftScheduledAt = useGameStore(state => state.draftScheduledAt);
   const managerProfile = useAuthStore(state => state.managerProfile);
   const isLeagueManager = useAuthStore(state => state.isLeagueManager());
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
+
+  // Draft countdown timer
+  const draftTarget = useMemo(() => {
+    if (!draftScheduledAt) return null;
+    return new Date(draftScheduledAt);
+  }, [draftScheduledAt]);
+
+  const [countdown, setCountdown] = useState<CountdownTime | null>(
+    draftTarget ? getCountdown(draftTarget) : null
+  );
+
+  useEffect(() => {
+    if (!draftTarget) {
+      setCountdown(null);
+      return;
+    }
+    setCountdown(getCountdown(draftTarget));
+    const interval = setInterval(() => {
+      setCountdown(getCountdown(draftTarget));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [draftTarget]);
 
   // Initialize selected week when currentWeek loads
   useEffect(() => {
@@ -100,6 +143,22 @@ const Dashboard = () => {
     }));
   }, [schedule, calculatedScores]);
 
+  // Format the draft date/time for display in user's local timezone
+  const formattedDraftTime = useMemo(() => {
+    if (!draftTarget) return '';
+    const dayName = draftTarget.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = draftTarget.toLocaleDateString('en-US', { month: 'short' });
+    const day = draftTarget.getDate();
+    const suffix = day === 1 || day === 21 || day === 31 ? 'st'
+      : day === 2 || day === 22 ? 'nd'
+        : day === 3 || day === 23 ? 'rd' : 'th';
+    const time = draftTarget.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const tz = draftTarget.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+    return `${dayName}, ${month} ${day}${suffix} @ ${time} ${tz}`;
+  }, [draftTarget]);
+
+  const showDraftCountdown = draftTarget && countdown && countdown.total > 0 && !draftState?.isFinalized;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -125,6 +184,67 @@ const Dashboard = () => {
       }
     >
       <div className="px-4 py-6 space-y-8">
+
+        {/* Draft Countdown Card */}
+        {showDraftCountdown && (
+          <Card className="border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-background to-background overflow-hidden">
+            <CardContent className="pt-6 pb-6">
+              <div className="space-y-5">
+                {/* Header */}
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+                    <Monitor className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold tracking-tight">Draftboard</h3>
+                    <p className="text-sm text-muted-foreground">{formattedDraftTime}</p>
+                  </div>
+                </div>
+
+                {/* Countdown */}
+                <div className="flex items-center justify-center gap-1 py-3">
+                  {[
+                    { value: countdown.days, label: 'DAYS' },
+                    { value: countdown.hours, label: 'HRS' },
+                    { value: countdown.minutes, label: 'MINS' },
+                    { value: countdown.seconds, label: 'SECS' },
+                  ].map((unit, i) => (
+                    <div key={unit.label} className="flex items-center gap-1">
+                      {i > 0 && (
+                        <span className="text-2xl font-bold text-emerald-400 mx-1">:</span>
+                      )}
+                      <div className="flex flex-col items-center">
+                        <span className="text-4xl md:text-5xl font-extrabold tabular-nums text-emerald-400 leading-none">
+                          {String(unit.value).padStart(2, '0')}
+                        </span>
+                        <span className="text-[10px] font-bold text-muted-foreground tracking-widest mt-1">
+                          {unit.label}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/mock-draft/setup')}
+                    className="rounded-full font-bold border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 px-6"
+                  >
+                    MOCK
+                  </Button>
+                  <Button
+                    onClick={() => navigate(`/${leagueId}/draft`)}
+                    className="flex-1 rounded-full font-bold bg-transparent border-2 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-400 hover:text-emerald-300 text-base"
+                  >
+                    DRAFT ROOM
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Invite Card if needed */}
         {isLeagueManager && hasAvailableSlots && (!draftState || draftState.status === 'pre_draft') && (
