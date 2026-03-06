@@ -164,8 +164,8 @@ export const useDraft = () => {
 
     const actuallyUsedManagerId = expectedManagerId || currentManagerId;
 
-    console.log(`[useDraft] 🎯 Calling execute_draft_pick for ${playerId}`);
-    const { error } = await supabase.rpc('execute_draft_pick', {
+    console.log(`[useDraft] 🎯 Calling execute_draft_pick for ${playerId}${isAutoDraft ? ' (auto)' : ''}`);
+    const { data, error } = await supabase.rpc('execute_draft_pick', {
       p_league_id: leagueId,
       p_manager_id: actuallyUsedManagerId,
       p_player_id: playerId,
@@ -173,8 +173,30 @@ export const useDraft = () => {
     });
 
     if (error) {
-      toast.error('Failed to make pick: ' + error.message);
-      console.error(error);
+      // For auto-draft picks, silently log — multiple clients may race and only one wins
+      if (isAutoDraft) {
+        console.log('[useDraft] Auto-draft pick conflict (expected with multiple clients):', error.message);
+      } else {
+        toast.error('Failed to make pick: ' + error.message);
+        console.error(error);
+      }
+      return;
+    }
+
+    // Check the RPC return value for soft failures (not exceptions)
+    const result = data as { success?: boolean; reason?: string } | null;
+    if (result && result.success === false) {
+      if (!isAutoDraft) {
+        if (result.reason === 'player already drafted') {
+          toast.error('This player was just drafted by another team. Please pick a different player.');
+        } else if (result.reason === 'draft not active') {
+          toast.error('The draft is no longer active.');
+        } else {
+          toast.error('Pick failed: ' + (result.reason || 'Unknown error'));
+        }
+      } else {
+        console.log('[useDraft] Auto-draft soft failure:', result.reason);
+      }
     }
   }, [leagueId, draftState, draftOrder]);
 
