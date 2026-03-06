@@ -6,7 +6,7 @@ import { useGameStore } from '@/store/useGameStore';
 import { toast } from 'sonner';
 import { Player } from '@/lib/supabase-types';
 import { buildOptimalActive11 } from '@/lib/roster-validation';
-import { sortPlayersByPriority } from '@/lib/player-order';
+import { selectBestPlayer } from '@/lib/auto-draft-logic';
 import type { TablesInsert } from '@/integrations/supabase/types';
 
 export const useDraft = () => {
@@ -516,7 +516,7 @@ export const useDraft = () => {
       const pickData = getCurrentPickData();
       if (!pickData) return;
 
-      const { orderNode } = pickData;
+      const { round, position, orderNode } = pickData;
       const hasManager = !!orderNode?.managerId;
       const manager = hasManager ? managers.find(m => m.id === orderNode!.managerId) : null;
 
@@ -524,20 +524,34 @@ export const useDraft = () => {
       const orderItem = draftOrder.find(o => o.managerId === orderNode?.managerId);
       const isAutoDraftEnabled = orderItem?.autoDraftEnabled || !manager?.userId;
 
-      // If immediate (CPU/Auto) or time is up, trigger the check RPC
+      // If immediate (CPU/Auto) or time is up, make a smart auto-pick
       if (isAutoDraftEnabled || getRemainingTime() <= 0) {
         if (!processingPicksRef.current.has('checking')) {
           processingPicksRef.current.add('checking');
 
-          // Add a small random jitter to prevent multiple clients hitting the RPC at the exact same millisecond
+          // Add a small random jitter to prevent multiple clients hitting at the same time
           const jitter = Math.random() * 2000;
-
           await new Promise(resolve => setTimeout(resolve, jitter));
 
           try {
-            await supabase.rpc('check_auto_draft', { p_league_id: leagueId! });
+            // Build the team's current roster from draft picks
+            const managerId = orderNode?.managerId;
+            const teamPlayerIds = managerId
+              ? draftPicks.filter(p => p.managerId === managerId).map(p => p.playerId).filter(Boolean) as string[]
+              : [];
+
+            // Get available players (not yet drafted)
+            const draftedIds = getDraftedPlayerIds();
+            const availablePlayers = players.filter(p => !draftedIds.includes(p.id));
+
+            const config = useGameStore.getState().config;
+            const selectedPlayer = selectBestPlayer(teamPlayerIds, availablePlayers, players, config);
+
+            if (selectedPlayer) {
+              await makePick(round, position, selectedPlayer.id, true);
+            }
           } catch (e) {
-            console.error('[useDraft] Auto-draft check failed:', e);
+            console.error('[useDraft] Auto-draft pick failed:', e);
           } finally {
             // Wait at least 3 seconds before another check for this client
             setTimeout(() => processingPicksRef.current.delete('checking'), 3000);
@@ -548,9 +562,9 @@ export const useDraft = () => {
 
     tick();
 
-    const timer = setInterval(tick, 3000); // Check every 3 seconds instead of 2
+    const timer = setInterval(tick, 3000);
     return () => clearInterval(timer);
-  }, [draftState, getRemainingTime, managers, draftOrder, getCurrentPickData, leagueId]);
+  }, [draftState, getRemainingTime, managers, draftOrder, getCurrentPickData, leagueId, draftPicks, players, getDraftedPlayerIds, makePick]);
 
   // Auto-complete all remaining picks
   const autoCompleteAllPicks = useCallback(async () => {
@@ -638,38 +652,63 @@ export const useDraft = () => {
         }));
       }
 
-      // 2. Prepare picks
-      const draftedIds = getDraftedPlayerIds();
-      const availablePlayers = players.filter(p => !draftedIds.includes(p.id));
-      const sortedPlayers = sortPlayersByPriority(availablePlayers);
-
-      if (sortedPlayers.length < emptyPicks.length) {
-        toast.error(`Not enough players available. Need ${emptyPicks.length}, have ${sortedPlayers.length}`, { id: 'auto-draft-all' });
-        return false;
+      // 2. Prepare picks using roster-aware selection per manager
+      const draftedIds = new Set(getDraftedPlayerIds());
+      // Track per-manager rosters as we simulate picks
+      const managerRosters: Record<string, string[]> = {};
+      for (const order of effectiveDraftOrder) {
+        if (order.managerId) {
+          // Initialize with already-drafted players for this manager
+          managerRosters[order.managerId] = draftPicks
+            .filter(p => p.managerId === order.managerId && p.playerId)
+            .map(p => p.playerId as string);
+        }
       }
 
-      // Prepare all picks data for batch insert
-      const picksToInsert = emptyPicks.map((emptyPick, index) => {
-        // Find the manager assigned to this position in the effective order
-        const managerId = effectiveDraftOrder.find(o => o.position === emptyPick.position)?.managerId || null;
-        const player = sortedPlayers[index]; // Use index to get unique player
+      const picksToInsert: Array<{
+        league_id: string;
+        round: number;
+        pick_number: number;
+        manager_id: string | null;
+        player_id: string;
+        is_auto_draft: boolean;
+      }> = [];
 
-        // Calculate absolute pick number for batch insert
+      for (const emptyPick of emptyPicks) {
+        const managerId = effectiveDraftOrder.find(o => o.position === emptyPick.position)?.managerId || null;
+        const teamPlayerIds = managerId ? (managerRosters[managerId] || []) : [];
+
+        const availablePlayers = players.filter(p => !draftedIds.has(p.id));
+        const selectedPlayer = selectBestPlayer(teamPlayerIds, availablePlayers, players, config);
+
+        if (!selectedPlayer) {
+          toast.error(`Not enough eligible players for position ${emptyPick.position}, round ${emptyPick.round}`, { id: 'auto-draft-all' });
+          return false;
+        }
+
+        // Calculate absolute pick number
         const isRRoundEven = emptyPick.round % 2 === 0;
         const posInRound = isRRoundEven
           ? (totalPositions - emptyPick.position + 1)
           : emptyPick.position;
         const absolutePickNumber = ((emptyPick.round - 1) * totalPositions) + posInRound;
 
-        return {
+        picksToInsert.push({
           league_id: leagueId,
           round: emptyPick.round,
           pick_number: absolutePickNumber,
           manager_id: managerId,
-          player_id: player.id,
+          player_id: selectedPlayer.id,
           is_auto_draft: true,
-        };
-      });
+        });
+
+        // Track this pick so subsequent picks for same manager respect roster composition
+        draftedIds.add(selectedPlayer.id);
+        if (managerId) {
+          if (!managerRosters[managerId]) managerRosters[managerId] = [];
+          managerRosters[managerId].push(selectedPlayer.id);
+        }
+      }
 
       // Batch insert all picks at once
       const { data, error } = await supabase
