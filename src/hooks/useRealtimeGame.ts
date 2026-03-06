@@ -574,7 +574,6 @@ export const useRealtimeGame = (leagueId?: string) => {
           name,
           primary_role: role,
           is_international: isInternational,
-          teams: [team],
         })
         .select("id")
         .single();

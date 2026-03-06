@@ -1532,6 +1532,45 @@ export type Database = {
           },
         ]
       }
+      tournament_players: {
+        Row: {
+          created_at: string | null
+          id: string
+          player_id: string
+          team_code: string
+          tournament_id: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          player_id: string
+          team_code: string
+          tournament_id: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          player_id?: string
+          team_code?: string
+          tournament_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "league_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "master_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trade_players: {
         Row: {
           created_at: string | null
@@ -2152,6 +2191,7 @@ export type Database = {
       }
       is_league_manager_of: { Args: { p_league_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      pause_draft: { Args: { p_league_id: string }; Returns: Json }
       reconcile_match_states: {
         Args: never
         Returns: {
@@ -2174,6 +2214,7 @@ export type Database = {
         Args: { p_cricbuzz_match_id: number }
         Returns: undefined
       }
+      resume_draft: { Args: { p_league_id: string }; Returns: Json }
       sync_league_rosters: { Args: { p_league_id: string }; Returns: undefined }
       update_league_standings: {
         Args: { league_uuid: string }

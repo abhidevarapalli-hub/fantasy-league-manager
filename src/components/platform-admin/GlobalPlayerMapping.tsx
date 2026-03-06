@@ -18,9 +18,9 @@ import { searchPlayer, getPlayerProfileUrl } from '@/lib/cricbuzz-api';
 interface MasterPlayer {
   id: string;
   name: string;
-  teams: string[];
   primary_role: string;
   cricbuzz_id: string | null;
+  teams: string[]; // populated from tournament_players
 }
 
 interface CricbuzzSearchResult {
@@ -42,20 +42,38 @@ export const GlobalPlayerMapping = () => {
   const [manualId, setManualId] = useState('');
   const [filterUnmapped, setFilterUnmapped] = useState(false);
 
-  // Load all master players
+  // Load all master players with team affiliations from tournament_players
   useEffect(() => {
     const loadPlayers = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('master_players')
-        .select('id, name, teams, primary_role, cricbuzz_id')
-        .order('name');
+      const [{ data: mpData, error: mpError }, { data: tpData, error: tpError }] = await Promise.all([
+        supabase
+          .from('master_players')
+          .select('id, name, primary_role, cricbuzz_id')
+          .order('name'),
+        supabase
+          .from('tournament_players')
+          .select('player_id, team_code'),
+      ]);
 
-      if (error) {
-        console.error('Error loading master players:', error);
+      if (mpError) {
+        console.error('Error loading master players:', mpError);
         toast.error('Failed to load players');
       } else {
-        setPlayers(data ?? []);
+        if (tpError) console.error('Error loading tournament_players:', tpError);
+        // Build team map from tournament_players
+        const teamMap = new Map<string, string[]>();
+        for (const tp of (tpData ?? [])) {
+          const existing = teamMap.get(tp.player_id) ?? [];
+          if (!existing.includes(tp.team_code)) existing.push(tp.team_code);
+          teamMap.set(tp.player_id, existing);
+        }
+
+        const enriched: MasterPlayer[] = (mpData ?? []).map(p => ({
+          ...p,
+          teams: teamMap.get(p.id) ?? [],
+        }));
+        setPlayers(enriched);
       }
       setIsLoading(false);
     };

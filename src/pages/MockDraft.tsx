@@ -5,6 +5,7 @@ import { MockDraftBoard } from '@/components/MockDraftBoard';
 import { useMockStore } from '@/store/useMockStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Player } from '@/lib/supabase-types';
+import { getDefaultTournament } from '@/lib/tournaments';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -25,24 +26,24 @@ const MockDraft = () => {
 
         const fetchPlayers = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('master_players')
-                    .select('*')
-                    .order('id');
-
-                const iplTeams = ['CSK', 'DC', 'GT', 'KKR', 'LSG', 'MI', 'PBKS', 'RR', 'RCB', 'SRH'];
+                const { data } = await supabase
+                    .from('tournament_players')
+                    .select('player_id, team_code, master_players!inner(id, name, primary_role, is_international)')
+                    .eq('tournament_id', getDefaultTournament().id);
 
                 const mappedPlayers: Player[] = (data || [])
-                    .filter(p => p.teams && p.teams.some((t: string) => iplTeams.includes(t)))
-                    .map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        team: p.teams && p.teams.length > 0 ? p.teams[0] : 'Unknown', // Primary team
-                        role: p.primary_role as Player['role'],
-                        points: 0,
-                        isInternational: p.is_international,
-                        cricbuzz_id: null,
-                    }));
+                    .map(p => {
+                        const mp = p.master_players as unknown as { id: string; name: string; primary_role: string; is_international: boolean };
+                        return {
+                            id: mp.id,
+                            name: mp.name,
+                            team: p.team_code || 'Unknown',
+                            role: mp.primary_role as Player['role'],
+                            points: 0,
+                            isInternational: mp.is_international,
+                            cricbuzz_id: null,
+                        };
+                    });
 
                 setMasterPlayers(mappedPlayers);
             } catch (err) {

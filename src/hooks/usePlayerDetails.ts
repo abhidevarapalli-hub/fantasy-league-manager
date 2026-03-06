@@ -18,8 +18,6 @@ import {
   ScorecardResponse,
 } from '@/integrations/cricbuzz/client';
 import { supabase } from '@/integrations/supabase/client';
-import { TournamentPlayer } from '@/lib/cricket-types';
-
 /**
  * Ranking entry for a specific format
  */
@@ -156,7 +154,7 @@ export function useExtendedPlayer(playerId: string | null) {
 /**
  * Fetch detailed player information
  * Strategy: Database Cache First -> API Fallback -> Cache Update
- * @param cricbuzzPlayerId - The Cricbuzz player ID (from TournamentPlayer.id)
+ * @param cricbuzzPlayerId - The Cricbuzz player ID
  */
 export function usePlayerInfo(cricbuzzPlayerId: string | null) {
   return useQuery({
@@ -187,7 +185,7 @@ export function usePlayerInfo(cricbuzzPlayerId: string | null) {
           id: cricbuzzPlayerId,
           name: dbData.name || '',
           role: dbData.primary_role,
-          team: dbData.teams?.[0],
+          team: undefined,
           battingStyle: dbData.batting_style,
           bowlingStyle: dbData.bowling_style,
           birthPlace: dbData.birth_place,

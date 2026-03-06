@@ -174,7 +174,6 @@ export interface DbExtendedPlayer {
   birth_place: string | null;
   height: string | null;
   bio: string | null;
-  teams: string[] | null;
   created_at: string;
   updated_at: string;
 }

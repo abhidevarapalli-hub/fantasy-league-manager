@@ -611,7 +611,6 @@ export const useGameStore = create<GameState>()(
               name,
               primary_role: role,
               is_international: isInternational,
-              teams: [team],
             })
             .select("id")
             .single();

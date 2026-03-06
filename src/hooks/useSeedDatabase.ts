@@ -315,7 +315,6 @@ export const useSeedDatabase = () => {
             name: p.name,
             primary_role: p.role,
             is_international: isInternationalPlayer(p.name),
-            teams: [p.team]
           });
         }
       }
@@ -385,50 +384,37 @@ export const useSeedDatabase = () => {
         }
       }
 
-      const targetTeams = tournament?.teams || [];
-      const testTeam = isInternational ? 'NAM' : 'CSK';
-      // Fallback to testTeam if targetTeams is empty, though it shouldn't be for supported tournaments
-      const teamsToCheck = targetTeams.length > 0 ? targetTeams : [testTeam];
-
       const { count: masterCount } = await supabase
-        .from("master_players")
+        .from("tournament_players")
         .select("*", { count: "exact", head: true })
-        .overlaps("teams", teamsToCheck);
+        .eq("tournament_id", tournamentId);
 
       const hasLocalData = (masterCount || 0) > 10;
 
       if (hasLocalData && !forceRefresh) {
-        console.log(`[Seed] found local data for ${teamsToCheck.join(',')} (${masterCount} players). Using local master_players.`);
+        console.log(`[Seed] found local data for tournament ${tournamentId} (${masterCount} players). Using tournament_players.`);
 
-        const targetTeams = tournament?.teams || [];
+        const { data: localPlayers } = await supabase
+          .from("tournament_players")
+          .select("player_id, team_code")
+          .eq("tournament_id", tournamentId);
 
-        if (targetTeams.length > 0) {
-          const { data: localPlayers } = await supabase
-            .from("master_players")
-            .select("id, teams")
-            .overlaps("teams", targetTeams);
+        if (localPlayers && localPlayers.length > 0) {
+          console.log(`[Seed] Found ${localPlayers.length} players locally. Linking to league...`);
 
-          if (localPlayers && localPlayers.length > 200) {
-            console.log(`[Seed] Found ${localPlayers.length} players locally. Linking to league...`);
+          const poolInserts = localPlayers.map(p => ({
+            league_id: leagueId,
+            player_id: p.player_id,
+            team_override: p.team_code
+          }));
 
-            const poolInserts = localPlayers.map(p => {
-              // Find which team matched (first match)
-              const team = p.teams?.find((t: string) => targetTeams.includes(t)) || p.teams?.[0] || 'UNK';
-              return {
-                league_id: leagueId,
-                player_id: p.id,
-                team_override: team
-              };
-            });
-
-            const chunkSize = 100;
-            for (let i = 0; i < poolInserts.length; i += chunkSize) {
-              const chunk = poolInserts.slice(i, i + chunkSize);
-              const { error } = await supabase.from("league_player_pool").upsert(chunk, { onConflict: 'league_id,player_id' });
-              if (error) console.error("Error linking chunk:", error);
-            }
-            return true;
+          const chunkSize = 100;
+          for (let i = 0; i < poolInserts.length; i += chunkSize) {
+            const chunk = poolInserts.slice(i, i + chunkSize);
+            const { error } = await supabase.from("league_player_pool").upsert(chunk, { onConflict: 'league_id,player_id' });
+            if (error) console.error("Error linking chunk:", error);
           }
+          return true;
         }
       }
 
@@ -492,7 +478,6 @@ export const useSeedDatabase = () => {
         image_id: number | undefined;
         batting_style: string | undefined;
         bowling_style: string | undefined;
-        teams: string[];
         team_code: string;
       }
       const allPlayers: SeedPlayer[] = [];
@@ -516,7 +501,6 @@ export const useSeedDatabase = () => {
             image_id: player.imageId,
             batting_style: player.battingStyle,
             bowling_style: player.bowlingStyle,
-            teams: [teamCode],
             team_code: teamCode
           });
         }
@@ -538,7 +522,6 @@ export const useSeedDatabase = () => {
           image_id: p.image_id,
           batting_style: p.batting_style,
           bowling_style: p.bowling_style,
-          teams: p.teams,
         }));
 
         if (validPayload.length > 0) {
@@ -571,7 +554,7 @@ export const useSeedDatabase = () => {
             leagueInserts.push({ league_id: leagueId, player_id: existing.id, team_override: p.team_code });
           } else {
             const { data: newP } = await supabase.from("master_players").insert({
-              name: p.name, primary_role: p.primary_role, is_international: p.is_international, teams: p.teams
+              name: p.name, primary_role: p.primary_role, is_international: p.is_international,
             }).select("id").single();
             if (newP) leagueInserts.push({ league_id: leagueId, player_id: newP.id, team_override: p.team_code });
           }
@@ -582,6 +565,18 @@ export const useSeedDatabase = () => {
         const chunk = leagueInserts.slice(i, i + 100);
         const { error } = await supabase.from("league_player_pool").upsert(chunk, { onConflict: 'league_id,player_id' });
         if (error) console.error("Error linking pool:", error);
+      }
+
+      // Upsert tournament_players for this tournament
+      const tournamentInserts = leagueInserts.map(li => ({
+        player_id: li.player_id,
+        tournament_id: tournamentId,
+        team_code: li.team_override
+      }));
+      for (let i = 0; i < tournamentInserts.length; i += 100) {
+        const chunk = tournamentInserts.slice(i, i + 100);
+        const { error } = await supabase.from("tournament_players").upsert(chunk, { onConflict: 'player_id,tournament_id' });
+        if (error) console.error("Error upserting tournament_players:", error);
       }
 
       return true;
