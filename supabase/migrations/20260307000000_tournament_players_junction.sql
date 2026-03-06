@@ -67,21 +67,26 @@ BEGIN
     -- Delete conflicting rows that couldn't be updated
     DELETE FROM league_player_pool WHERE player_id = r.old_id;
 
+    -- manager_roster: unique on (player_id, league_id, week)
     UPDATE manager_roster SET player_id = r.new_id WHERE player_id = r.old_id
       AND NOT EXISTS (
         SELECT 1 FROM manager_roster mr2
-        WHERE mr2.manager_id = manager_roster.manager_id AND mr2.player_id = r.new_id
+        WHERE mr2.player_id = r.new_id
+          AND mr2.league_id = manager_roster.league_id
+          AND mr2.week = manager_roster.week
       );
     DELETE FROM manager_roster WHERE player_id = r.old_id;
 
-    UPDATE draft_picks SET player_id = r.new_id WHERE player_id = r.old_id;
-
-    UPDATE match_player_stats SET player_id = r.new_id WHERE player_id = r.old_id
+    -- draft_picks: unique on (league_id, player_id)
+    UPDATE draft_picks SET player_id = r.new_id WHERE player_id = r.old_id
       AND NOT EXISTS (
-        SELECT 1 FROM match_player_stats mps2
-        WHERE mps2.match_id = match_player_stats.match_id AND mps2.player_id = r.new_id
+        SELECT 1 FROM draft_picks dp2
+        WHERE dp2.league_id = draft_picks.league_id AND dp2.player_id = r.new_id
       );
-    DELETE FROM match_player_stats WHERE player_id = r.old_id;
+    DELETE FROM draft_picks WHERE player_id = r.old_id;
+
+    -- match_player_stats: player_id has no unique constraint
+    UPDATE match_player_stats SET player_id = r.new_id WHERE player_id = r.old_id;
 
     UPDATE league_player_match_scores SET player_id = r.new_id WHERE player_id = r.old_id
       AND NOT EXISTS (

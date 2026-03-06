@@ -27,10 +27,15 @@ const BASE_URL = import.meta.env.DEV
   : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cricbuzz-proxy?endpoint=`;
 
 // Common headers for all requests
-const getHeaders = () => ({
-  'x-rapidapi-key': RAPIDAPI_KEY,
-  'x-rapidapi-host': RAPIDAPI_HOST,
-});
+// In production, the edge function proxy adds RapidAPI credentials server-side,
+// so we only need these headers in dev mode (where Vite proxies directly to Cricbuzz).
+const getHeaders = (): Record<string, string> =>
+  import.meta.env.DEV
+    ? {
+        'x-rapidapi-key': RAPIDAPI_KEY,
+        'x-rapidapi-host': RAPIDAPI_HOST,
+      }
+    : {};
 
 // Custom error class for API errors
 export class CricbuzzApiError extends Error {
