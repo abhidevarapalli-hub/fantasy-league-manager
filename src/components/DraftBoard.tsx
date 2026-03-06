@@ -362,7 +362,7 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
     const targetRound = round ?? selectedCell?.round;
     const targetPosition = position ?? selectedCell?.position;
 
-    if (!targetRound || !targetPosition || isEffectivelyReadOnly) return;
+    if (!targetRound || !targetPosition || draftState?.isFinalized) return;
 
     setIsSubmitting(true);
     try {
