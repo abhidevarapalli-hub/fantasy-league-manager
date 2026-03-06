@@ -172,162 +172,162 @@ INSERT INTO scoring_rules (league_id, rules) VALUES (
 -- -----------------------------------------------
 -- INDIA (T20 WC) — 15 players
 -- -----------------------------------------------
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000001', 'Virat Kohli', 'Batsman', '1413', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000002', 'Rohit Sharma', 'Batsman', '576', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000003', 'Jasprit Bumrah', 'Bowler', '9311', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000004', 'Suryakumar Yadav', 'Batsman', '7915', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000005', 'Ravindra Jadeja', 'All Rounder', '587', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000006', 'Rishabh Pant', 'Wicket Keeper', '10744', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000007', 'Hardik Pandya', 'All Rounder', '9647', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000008', 'Kuldeep Yadav', 'Bowler', '8292', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000009', 'Mohammed Siraj', 'Bowler', '10808', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000010', 'Shubman Gill', 'Batsman', '11808', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000011', 'Yashasvi Jaiswal', 'Batsman', '13940', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000012', 'Axar Patel', 'All Rounder', '8808', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000013', 'Arshdeep Singh', 'Bowler', '10532', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000014', 'Sanju Samson', 'Wicket Keeper', '8271', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000015', 'Yuzvendra Chahal', 'Bowler', '7910', ARRAY['India'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000001', 'Virat Kohli', 'Batsman', '1413', true),
+  ('30000000-0000-0000-0000-000000000002', 'Rohit Sharma', 'Batsman', '576', true),
+  ('30000000-0000-0000-0000-000000000003', 'Jasprit Bumrah', 'Bowler', '9311', true),
+  ('30000000-0000-0000-0000-000000000004', 'Suryakumar Yadav', 'Batsman', '7915', true),
+  ('30000000-0000-0000-0000-000000000005', 'Ravindra Jadeja', 'All Rounder', '587', true),
+  ('30000000-0000-0000-0000-000000000006', 'Rishabh Pant', 'Wicket Keeper', '10744', true),
+  ('30000000-0000-0000-0000-000000000007', 'Hardik Pandya', 'All Rounder', '9647', true),
+  ('30000000-0000-0000-0000-000000000008', 'Kuldeep Yadav', 'Bowler', '8292', true),
+  ('30000000-0000-0000-0000-000000000009', 'Mohammed Siraj', 'Bowler', '10808', true),
+  ('30000000-0000-0000-0000-000000000010', 'Shubman Gill', 'Batsman', '11808', true),
+  ('30000000-0000-0000-0000-000000000011', 'Yashasvi Jaiswal', 'Batsman', '13940', true),
+  ('30000000-0000-0000-0000-000000000012', 'Axar Patel', 'All Rounder', '8808', true),
+  ('30000000-0000-0000-0000-000000000013', 'Arshdeep Singh', 'Bowler', '10532', true),
+  ('30000000-0000-0000-0000-000000000014', 'Sanju Samson', 'Wicket Keeper', '8271', true),
+  ('30000000-0000-0000-0000-000000000015', 'Yuzvendra Chahal', 'Bowler', '7910', true);
 
 -- -----------------------------------------------
 -- AUSTRALIA (T20 WC) — 15 players
 -- -----------------------------------------------
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000016', 'Pat Cummins', 'Bowler', '8095', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000017', 'Travis Head', 'Batsman', '8497', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000018', 'Mitchell Starc', 'Bowler', '7710', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000019', 'Steve Smith', 'Batsman', '2250', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000020', 'David Warner', 'Batsman', '1739', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000021', 'Glenn Maxwell', 'All Rounder', '7662', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000022', 'Josh Hazlewood', 'Bowler', '6258', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000023', 'Mitchell Marsh', 'All Rounder', '6250', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000024', 'Adam Zampa', 'Bowler', '8642', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000025', 'Marcus Stoinis', 'All Rounder', '8989', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000026', 'Alex Carey', 'Wicket Keeper', '9200', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000027', 'Cameron Green', 'All Rounder', '12225', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000028', 'Nathan Ellis', 'Bowler', '15480', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000029', 'Tim David', 'Batsman', '13169', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000030', 'Matt Short', 'All Rounder', '9456', ARRAY['Australia'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000016', 'Pat Cummins', 'Bowler', '8095', true),
+  ('30000000-0000-0000-0000-000000000017', 'Travis Head', 'Batsman', '8497', true),
+  ('30000000-0000-0000-0000-000000000018', 'Mitchell Starc', 'Bowler', '7710', true),
+  ('30000000-0000-0000-0000-000000000019', 'Steve Smith', 'Batsman', '2250', true),
+  ('30000000-0000-0000-0000-000000000020', 'David Warner', 'Batsman', '1739', true),
+  ('30000000-0000-0000-0000-000000000021', 'Glenn Maxwell', 'All Rounder', '7662', true),
+  ('30000000-0000-0000-0000-000000000022', 'Josh Hazlewood', 'Bowler', '6258', true),
+  ('30000000-0000-0000-0000-000000000023', 'Mitchell Marsh', 'All Rounder', '6250', true),
+  ('30000000-0000-0000-0000-000000000024', 'Adam Zampa', 'Bowler', '8642', true),
+  ('30000000-0000-0000-0000-000000000025', 'Marcus Stoinis', 'All Rounder', '8989', true),
+  ('30000000-0000-0000-0000-000000000026', 'Alex Carey', 'Wicket Keeper', '9200', true),
+  ('30000000-0000-0000-0000-000000000027', 'Cameron Green', 'All Rounder', '12225', true),
+  ('30000000-0000-0000-0000-000000000028', 'Nathan Ellis', 'Bowler', '15480', true),
+  ('30000000-0000-0000-0000-000000000029', 'Tim David', 'Batsman', '13169', true),
+  ('30000000-0000-0000-0000-000000000030', 'Matt Short', 'All Rounder', '9456', true);
 
 -- -----------------------------------------------
 -- PAKISTAN (T20 WC) — 15 players
 -- -----------------------------------------------
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000031', 'Babar Azam', 'Batsman', '8359', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000032', 'Shaheen Afridi', 'Bowler', '12160', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000033', 'Mohammad Rizwan', 'Wicket Keeper', '9468', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000034', 'Fakhar Zaman', 'Batsman', '10863', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000035', 'Shadab Khan', 'All Rounder', '11186', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000036', 'Haris Rauf', 'Bowler', '14561', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000037', 'Naseem Shah', 'Bowler', '14247', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000038', 'Iftikhar Ahmed', 'All Rounder', '10799', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000039', 'Imad Wasim', 'All Rounder', '10408', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000040', 'Mohammad Nawaz', 'All Rounder', '8367', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000041', 'Saim Ayub', 'Batsman', '14241', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000042', 'Abrar Ahmed', 'Bowler', '12555', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000043', 'Mohammad Amir', 'Bowler', '1917', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000044', 'Azam Khan', 'Wicket Keeper', '3747', ARRAY['Pakistan'], true),
-  ('30000000-0000-0000-0000-000000000045', 'Usman Khan', 'Batsman', '19013', ARRAY['Pakistan'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000031', 'Babar Azam', 'Batsman', '8359', true),
+  ('30000000-0000-0000-0000-000000000032', 'Shaheen Afridi', 'Bowler', '12160', true),
+  ('30000000-0000-0000-0000-000000000033', 'Mohammad Rizwan', 'Wicket Keeper', '9468', true),
+  ('30000000-0000-0000-0000-000000000034', 'Fakhar Zaman', 'Batsman', '10863', true),
+  ('30000000-0000-0000-0000-000000000035', 'Shadab Khan', 'All Rounder', '11186', true),
+  ('30000000-0000-0000-0000-000000000036', 'Haris Rauf', 'Bowler', '14561', true),
+  ('30000000-0000-0000-0000-000000000037', 'Naseem Shah', 'Bowler', '14247', true),
+  ('30000000-0000-0000-0000-000000000038', 'Iftikhar Ahmed', 'All Rounder', '10799', true),
+  ('30000000-0000-0000-0000-000000000039', 'Imad Wasim', 'All Rounder', '10408', true),
+  ('30000000-0000-0000-0000-000000000040', 'Mohammad Nawaz', 'All Rounder', '8367', true),
+  ('30000000-0000-0000-0000-000000000041', 'Saim Ayub', 'Batsman', '14241', true),
+  ('30000000-0000-0000-0000-000000000042', 'Abrar Ahmed', 'Bowler', '12555', true),
+  ('30000000-0000-0000-0000-000000000043', 'Mohammad Amir', 'Bowler', '1917', true),
+  ('30000000-0000-0000-0000-000000000044', 'Azam Khan', 'Wicket Keeper', '3747', true),
+  ('30000000-0000-0000-0000-000000000045', 'Usman Khan', 'Batsman', '19013', true);
 
 -- -----------------------------------------------
 -- ENGLAND (T20 WC) — 15 players
 -- -----------------------------------------------
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000046', 'Jos Buttler', 'Wicket Keeper', '2258', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000047', 'Joe Root', 'Batsman', '8019', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000048', 'Ben Stokes', 'All Rounder', '6557', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000049', 'Jofra Archer', 'Bowler', '11540', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000050', 'Mark Wood', 'Bowler', '8383', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000051', 'Adil Rashid', 'Bowler', '1742', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000052', 'Moeen Ali', 'All Rounder', '6692', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000053', 'Harry Brook', 'Batsman', '12201', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000054', 'Phil Salt', 'Batsman', '10479', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000055', 'Liam Livingstone', 'All Rounder', '10045', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000056', 'Sam Curran', 'All Rounder', '10420', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000057', 'Chris Jordan', 'Bowler', '6532', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000058', 'Reece Topley', 'Bowler', '8349', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000059', 'Jonny Bairstow', 'Wicket Keeper', '6507', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000060', 'Will Jacks', 'All Rounder', '12258', ARRAY['England'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000046', 'Jos Buttler', 'Wicket Keeper', '2258', true),
+  ('30000000-0000-0000-0000-000000000047', 'Joe Root', 'Batsman', '8019', true),
+  ('30000000-0000-0000-0000-000000000048', 'Ben Stokes', 'All Rounder', '6557', true),
+  ('30000000-0000-0000-0000-000000000049', 'Jofra Archer', 'Bowler', '11540', true),
+  ('30000000-0000-0000-0000-000000000050', 'Mark Wood', 'Bowler', '8383', true),
+  ('30000000-0000-0000-0000-000000000051', 'Adil Rashid', 'Bowler', '1742', true),
+  ('30000000-0000-0000-0000-000000000052', 'Moeen Ali', 'All Rounder', '6692', true),
+  ('30000000-0000-0000-0000-000000000053', 'Harry Brook', 'Batsman', '12201', true),
+  ('30000000-0000-0000-0000-000000000054', 'Phil Salt', 'Batsman', '10479', true),
+  ('30000000-0000-0000-0000-000000000055', 'Liam Livingstone', 'All Rounder', '10045', true),
+  ('30000000-0000-0000-0000-000000000056', 'Sam Curran', 'All Rounder', '10420', true),
+  ('30000000-0000-0000-0000-000000000057', 'Chris Jordan', 'Bowler', '6532', true),
+  ('30000000-0000-0000-0000-000000000058', 'Reece Topley', 'Bowler', '8349', true),
+  ('30000000-0000-0000-0000-000000000059', 'Jonny Bairstow', 'Wicket Keeper', '6507', true),
+  ('30000000-0000-0000-0000-000000000060', 'Will Jacks', 'All Rounder', '12258', true);
 
 -- -----------------------------------------------
 -- NEW ZEALAND (T20 WC) — 15 players
 -- -----------------------------------------------
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000061', 'Kane Williamson', 'Batsman', '6326', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000062', 'Trent Boult', 'Bowler', '8117', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000063', 'Devon Conway', 'Batsman', '9838', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000064', 'Tim Southee', 'Bowler', '1057', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000065', 'Glenn Phillips', 'Batsman', '10693', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000066', 'Daryl Mitchell', 'All Rounder', '10713', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000067', 'Mitchell Santner', 'All Rounder', '10100', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000068', 'Lockie Ferguson', 'Bowler', '10692', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000069', 'Rachin Ravindra', 'All Rounder', '11177', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000070', 'Mark Chapman', 'Batsman', '9976', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000071', 'Tom Latham', 'Wicket Keeper', '8216', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000072', 'Matt Henry', 'Bowler', '9067', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000073', 'Ish Sodhi', 'Bowler', '8561', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000074', 'James Neesham', 'All Rounder', '8983', ARRAY['New Zealand'], true),
-  ('30000000-0000-0000-0000-000000000075', 'Finn Allen', 'Batsman', '11172', ARRAY['New Zealand'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000061', 'Kane Williamson', 'Batsman', '6326', true),
+  ('30000000-0000-0000-0000-000000000062', 'Trent Boult', 'Bowler', '8117', true),
+  ('30000000-0000-0000-0000-000000000063', 'Devon Conway', 'Batsman', '9838', true),
+  ('30000000-0000-0000-0000-000000000064', 'Tim Southee', 'Bowler', '1057', true),
+  ('30000000-0000-0000-0000-000000000065', 'Glenn Phillips', 'Batsman', '10693', true),
+  ('30000000-0000-0000-0000-000000000066', 'Daryl Mitchell', 'All Rounder', '10713', true),
+  ('30000000-0000-0000-0000-000000000067', 'Mitchell Santner', 'All Rounder', '10100', true),
+  ('30000000-0000-0000-0000-000000000068', 'Lockie Ferguson', 'Bowler', '10692', true),
+  ('30000000-0000-0000-0000-000000000069', 'Rachin Ravindra', 'All Rounder', '11177', true),
+  ('30000000-0000-0000-0000-000000000070', 'Mark Chapman', 'Batsman', '9976', true),
+  ('30000000-0000-0000-0000-000000000071', 'Tom Latham', 'Wicket Keeper', '8216', true),
+  ('30000000-0000-0000-0000-000000000072', 'Matt Henry', 'Bowler', '9067', true),
+  ('30000000-0000-0000-0000-000000000073', 'Ish Sodhi', 'Bowler', '8561', true),
+  ('30000000-0000-0000-0000-000000000074', 'James Neesham', 'All Rounder', '8983', true),
+  ('30000000-0000-0000-0000-000000000075', 'Finn Allen', 'Batsman', '11172', true);
 
 -- -----------------------------------------------
 -- AFGHANISTAN (T20 WC) — 15 players
 -- -----------------------------------------------
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000076', 'Rashid Khan', 'Bowler', '3669', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000077', 'Ibrahim Zadran', 'Batsman', '12173', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000078', 'Rahmanullah Gurbaz', 'Wicket Keeper', '13213', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000079', 'Fazalhaq Farooqi', 'Bowler', '14282', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000080', 'Naveen-ul-Haq', 'Bowler', '11289', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000081', 'Azmatullah Omarzai', 'All Rounder', '13214', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000082', 'Najibullah Zadran', 'Batsman', '8375', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000083', 'Mohammad Nabi', 'All Rounder', '3007', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000084', 'Mujeeb Ur Rahman', 'Bowler', '12071', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000085', 'Gulbadin Naib', 'All Rounder', '8030', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000086', 'Karim Janat', 'All Rounder', '11077', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000087', 'Noor Ahmad', 'Bowler', '15452', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000088', 'Hazratullah Zazai', 'Batsman', '12068', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000089', 'Sediqullah Atal', 'Batsman', '14204', ARRAY['Afghanistan'], true),
-  ('30000000-0000-0000-0000-000000000090', 'Ikram Alikhil', 'Wicket Keeper', '11071', ARRAY['Afghanistan'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000076', 'Rashid Khan', 'Bowler', '3669', true),
+  ('30000000-0000-0000-0000-000000000077', 'Ibrahim Zadran', 'Batsman', '12173', true),
+  ('30000000-0000-0000-0000-000000000078', 'Rahmanullah Gurbaz', 'Wicket Keeper', '13213', true),
+  ('30000000-0000-0000-0000-000000000079', 'Fazalhaq Farooqi', 'Bowler', '14282', true),
+  ('30000000-0000-0000-0000-000000000080', 'Naveen-ul-Haq', 'Bowler', '11289', true),
+  ('30000000-0000-0000-0000-000000000081', 'Azmatullah Omarzai', 'All Rounder', '13214', true),
+  ('30000000-0000-0000-0000-000000000082', 'Najibullah Zadran', 'Batsman', '8375', true),
+  ('30000000-0000-0000-0000-000000000083', 'Mohammad Nabi', 'All Rounder', '3007', true),
+  ('30000000-0000-0000-0000-000000000084', 'Mujeeb Ur Rahman', 'Bowler', '12071', true),
+  ('30000000-0000-0000-0000-000000000085', 'Gulbadin Naib', 'All Rounder', '8030', true),
+  ('30000000-0000-0000-0000-000000000086', 'Karim Janat', 'All Rounder', '11077', true),
+  ('30000000-0000-0000-0000-000000000087', 'Noor Ahmad', 'Bowler', '15452', true),
+  ('30000000-0000-0000-0000-000000000088', 'Hazratullah Zazai', 'Batsman', '12068', true),
+  ('30000000-0000-0000-0000-000000000089', 'Sediqullah Atal', 'Batsman', '14204', true),
+  ('30000000-0000-0000-0000-000000000090', 'Ikram Alikhil', 'Wicket Keeper', '11071', true);
 
 -- -----------------------------------------------
 -- SOUTH AFRICA (T20 WC) — 15 players
 -- -----------------------------------------------
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000091', 'Quinton de Kock', 'Wicket Keeper', '8520', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000092', 'Kagiso Rabada', 'Bowler', '9585', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000093', 'Aiden Markram', 'Batsman', '9582', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000094', 'David Miller', 'Batsman', '6349', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000095', 'Anrich Nortje', 'Bowler', '11427', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000096', 'Marco Jansen', 'All Rounder', '14565', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000097', 'Heinrich Klaasen', 'Wicket Keeper', '10209', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000098', 'Keshav Maharaj', 'Bowler', '9720', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000099', 'Tristan Stubbs', 'Batsman', '19243', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000100', 'Reeza Hendricks', 'Batsman', '9491', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000101', 'Lungi Ngidi', 'Bowler', '9603', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000102', 'Tabraiz Shamsi', 'Bowler', '10173', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000103', 'Rassie van der Dussen', 'Batsman', '9554', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000104', 'Gerald Coetzee', 'Bowler', '13320', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000105', 'Ryan Rickelton', 'Batsman', '13070', ARRAY['South Africa'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000091', 'Quinton de Kock', 'Wicket Keeper', '8520', true),
+  ('30000000-0000-0000-0000-000000000092', 'Kagiso Rabada', 'Bowler', '9585', true),
+  ('30000000-0000-0000-0000-000000000093', 'Aiden Markram', 'Batsman', '9582', true),
+  ('30000000-0000-0000-0000-000000000094', 'David Miller', 'Batsman', '6349', true),
+  ('30000000-0000-0000-0000-000000000095', 'Anrich Nortje', 'Bowler', '11427', true),
+  ('30000000-0000-0000-0000-000000000096', 'Marco Jansen', 'All Rounder', '14565', true),
+  ('30000000-0000-0000-0000-000000000097', 'Heinrich Klaasen', 'Wicket Keeper', '10209', true),
+  ('30000000-0000-0000-0000-000000000098', 'Keshav Maharaj', 'Bowler', '9720', true),
+  ('30000000-0000-0000-0000-000000000099', 'Tristan Stubbs', 'Batsman', '19243', true),
+  ('30000000-0000-0000-0000-000000000100', 'Reeza Hendricks', 'Batsman', '9491', true),
+  ('30000000-0000-0000-0000-000000000101', 'Lungi Ngidi', 'Bowler', '9603', true),
+  ('30000000-0000-0000-0000-000000000102', 'Tabraiz Shamsi', 'Bowler', '10173', true),
+  ('30000000-0000-0000-0000-000000000103', 'Rassie van der Dussen', 'Batsman', '9554', true),
+  ('30000000-0000-0000-0000-000000000104', 'Gerald Coetzee', 'Bowler', '13320', true),
+  ('30000000-0000-0000-0000-000000000105', 'Ryan Rickelton', 'Batsman', '13070', true);
 
 -- -----------------------------------------------
 -- WEST INDIES (T20 WC) — 15 players
 -- -----------------------------------------------
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000106', 'Nicholas Pooran', 'Wicket Keeper', '9406', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000107', 'Andre Russell', 'All Rounder', '7736', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000108', 'Shimron Hetmyer', 'Batsman', '9789', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000109', 'Shai Hope', 'Wicket Keeper', '10384', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000110', 'Alzarri Joseph', 'Bowler', '11220', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000111', 'Akeal Hosein', 'Bowler', '8435', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000112', 'Kyle Mayers', 'All Rounder', '8440', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000113', 'Rovman Powell', 'Batsman', '11445', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000114', 'Brandon King', 'Batsman', '9791', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000115', 'Gudakesh Motie', 'Bowler', '9793', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000116', 'Roston Chase', 'All Rounder', '11543', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000117', 'Obed McCoy', 'Bowler', '11221', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000118', 'Johnson Charles', 'Batsman', '8101', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000119', 'Romario Shepherd', 'All Rounder', '13646', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000120', 'Shamar Joseph', 'Bowler', '50458', ARRAY['West Indies'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000106', 'Nicholas Pooran', 'Wicket Keeper', '9406', true),
+  ('30000000-0000-0000-0000-000000000107', 'Andre Russell', 'All Rounder', '7736', true),
+  ('30000000-0000-0000-0000-000000000108', 'Shimron Hetmyer', 'Batsman', '9789', true),
+  ('30000000-0000-0000-0000-000000000109', 'Shai Hope', 'Wicket Keeper', '10384', true),
+  ('30000000-0000-0000-0000-000000000110', 'Alzarri Joseph', 'Bowler', '11220', true),
+  ('30000000-0000-0000-0000-000000000111', 'Akeal Hosein', 'Bowler', '8435', true),
+  ('30000000-0000-0000-0000-000000000112', 'Kyle Mayers', 'All Rounder', '8440', true),
+  ('30000000-0000-0000-0000-000000000113', 'Rovman Powell', 'Batsman', '11445', true),
+  ('30000000-0000-0000-0000-000000000114', 'Brandon King', 'Batsman', '9791', true),
+  ('30000000-0000-0000-0000-000000000115', 'Gudakesh Motie', 'Bowler', '9793', true),
+  ('30000000-0000-0000-0000-000000000116', 'Roston Chase', 'All Rounder', '11543', true),
+  ('30000000-0000-0000-0000-000000000117', 'Obed McCoy', 'Bowler', '11221', true),
+  ('30000000-0000-0000-0000-000000000118', 'Johnson Charles', 'Batsman', '8101', true),
+  ('30000000-0000-0000-0000-000000000119', 'Romario Shepherd', 'All Rounder', '13646', true),
+  ('30000000-0000-0000-0000-000000000120', 'Shamar Joseph', 'Bowler', '50458', true);
 
 -- -----------------------------------------------
 -- IPL FRANCHISE PLAYERS (150 players, 10 teams × 15)
@@ -338,154 +338,154 @@ INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_inter
 -- CSK — Chennai Super Kings (15 players)
 -- Shared: Jadeja (005), Moeen Ali (052), Conway (063), Gurbaz (078), Rachin Ravindra (069), Noor Ahmad (087)
 -- Deepak Chahar (126) moved to MI; Mukesh Choudhary (240) added as replacement
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000121', 'Ruturaj Gaikwad', 'Batsman', '11813', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000122', 'MS Dhoni', 'Wicket Keeper', '265', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000123', 'Matheesha Pathirana', 'Bowler', '16458', ARRAY['Sri Lanka'], true),
-  ('30000000-0000-0000-0000-000000000125', 'Shardul Thakur', 'All Rounder', '8683', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000126', 'Deepak Chahar', 'Bowler', '7836', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000127', 'Shivam Dube', 'All Rounder', '11195', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000128', 'Ravichandran Ashwin', 'Bowler', '1593', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000129', 'Ajinkya Rahane', 'Batsman', '1447', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000130', 'Tushar Deshpande', 'Bowler', '11307', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000240', 'Mukesh Choudhary', 'Bowler', '13184', ARRAY['India'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000121', 'Ruturaj Gaikwad', 'Batsman', '11813', true),
+  ('30000000-0000-0000-0000-000000000122', 'MS Dhoni', 'Wicket Keeper', '265', true),
+  ('30000000-0000-0000-0000-000000000123', 'Matheesha Pathirana', 'Bowler', '16458', true),
+  ('30000000-0000-0000-0000-000000000125', 'Shardul Thakur', 'All Rounder', '8683', true),
+  ('30000000-0000-0000-0000-000000000126', 'Deepak Chahar', 'Bowler', '7836', true),
+  ('30000000-0000-0000-0000-000000000127', 'Shivam Dube', 'All Rounder', '11195', true),
+  ('30000000-0000-0000-0000-000000000128', 'Ravichandran Ashwin', 'Bowler', '1593', true),
+  ('30000000-0000-0000-0000-000000000129', 'Ajinkya Rahane', 'Batsman', '1447', true),
+  ('30000000-0000-0000-0000-000000000130', 'Tushar Deshpande', 'Bowler', '11307', true),
+  ('30000000-0000-0000-0000-000000000240', 'Mukesh Choudhary', 'Bowler', '13184', true);
 
 -- MI — Mumbai Indians (15 players)
 -- Shared: Rohit (002), Bumrah (003), Hardik (007), Tim David (029), Suryakumar (004),
 --         Trent Boult (062), Will Jacks (060), Deepak Chahar (126)
 -- Pooran moved to LSG; Sherfane Rutherford (241) added as replacement
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000132', 'Ishan Kishan', 'Wicket Keeper', '10276', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000133', 'Tilak Varma', 'Batsman', '14504', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000136', 'Dewald Brevis', 'Batsman', '20538', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000137', 'Piyush Chawla', 'Bowler', '466', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000138', 'Nehal Wadhera', 'Batsman', '13915', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000139', 'Naman Dhir', 'All Rounder', '36139', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000241', 'Sherfane Rutherford', 'All Rounder', '13748', ARRAY['West Indies'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000132', 'Ishan Kishan', 'Wicket Keeper', '10276', true),
+  ('30000000-0000-0000-0000-000000000133', 'Tilak Varma', 'Batsman', '14504', true),
+  ('30000000-0000-0000-0000-000000000136', 'Dewald Brevis', 'Batsman', '20538', true),
+  ('30000000-0000-0000-0000-000000000137', 'Piyush Chawla', 'Bowler', '466', true),
+  ('30000000-0000-0000-0000-000000000138', 'Nehal Wadhera', 'Batsman', '13915', true),
+  ('30000000-0000-0000-0000-000000000139', 'Naman Dhir', 'All Rounder', '36139', true),
+  ('30000000-0000-0000-0000-000000000241', 'Sherfane Rutherford', 'All Rounder', '13748', true);
 
 -- RCB — Royal Challengers Bengaluru (15 players)
 -- Shared: Kohli (001), Hazlewood (022), Glenn Maxwell (021), Mohammed Siraj (009),
 --         Lockie Ferguson (068), Liam Livingstone (055)
 -- Phil Salt moved to KKR; Mahipal Lomror (242) added as replacement
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000142', 'Faf du Plessis', 'Batsman', '7825', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000144', 'Dinesh Karthik', 'Wicket Keeper', '145', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000146', 'Rajat Patidar', 'Batsman', '10636', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000147', 'Swapnil Singh', 'All Rounder', '10238', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000148', 'Yash Dayal', 'Bowler', '14172', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000149', 'Vyshak Vijaykumar', 'Bowler', '10486', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000150', 'Manoj Bhandage', 'All Rounder', '13962', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000151', 'Suyash Sharma', 'Bowler', '36487', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000242', 'Mahipal Lomror', 'All Rounder', '10954', ARRAY['India'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000142', 'Faf du Plessis', 'Batsman', '7825', true),
+  ('30000000-0000-0000-0000-000000000144', 'Dinesh Karthik', 'Wicket Keeper', '145', true),
+  ('30000000-0000-0000-0000-000000000146', 'Rajat Patidar', 'Batsman', '10636', true),
+  ('30000000-0000-0000-0000-000000000147', 'Swapnil Singh', 'All Rounder', '10238', true),
+  ('30000000-0000-0000-0000-000000000148', 'Yash Dayal', 'Bowler', '14172', true),
+  ('30000000-0000-0000-0000-000000000149', 'Vyshak Vijaykumar', 'Bowler', '10486', true),
+  ('30000000-0000-0000-0000-000000000150', 'Manoj Bhandage', 'All Rounder', '13962', true),
+  ('30000000-0000-0000-0000-000000000151', 'Suyash Sharma', 'Bowler', '36487', true),
+  ('30000000-0000-0000-0000-000000000242', 'Mahipal Lomror', 'All Rounder', '10954', true);
 
 -- KKR — Kolkata Knight Riders (15 players)
 -- Shared: Russell (107), Phil Salt (054)
 -- Starc moved to DC, SKY moved to MI; Manish Pandey (243) and Allah Ghazanfar (251) added
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000154', 'Shreyas Iyer', 'Batsman', '9428', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000155', 'Rinku Singh', 'Batsman', '10896', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000156', 'Sunil Narine', 'All Rounder', '2276', ARRAY['West Indies'], true),
-  ('30000000-0000-0000-0000-000000000157', 'Varun Chakravarthy', 'Bowler', '12926', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000158', 'Venkatesh Iyer', 'All Rounder', '10917', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000159', 'Nitish Rana', 'Batsman', '9204', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000160', 'Harshit Rana', 'Bowler', '24729', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000161', 'Ramandeep Singh', 'All Rounder', '12337', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000162', 'Anukul Roy', 'All Rounder', '12344', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000163', 'Vaibhav Arora', 'Bowler', '15861', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000165', 'Angkrish Raghuvanshi', 'Batsman', '22566', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000243', 'Manish Pandey', 'Batsman', '1836', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000251', 'Allah Ghazanfar', 'Bowler', '36501', ARRAY['Afghanistan'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000154', 'Shreyas Iyer', 'Batsman', '9428', true),
+  ('30000000-0000-0000-0000-000000000155', 'Rinku Singh', 'Batsman', '10896', true),
+  ('30000000-0000-0000-0000-000000000156', 'Sunil Narine', 'All Rounder', '2276', true),
+  ('30000000-0000-0000-0000-000000000157', 'Varun Chakravarthy', 'Bowler', '12926', true),
+  ('30000000-0000-0000-0000-000000000158', 'Venkatesh Iyer', 'All Rounder', '10917', true),
+  ('30000000-0000-0000-0000-000000000159', 'Nitish Rana', 'Batsman', '9204', true),
+  ('30000000-0000-0000-0000-000000000160', 'Harshit Rana', 'Bowler', '24729', true),
+  ('30000000-0000-0000-0000-000000000161', 'Ramandeep Singh', 'All Rounder', '12337', true),
+  ('30000000-0000-0000-0000-000000000162', 'Anukul Roy', 'All Rounder', '12344', true),
+  ('30000000-0000-0000-0000-000000000163', 'Vaibhav Arora', 'Bowler', '15861', true),
+  ('30000000-0000-0000-0000-000000000165', 'Angkrish Raghuvanshi', 'Batsman', '22566', true),
+  ('30000000-0000-0000-0000-000000000243', 'Manish Pandey', 'Batsman', '1836', true),
+  ('30000000-0000-0000-0000-000000000251', 'Allah Ghazanfar', 'Bowler', '36501', true);
 
 -- DC — Delhi Capitals (15 players)
 -- Shared: Pant (006), Axar (012), Kuldeep (008), Mitchell Starc (018),
 --         Tristan Stubbs (099), Harry Brook (053)
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000166', 'Jake Fraser-McGurk', 'Batsman', '14501', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000168', 'Abishek Porel', 'Wicket Keeper', '24326', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000170', 'Ishant Sharma', 'Bowler', '702', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000171', 'Khaleel Ahmed', 'Bowler', '10952', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000172', 'Mukesh Kumar', 'Bowler', '10754', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000173', 'Pravin Dubey', 'Bowler', '10484', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000174', 'Kumar Kushagra', 'Wicket Keeper', '15779', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000175', 'Ricky Bhui', 'Batsman', '9425', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000176', 'Sumit Kumar', 'Batsman', '10305', ARRAY['India'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000166', 'Jake Fraser-McGurk', 'Batsman', '14501', true),
+  ('30000000-0000-0000-0000-000000000168', 'Abishek Porel', 'Wicket Keeper', '24326', true),
+  ('30000000-0000-0000-0000-000000000170', 'Ishant Sharma', 'Bowler', '702', true),
+  ('30000000-0000-0000-0000-000000000171', 'Khaleel Ahmed', 'Bowler', '10952', true),
+  ('30000000-0000-0000-0000-000000000172', 'Mukesh Kumar', 'Bowler', '10754', true),
+  ('30000000-0000-0000-0000-000000000173', 'Pravin Dubey', 'Bowler', '10484', true),
+  ('30000000-0000-0000-0000-000000000174', 'Kumar Kushagra', 'Wicket Keeper', '15779', true),
+  ('30000000-0000-0000-0000-000000000175', 'Ricky Bhui', 'Batsman', '9425', true),
+  ('30000000-0000-0000-0000-000000000176', 'Sumit Kumar', 'Batsman', '10305', true);
 
 -- GT — Gujarat Titans (15 players)
 -- Shared: Gill (010), Rashid Khan (076), Azmatullah Omarzai (081), Kane Williamson (061)
 -- Noor Ahmad moved to CSK; Mohit Sharma (244) added as replacement
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000178', 'Sai Sudharsan', 'Batsman', '13866', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000179', 'Wriddhiman Saha', 'Wicket Keeper', '1465', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000180', 'Mohammed Shami', 'Bowler', '7909', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000182', 'Sai Kishore', 'Bowler', '11595', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000183', 'Vijay Shankar', 'All Rounder', '8204', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000184', 'Abhinav Manohar', 'Batsman', '10499', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000185', 'Darshan Nalkande', 'All Rounder', '12779', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000186', 'Spencer Johnson', 'Bowler', '13143', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000188', 'Matthew Wade', 'Wicket Keeper', '1649', ARRAY['Australia'], true),
-  ('30000000-0000-0000-0000-000000000190', 'Rahul Tewatia', 'All Rounder', '9693', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000244', 'Mohit Sharma', 'Bowler', '8181', ARRAY['India'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000178', 'Sai Sudharsan', 'Batsman', '13866', true),
+  ('30000000-0000-0000-0000-000000000179', 'Wriddhiman Saha', 'Wicket Keeper', '1465', true),
+  ('30000000-0000-0000-0000-000000000180', 'Mohammed Shami', 'Bowler', '7909', true),
+  ('30000000-0000-0000-0000-000000000182', 'Sai Kishore', 'Bowler', '11595', true),
+  ('30000000-0000-0000-0000-000000000183', 'Vijay Shankar', 'All Rounder', '8204', true),
+  ('30000000-0000-0000-0000-000000000184', 'Abhinav Manohar', 'Batsman', '10499', true),
+  ('30000000-0000-0000-0000-000000000185', 'Darshan Nalkande', 'All Rounder', '12779', true),
+  ('30000000-0000-0000-0000-000000000186', 'Spencer Johnson', 'Bowler', '13143', true),
+  ('30000000-0000-0000-0000-000000000188', 'Matthew Wade', 'Wicket Keeper', '1649', true),
+  ('30000000-0000-0000-0000-000000000190', 'Rahul Tewatia', 'All Rounder', '9693', true),
+  ('30000000-0000-0000-0000-000000000244', 'Mohit Sharma', 'Bowler', '8181', true);
 
 -- LSG — Lucknow Super Giants (15 players)
 -- Shared: Marcus Stoinis (025), Naveen-ul-Haq (080), Matt Henry (072),
 --         Nicholas Pooran (106), Quinton de Kock (091)
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000191', 'KL Rahul', 'Wicket Keeper', '8733', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000193', 'Ravi Bishnoi', 'Bowler', '14659', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000194', 'Krunal Pandya', 'All Rounder', '11311', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000195', 'Avesh Khan', 'Bowler', '9781', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000196', 'Devdutt Padikkal', 'Batsman', '13088', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000197', 'Ayush Badoni', 'Batsman', '13907', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000198', 'Deepak Hooda', 'All Rounder', '9427', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000203', 'Mohsin Khan', 'Bowler', '3651', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000245', 'Manan Vohra', 'Batsman', '8358', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000246', 'Prerak Mankad', 'All Rounder', '11054', ARRAY['India'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000191', 'KL Rahul', 'Wicket Keeper', '8733', true),
+  ('30000000-0000-0000-0000-000000000193', 'Ravi Bishnoi', 'Bowler', '14659', true),
+  ('30000000-0000-0000-0000-000000000194', 'Krunal Pandya', 'All Rounder', '11311', true),
+  ('30000000-0000-0000-0000-000000000195', 'Avesh Khan', 'Bowler', '9781', true),
+  ('30000000-0000-0000-0000-000000000196', 'Devdutt Padikkal', 'Batsman', '13088', true),
+  ('30000000-0000-0000-0000-000000000197', 'Ayush Badoni', 'Batsman', '13907', true),
+  ('30000000-0000-0000-0000-000000000198', 'Deepak Hooda', 'All Rounder', '9427', true),
+  ('30000000-0000-0000-0000-000000000203', 'Mohsin Khan', 'Bowler', '3651', true),
+  ('30000000-0000-0000-0000-000000000245', 'Manan Vohra', 'Batsman', '8358', true),
+  ('30000000-0000-0000-0000-000000000246', 'Prerak Mankad', 'All Rounder', '11054', true);
 
 -- PBKS — Punjab Kings (15 players)
 -- Shared: Arshdeep (013), Bairstow (059), Sam Curran (056), Kagiso Rabada (092),
 --         Nathan Ellis (028), Jaiswal (011)
 -- Liam Livingstone moved to RCB; Josh Inglis (247) added as replacement
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000204', 'Shikhar Dhawan', 'Batsman', '1446', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000207', 'Jitesh Sharma', 'Wicket Keeper', '10214', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000209', 'Rahul Chahar', 'Bowler', '12087', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000210', 'Prabhsimran Singh', 'Batsman', '14254', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000211', 'Harpreet Brar', 'All Rounder', '14452', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000213', 'Atharva Taide', 'Batsman', '13914', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000214', 'Vishwanath Pratap Singh', 'Bowler', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000215', 'Rilee Rossouw', 'Batsman', '2244', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000247', 'Josh Inglis', 'Wicket Keeper', '10637', ARRAY['Australia'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000204', 'Shikhar Dhawan', 'Batsman', '1446', true),
+  ('30000000-0000-0000-0000-000000000207', 'Jitesh Sharma', 'Wicket Keeper', '10214', true),
+  ('30000000-0000-0000-0000-000000000209', 'Rahul Chahar', 'Bowler', '12087', true),
+  ('30000000-0000-0000-0000-000000000210', 'Prabhsimran Singh', 'Batsman', '14254', true),
+  ('30000000-0000-0000-0000-000000000211', 'Harpreet Brar', 'All Rounder', '14452', true),
+  ('30000000-0000-0000-0000-000000000213', 'Atharva Taide', 'Batsman', '13914', true),
+  ('30000000-0000-0000-0000-000000000214', 'Vishwanath Pratap Singh', 'Bowler', NULL, true),
+  ('30000000-0000-0000-0000-000000000215', 'Rilee Rossouw', 'Batsman', '2244', true),
+  ('30000000-0000-0000-0000-000000000247', 'Josh Inglis', 'Wicket Keeper', '10637', true);
 
 -- RR — Rajasthan Royals (15 players)
 -- Shared: Buttler (046), Chahal (015), Samson (014), Shimron Hetmyer (108)
 -- Trent Boult moved to MI, Ashwin stays in CSK, Avesh Khan stays in LSG
 -- Replacements: Wanindu Hasaranga (248), Maheesh Theekshana (249), Prasidh Krishna (250)
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000218', 'Riyan Parag', 'All Rounder', '12305', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000219', 'Dhruv Jurel', 'Wicket Keeper', '14691', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000221', 'Sandeep Sharma', 'Bowler', '8356', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000222', 'Navdeep Saini', 'Bowler', '9715', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000223', 'Nandre Burger', 'Bowler', '13630', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000224', 'Donovan Ferreira', 'All Rounder', '14798', ARRAY['South Africa'], true),
-  ('30000000-0000-0000-0000-000000000225', 'Tom Kohler-Cadmore', 'Batsman', '10033', ARRAY['England'], true),
-  ('30000000-0000-0000-0000-000000000226', 'Kunal Rathore', 'Batsman', NULL, ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000248', 'Wanindu Hasaranga', 'All Rounder', '10926', ARRAY['Sri Lanka'], true),
-  ('30000000-0000-0000-0000-000000000249', 'Maheesh Theekshana', 'Bowler', '18504', ARRAY['Sri Lanka'], true),
-  ('30000000-0000-0000-0000-000000000250', 'Prasidh Krishna', 'Bowler', '10551', ARRAY['India'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000218', 'Riyan Parag', 'All Rounder', '12305', true),
+  ('30000000-0000-0000-0000-000000000219', 'Dhruv Jurel', 'Wicket Keeper', '14691', true),
+  ('30000000-0000-0000-0000-000000000221', 'Sandeep Sharma', 'Bowler', '8356', true),
+  ('30000000-0000-0000-0000-000000000222', 'Navdeep Saini', 'Bowler', '9715', true),
+  ('30000000-0000-0000-0000-000000000223', 'Nandre Burger', 'Bowler', '13630', true),
+  ('30000000-0000-0000-0000-000000000224', 'Donovan Ferreira', 'All Rounder', '14798', true),
+  ('30000000-0000-0000-0000-000000000225', 'Tom Kohler-Cadmore', 'Batsman', '10033', true),
+  ('30000000-0000-0000-0000-000000000226', 'Kunal Rathore', 'Batsman', NULL, true),
+  ('30000000-0000-0000-0000-000000000248', 'Wanindu Hasaranga', 'All Rounder', '10926', true),
+  ('30000000-0000-0000-0000-000000000249', 'Maheesh Theekshana', 'Bowler', '18504', true),
+  ('30000000-0000-0000-0000-000000000250', 'Prasidh Krishna', 'Bowler', '10551', true);
 
 -- SRH — Sunrisers Hyderabad (15 players)
 -- Shared: Head (017), Klaasen (097), Cummins (016), Glenn Phillips (065), Marco Jansen (096)
-INSERT INTO master_players (id, name, primary_role, cricbuzz_id, teams, is_international) VALUES
-  ('30000000-0000-0000-0000-000000000228', 'Abhishek Sharma', 'All Rounder', '12086', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000229', 'Bhuvneshwar Kumar', 'Bowler', '1726', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000230', 'Umran Malik', 'Bowler', '19027', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000231', 'Washington Sundar', 'All Rounder', '10945', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000232', 'Abdul Samad', 'Batsman', '14628', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000233', 'Rahul Tripathi', 'Batsman', '9012', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000235', 'Mayank Agarwal', 'Batsman', '2195', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000236', 'Jaydev Unadkat', 'Bowler', '6327', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000238', 'Anmolpreet Singh', 'Batsman', '10947', ARRAY['India'], true),
-  ('30000000-0000-0000-0000-000000000239', 'Nitish Reddy', 'All Rounder', '1464774', ARRAY['India'], true);
+INSERT INTO master_players (id, name, primary_role, cricbuzz_id, is_international) VALUES
+  ('30000000-0000-0000-0000-000000000228', 'Abhishek Sharma', 'All Rounder', '12086', true),
+  ('30000000-0000-0000-0000-000000000229', 'Bhuvneshwar Kumar', 'Bowler', '1726', true),
+  ('30000000-0000-0000-0000-000000000230', 'Umran Malik', 'Bowler', '19027', true),
+  ('30000000-0000-0000-0000-000000000231', 'Washington Sundar', 'All Rounder', '10945', true),
+  ('30000000-0000-0000-0000-000000000232', 'Abdul Samad', 'Batsman', '14628', true),
+  ('30000000-0000-0000-0000-000000000233', 'Rahul Tripathi', 'Batsman', '9012', true),
+  ('30000000-0000-0000-0000-000000000235', 'Mayank Agarwal', 'Batsman', '2195', true),
+  ('30000000-0000-0000-0000-000000000236', 'Jaydev Unadkat', 'Bowler', '6327', true),
+  ('30000000-0000-0000-0000-000000000238', 'Anmolpreet Singh', 'Batsman', '10947', true),
+  ('30000000-0000-0000-0000-000000000239', 'Nitish Reddy', 'All Rounder', '1464774', true);
 
 -- =============================================
 -- 4. League player pool — T20 WC league

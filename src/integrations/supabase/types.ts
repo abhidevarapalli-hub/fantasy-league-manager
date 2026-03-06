@@ -1030,7 +1030,6 @@ export type Database = {
           is_international: boolean | null
           name: string
           primary_role: string
-          teams: string[] | null
           updated_at: string | null
         }
         Insert: {
@@ -1048,7 +1047,6 @@ export type Database = {
           is_international?: boolean | null
           name: string
           primary_role: string
-          teams?: string[] | null
           updated_at?: string | null
         }
         Update: {
@@ -1066,7 +1064,6 @@ export type Database = {
           is_international?: boolean | null
           name?: string
           primary_role?: string
-          teams?: string[] | null
           updated_at?: string | null
         }
         Relationships: []

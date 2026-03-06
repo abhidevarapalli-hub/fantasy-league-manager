@@ -68,7 +68,7 @@ CREATE TABLE player_id_mapping (
 -- Insert players that have extended_players records (with cricbuzz_id)
 INSERT INTO master_players (
   cricbuzz_id, name, primary_role, is_international,
-  image_id, batting_style, bowling_style, dob, birth_place, height, bio, teams
+  image_id, batting_style, bowling_style, dob, birth_place, height, bio
 )
 SELECT DISTINCT ON (ep.cricbuzz_id)
   ep.cricbuzz_id,
@@ -81,20 +81,18 @@ SELECT DISTINCT ON (ep.cricbuzz_id)
   ep.dob,
   ep.birth_place,
   ep.height,
-  ep.bio,
-  COALESCE(ep.teams, ARRAY[p.team])
+  ep.bio
 FROM extended_players ep
 JOIN players p ON ep.player_id = p.id
 WHERE ep.cricbuzz_id IS NOT NULL AND ep.cricbuzz_id != ''
 ORDER BY ep.cricbuzz_id, ep.updated_at DESC NULLS LAST;
 
 -- Insert players without cricbuzz_id (deduplicate by name + role)
-INSERT INTO master_players (name, primary_role, is_international, teams)
+INSERT INTO master_players (name, primary_role, is_international)
 SELECT DISTINCT ON (LOWER(TRIM(p.name)), p.role)
   p.name,
   p.role,
-  p.is_international,
-  ARRAY[p.team]
+  p.is_international
 FROM players p
 LEFT JOIN extended_players ep ON p.id = ep.player_id
 WHERE (ep.player_id IS NULL OR ep.cricbuzz_id IS NULL OR ep.cricbuzz_id = '')
