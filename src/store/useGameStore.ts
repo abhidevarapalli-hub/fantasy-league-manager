@@ -144,6 +144,13 @@ export const useGameStore = create<GameState>()(
 
         if (!manager || !player || !currentLeagueId) return;
 
+        // Race condition guard: verify player isn't already on a roster
+        const allRosteredIds = new Set(managers.flatMap(m => [...m.activeRoster, ...m.bench]));
+        if (allRosteredIds.has(playerId)) {
+          toast.error(`${player.name} is already on a roster`);
+          return;
+        }
+
         const ROSTER_CAP = config.activeSize + config.benchSize;
         const rosterCount = manager.activeRoster.length + manager.bench.length;
         if (rosterCount >= ROSTER_CAP && !dropPlayerId) return;
@@ -224,10 +231,25 @@ export const useGameStore = create<GameState>()(
             return;
           }
         } else {
-          // No drop player, append to available space
-          if (manager.activeRoster.length < config.activeSize) {
-            slotType = 'active';
-            position = manager.activeRoster.length;
+          // No drop player — validate before placing into active roster
+          const currentActivePlayers = manager.activeRoster
+            .map(id => players.find(p => p.id === id))
+            .filter(Boolean) as Player[];
+          const validation = canAddToActive(currentActivePlayers, player, config);
+
+          if (manager.activeRoster.length < config.activeSize && validation.isValid) {
+            // Find a role-compatible empty slot in the active roster layout
+            const slots = getActiveRosterSlots(currentActivePlayers, config);
+            const compatibleSlotIdx = slots.findIndex(
+              s => !s.filled && isRoleCompatible(player.role as PlayerRole, s.role)
+            );
+            if (compatibleSlotIdx !== -1) {
+              slotType = 'active';
+              position = compatibleSlotIdx;
+            } else {
+              slotType = 'bench';
+              position = manager.bench.length;
+            }
           } else {
             slotType = 'bench';
             position = manager.bench.length;

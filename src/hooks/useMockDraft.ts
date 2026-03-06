@@ -28,7 +28,8 @@ export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
   const makeUserPick = useCallback((playerId: string) => {
     if (!draft || draft.status !== 'in_progress') return;
 
-    const teamIndex = draft.userPosition - 1;
+    // Use snake-order to determine the correct team index for this pick
+    const teamIndex = getTeamForPick(draft.currentRound, draft.currentPickIndex);
     const newPick: MockDraftPick = {
       round: draft.currentRound,
       position: draft.currentPickIndex + 1,
@@ -58,7 +59,7 @@ export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
       lastPickAt: new Date().toISOString(),
       pausedAt: null,
     });
-  }, [draftId, draft, TEAMS, ROUNDS, updateDraft]);
+  }, [draftId, draft, TEAMS, ROUNDS, updateDraft, getTeamForPick]);
 
   // Stop auto picks on unmount
   useEffect(() => {
@@ -145,7 +146,11 @@ export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
     const currentTeamIndex = getTeamForPick(currentDraft.currentRound, currentDraft.currentPickIndex);
     const userTeamIndex = currentDraft.userPosition - 1;
 
-    if (currentTeamIndex === userTeamIndex) return; // User's turn
+    if (currentTeamIndex === userTeamIndex) {
+      // It's now the user's turn — reset the timer so they get the full duration
+      useMockStore.getState().updateDraft(draftId, { lastPickAt: new Date().toISOString() });
+      return;
+    }
 
     const updates = processAutoPick(currentDraft, sortedPlayers);
     if (updates) {
@@ -157,6 +162,9 @@ export const useMockDraft = (draftId: string, allPlayers: Player[]) => {
           timeoutRef.current = setTimeout(() => {
             if (!abortRef.current) runAutoPickLoop();
           }, AUTO_PICK_DELAY);
+        } else {
+          // Next pick is the user's — reset their timer so they get full duration
+          useMockStore.getState().updateDraft(draftId, { lastPickAt: new Date().toISOString() });
         }
       }
     }

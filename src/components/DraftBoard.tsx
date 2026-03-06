@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { X, User, Plane, Timer, Pause, Play, RefreshCw, Shuffle, Bot, CheckCircle, AlertCircle, Flag, Zap } from 'lucide-react';
+import { X, Plane, Timer, Pause, Play, RefreshCw, Shuffle, Bot, CheckCircle, AlertCircle, Flag, Zap } from 'lucide-react';
 import { LazyPlayerAvatar } from "@/components/LazyPlayerAvatar";
 import { useGameStore } from '@/store/useGameStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,157 +9,13 @@ import type { DraftState } from '@/lib/draft-types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DraftPickDialog } from '@/components/DraftPickDialog';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { DraftTimer } from '@/components/DraftTimer';
+import { SharedDraftCell } from '@/components/SharedDraftCell';
 import { cn } from '@/lib/utils';
-import { getTeamColors } from '@/lib/team-colors';
 import { toast } from 'sonner';
 
-// Default color for empty cells
-const defaultCellColor = 'bg-muted/50 border-border text-muted-foreground';
-
-// Role to abbreviation mapping
-const roleAbbreviations: Record<string, string> = {
-  'Bowler': 'BOWL',
-  'Batsman': 'BAT',
-  'Wicket Keeper': 'WK',
-  'All Rounder': 'AR',
-};
-
-interface DraftCellProps {
-  round: number;
-  position: number;
-  manager: Manager | null;
-  player: Player | null;
-  pickNumber: string;
-  onCellClick: () => void;
-  onClearPick: () => void;
-  readOnly?: boolean;
-  isActive?: boolean;
-  isMyCol?: boolean;
-  isMyTurn?: boolean;
-}
-
-const DraftCell = ({ round, position, manager, player, pickNumber, onCellClick, onClearPick, readOnly, isActive, isMyCol, isMyTurn }: DraftCellProps) => {
-  const isEmpty = !player;
-
-  const handleClearClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!readOnly) {
-      onClearPick();
-    }
-  };
-
-  const colors = player ? getTeamColors(player.team) : null;
-
-  return (
-    <div
-      onClick={onCellClick}
-      className={cn(
-        "relative min-h-[80px] p-2 border rounded-lg transition-all overflow-hidden",
-        !player && "bg-muted/50 border-border text-muted-foreground",
-        "cursor-pointer hover:opacity-80",
-        !manager && !player && "opacity-50",
-        isEmpty && manager && !readOnly && "border-dashed",
-        isActive && !player && "border-primary ring-2 ring-primary ring-inset animate-pulse",
-        isMyCol && !player && !isActive && "bg-primary/5 border-primary/20"
-      )}
-      style={player && colors ? {
-        backgroundColor: colors.raw,
-        borderColor: colors.raw, // Same as bg for solid look
-      } : {}}
-    >
-      {/* Background Gradient for depth */}
-      {player && colors && (
-        <div className={cn("absolute inset-0 bg-gradient-to-br from-black/0 via-black/0 to-black/20 pointer-events-none")} />
-      )}
-
-      {/* Pick number badge */}
-      <div className="absolute top-1 right-1 text-[10px] font-bold opacity-60 z-10">
-        {pickNumber}
-      </div>
-
-      {/* International player icon */}
-      {player?.isInternational && (
-        <div className="absolute bottom-1 right-1 z-10">
-          <Plane className="w-3 h-3 opacity-80" />
-        </div>
-      )}
-
-      {/* X icon to clear pick - only show if not read-only */}
-      {player && !readOnly && (
-        <button
-          onClick={handleClearClick}
-          className="absolute top-1 left-1 p-0.5 rounded hover:bg-black/20 transition-colors z-20"
-        >
-          <X className="w-3 h-3 opacity-60 hover:opacity-100" />
-        </button>
-      )}
-
-      {player ? (
-        <div className="pt-1 flex flex-col items-center justify-center text-center relative z-0">
-          {/* Avatar - Lazy loaded */}
-          <LazyPlayerAvatar
-            name={player.name}
-            imageId={player.imageId}
-            cachedUrl={player.cachedUrl}
-            className="h-10 w-10 mb-1 border-2 border-white/20 shadow-sm"
-            fallbackClassName="text-[10px] font-bold bg-black/20 text-white/80"
-          />
-
-          {/* First name */}
-          <p className={cn(
-            "font-medium text-[10px] truncate leading-tight w-full opacity-90",
-            colors?.text
-          )}>
-            {player.name.split(' ')[0]}
-          </p>
-          {/* Last name */}
-          <p className={cn(
-            "font-bold text-xs truncate leading-tight w-full",
-            colors?.text
-          )}>
-            {player.name.split(' ').slice(1).join(' ')}
-          </p>
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-[8px] px-1 py-0 mt-1 font-semibold border"
-            )}
-            style={{
-              backgroundColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
-              borderColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-              color: colors?.text === 'text-white' ? 'white' : 'black'
-            }}
-          >
-            {roleAbbreviations[player.role] || player.role}
-          </Badge>
-        </div>
-      ) : (
-        <div className="flex items-center justify-center h-full pt-2">
-          {isActive && isMyTurn ? (
-            <div className="flex flex-col items-center gap-1 group-hover:scale-110 transition-transform duration-300">
-              <Zap className="w-8 h-8 text-primary animate-pulse fill-primary/20" />
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-black text-primary uppercase tracking-tighter">Click to</span>
-                <span className="text-[12px] font-black text-primary uppercase tracking-tighter leading-none">Pick Player</span>
-              </div>
-            </div>
-          ) : isActive ? (
-            <div className="flex flex-col items-center gap-1 opacity-50">
-              <Timer className="w-6 h-6 text-primary" />
-              <span className="text-[8px] font-bold text-primary uppercase">On Clock</span>
-            </div>
-          ) : (
-            <User className="w-6 h-6 opacity-30" />
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 interface DraftLMControlsProps {
   draftState: DraftState | null;
@@ -645,19 +501,36 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
                 const isMyTurn = isActivePick && isMyCol;
 
                 return (
-                  <DraftCell
+                  <SharedDraftCell
                     key={`${round}-${position}`}
-                    round={round}
-                    position={position}
-                    manager={manager}
                     player={player}
                     pickNumber={pickNumber}
+                    isCurrentPick={!!isActivePick}
+                    isUserTeam={!!isMyCol}
+                    isUserTurn={!!isMyTurn}
                     onCellClick={() => handleCellClick(round, position)}
-                    onClearPick={() => !isEffectivelyReadOnly && clearPick(round, position)}
-                    readOnly={isEffectivelyReadOnly}
-                    isActive={isActivePick}
-                    isMyCol={isMyCol}
-                    isMyTurn={isMyTurn}
+                    gradientOverlay
+                    avatar={player ? (
+                      <LazyPlayerAvatar
+                        name={player.name}
+                        imageId={player.imageId}
+                        cachedUrl={player.cachedUrl}
+                        className="h-10 w-10 mb-1 border-2 border-white/20 shadow-sm"
+                        fallbackClassName="text-[10px] font-bold bg-black/20 text-white/80"
+                      />
+                    ) : undefined}
+                    clearButton={player && !isEffectivelyReadOnly ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); clearPick(round, position); }}
+                        className="absolute top-1 left-1 p-0.5 rounded hover:bg-black/20 transition-colors z-20"
+                      >
+                        <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+                      </button>
+                    ) : undefined}
+                    extraEmptyClassName={cn(
+                      !manager && !player && "opacity-50",
+                      !player && manager && !isEffectivelyReadOnly && "border-dashed"
+                    )}
                   />
                 );
               });

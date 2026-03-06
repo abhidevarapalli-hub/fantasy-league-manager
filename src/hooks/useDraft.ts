@@ -533,27 +533,33 @@ export const useDraft = () => {
 
   // Calculate current pick position details
   const getCurrentPickData = useCallback(() => {
-    const currentTotalPicks = draftPicks.length;
     const positionsCount = managers.length;
-
     if (positionsCount === 0) return null;
 
-    // This represents the NEXT pick to be made
-    const nextPickIndex = currentTotalPicks;
-    const round = Math.floor(nextPickIndex / positionsCount) + 1;
-    const pickIndexInRound = nextPickIndex % positionsCount;
-    const isEvenRound = round % 2 === 0;
+    // Prefer server-authoritative state for round/position when available
+    let round: number;
+    let position: number;
 
-    // In snake draft, the position (column) is determined by how many picks are left in the round
-    const position = isEvenRound
-      ? (positionsCount - pickIndexInRound)
-      : (pickIndexInRound + 1);
+    if (draftState && draftState.status === 'active') {
+      round = draftState.currentRound;
+      position = draftState.currentPosition;
+    } else {
+      // Fallback: derive from local pick count
+      const currentTotalPicks = draftPicks.length;
+      const nextPickIndex = currentTotalPicks;
+      round = Math.floor(nextPickIndex / positionsCount) + 1;
+      const pickIndexInRound = nextPickIndex % positionsCount;
+      const isEvenRound = round % 2 === 0;
+      position = isEvenRound
+        ? (positionsCount - pickIndexInRound)
+        : (pickIndexInRound + 1);
+    }
 
     const orderNode = draftOrder.find(o => o.position === position);
     const isAutoDraftEnabled = orderNode?.autoDraftEnabled || false;
 
     return { round, position, orderNode, isAutoDraftEnabled };
-  }, [draftPicks.length, managers.length, draftOrder]);
+  }, [draftPicks.length, managers.length, draftOrder, draftState]);
 
   // Get remaining time for current pick (in ms)
   const getRemainingTime = useCallback(() => {
@@ -599,8 +605,8 @@ export const useDraft = () => {
               : [];
 
             // Get available players (not yet drafted)
-            const draftedIds = getDraftedPlayerIds();
-            const availablePlayers = players.filter(p => !draftedIds.includes(p.id));
+            const draftedIdSet = new Set(getDraftedPlayerIds());
+            const availablePlayers = players.filter(p => !draftedIdSet.has(p.id));
 
             const config = useGameStore.getState().config;
             const selectedPlayer = selectBestPlayer(teamPlayerIds, availablePlayers, players, config);

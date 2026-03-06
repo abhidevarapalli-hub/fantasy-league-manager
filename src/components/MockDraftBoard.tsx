@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { User, Plane, Play, RotateCcw, Timer, Trash2, Zap, Pause, RefreshCw } from 'lucide-react';
+import { Play, RotateCcw, Timer, Trash2, Zap, Pause, RefreshCw } from 'lucide-react';
 import { useMockDraft } from '@/hooks/useMockDraft';
 import type { Player, Manager } from '@/lib/supabase-types';
 import type { DraftPick } from '@/lib/draft-types';
@@ -7,125 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AvailablePlayersDrawer } from '@/components/AvailablePlayersDrawer';
 import { DraftTimer } from '@/components/DraftTimer';
+import { SharedDraftCell } from '@/components/SharedDraftCell';
 import { cn } from '@/lib/utils';
 import { getTeamColors } from '@/lib/team-colors';
 import { useNavigate } from 'react-router-dom';
 import { useMockStore } from '@/store/useMockStore';
-
-// Role to abbreviation mapping
-const roleAbbreviations: Record<string, string> = {
-  'Bowler': 'BOWL',
-  'Batsman': 'BAT',
-  'Wicket Keeper': 'WK',
-  'All Rounder': 'AR',
-};
-
-const getCellColor = (player: Player | null): string => {
-  return '';
-};
-
-interface MockDraftCellProps {
-  round: number;
-  position: number;
-  player: Player | null;
-  pickNumber: string;
-  isCurrentPick: boolean;
-  isUserTeam: boolean;
-  isUserTurn: boolean;
-  onCellClick?: () => void;
-}
-
-const MockDraftCell = ({
-  round,
-  position,
-  player,
-  pickNumber,
-  isCurrentPick,
-  isUserTeam,
-  isUserTurn,
-  onCellClick
-}: MockDraftCellProps) => {
-  const colors = player ? getTeamColors(player.team) : null;
-  return (
-    <div
-      onClick={onCellClick}
-      className={cn(
-        "relative min-h-[80px] p-2 border rounded-lg transition-all overflow-hidden",
-        !player && "bg-muted/50 border-border text-muted-foreground",
-        !player && isCurrentPick && "border-primary ring-2 ring-primary ring-inset animate-pulse",
-        !player && isUserTeam && !isCurrentPick && "bg-primary/5 border-primary/20",
-        onCellClick ? "cursor-pointer hover:opacity-80" : "cursor-default",
-        !player && !isCurrentPick && "border-dashed"
-      )}
-      style={player && colors ? {
-        backgroundColor: colors.raw,
-        borderColor: colors.raw,
-      } : {}}
-    >
-      {/* Pick number badge */}
-      <div className="absolute top-1 right-1 text-[10px] font-bold opacity-60">
-        {pickNumber}
-      </div>
-
-      {/* International player icon */}
-      {player?.isInternational && (
-        <div className="absolute bottom-1 right-1">
-          <Plane className="w-3 h-3 opacity-80" />
-        </div>
-      )}
-
-
-      {player ? (
-        <div className="pt-3 flex flex-col items-center justify-center text-center relative z-10">
-          <p className={cn(
-            "font-medium text-[10px] truncate leading-tight w-full opacity-90",
-            colors?.text
-          )}>
-            {player.name.split(' ')[0]}
-          </p>
-          <p className={cn(
-            "font-bold text-xs truncate leading-tight w-full",
-            colors?.text
-          )}>
-            {player.name.split(' ').slice(1).join(' ')}
-          </p>
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-[8px] px-1 py-0 mt-1 font-semibold border"
-            )}
-            style={{
-              backgroundColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
-              borderColor: colors?.text === 'text-white' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-              color: colors?.text === 'text-white' ? 'white' : 'black'
-            }}
-          >
-            {roleAbbreviations[player.role] || player.role}
-          </Badge>
-        </div>
-      ) : (
-        <div className="flex items-center justify-center h-full pt-2">
-          {isCurrentPick && isUserTurn ? (
-            <div className="flex flex-col items-center gap-1 group-hover:scale-110 transition-transform duration-300">
-              <Zap className="w-8 h-8 text-primary animate-pulse fill-primary/20" />
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-black text-primary uppercase tracking-tighter">Click to</span>
-                <span className="text-[12px] font-black text-primary uppercase tracking-tighter leading-none">Pick Player</span>
-              </div>
-            </div>
-          ) : isCurrentPick ? (
-            <div className="flex flex-col items-center gap-1 opacity-50">
-              <Timer className="w-6 h-6 text-primary" />
-              <span className="text-[8px] font-bold text-primary uppercase">On Clock</span>
-            </div>
-          ) : (
-            <User className="w-6 h-6 opacity-30" />
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 export const MockDraftBoard = ({ draftId, masterPlayers }: { draftId: string, masterPlayers: Player[] }) => {
   const navigate = useNavigate();
@@ -289,10 +175,8 @@ export const MockDraftBoard = ({ draftId, masterPlayers }: { draftId: string, ma
                 const canClick = isUserTurn && isCurrentPick && isUserTeam;
 
                 return (
-                  <MockDraftCell
+                  <SharedDraftCell
                     key={`${round}-${teamIndex}`}
-                    round={round}
-                    position={teamIndex + 1}
                     player={player}
                     pickNumber={pickNumber}
                     isCurrentPick={isCurrentPick}

@@ -127,17 +127,15 @@ export function selectBestPlayer(
   const canAddInternational = counts.international < config.maxInternational;
   const batWkCount = counts.batsmen + counts.wicketKeepers;
 
-  const sortedAvailable = sortPlayersByPriority(availablePlayers);
-
   // First try: players matching needed roles and international constraints
-  let eligiblePlayers = sortedAvailable.filter(p => {
+  let eligiblePlayers = availablePlayers.filter(p => {
     if (!canAddInternational && p.isInternational) return false;
     return neededRoles.includes(p.role);
   });
 
   // Fallback: any player that doesn't violate max constraints
   if (eligiblePlayers.length === 0) {
-    eligiblePlayers = sortedAvailable.filter(p => {
+    eligiblePlayers = availablePlayers.filter(p => {
       if (!canAddInternational && p.isInternational) return false;
       if ((p.role === 'Batsman' || p.role === 'Wicket Keeper') && batWkCount >= config.maxBatWk) return false;
       if (p.role === 'Bowler' && counts.bowlers >= config.maxBowlers) return false;

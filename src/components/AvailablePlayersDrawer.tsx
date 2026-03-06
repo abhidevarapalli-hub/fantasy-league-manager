@@ -41,12 +41,10 @@ const ROLE_AND_NATIONALITY_COLORS = {
   International: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
   All: 'bg-primary/20 text-primary border-primary/30',
 };
+import { ROLE_ABBREVIATIONS } from '@/lib/draft-constants';
 
 const roleAbbreviations: Record<string, string> = {
-  'Bowler': 'BOWL',
-  'Batsman': 'BAT',
-  'Wicket Keeper': 'WK',
-  'All Rounder': 'AR',
+  ...ROLE_ABBREVIATIONS,
   'All': 'All',
 };
 

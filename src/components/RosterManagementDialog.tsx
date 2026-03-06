@@ -96,19 +96,8 @@ export const RosterManagementDialog = ({ open, onOpenChange, player }: RosterMan
     }
   };
 
-  // Auto-submit if no drop is required
-  useEffect(() => {
-    if (open && player && selectedManagerId && !mustDrop && !isSubmitting) {
-      // Small timeout to let the dialog render visually immediately close to prevent flashing, but react state is fast enough
-      handleSubmit('none');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, player, selectedManagerId, mustDrop]);
 
   if (!player) return null;
-
-  // If we don't need to drop, don't show the dialog contents while it auto-submits
-  if (!mustDrop) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,7 +105,7 @@ export const RosterManagementDialog = ({ open, onOpenChange, player }: RosterMan
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <UserPlus className="w-5 h-5 text-primary" />
-            Add Player to Roster
+            {mustDrop ? 'Add & Drop Player' : 'Add Player to Roster'}
           </DialogTitle>
         </DialogHeader>
 
