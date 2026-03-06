@@ -438,26 +438,21 @@ export const useDraft = () => {
     }
   }, [draftState, draftOrder, managers, setDraftState, leagueId]);
 
-  // Pause draft
+  // Pause draft (server-side timestamp)
   const pauseDraft = useCallback(async () => {
     if (!draftState || draftState.status !== 'active') return;
-
-    const pausedAt = new Date().toISOString();
 
     // Optimistic update
     setDraftState({
       ...draftState,
       status: 'paused',
-      pausedAt: new Date(pausedAt)
+      pausedAt: new Date()
     });
 
-    const { error } = await supabase
-      .from('draft_state')
-      .update({
-        status: 'paused',
-        paused_at: pausedAt
-      })
-      .eq('league_id', leagueId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).rpc('pause_draft', {
+      p_league_id: leagueId!
+    });
 
     if (error) {
       toast.error('Failed to pause draft');
@@ -468,36 +463,31 @@ export const useDraft = () => {
         status: 'active',
         pausedAt: null
       });
+      return;
+    }
+
+    const result = data as { success?: boolean; reason?: string; paused_at?: string } | null;
+    if (result && !result.success) {
+      toast.error('Failed to pause: ' + (result.reason || 'Unknown'));
+      setDraftState({ ...draftState, status: 'active', pausedAt: null });
     }
   }, [draftState, setDraftState, leagueId]);
 
-  // Resume draft
+  // Resume draft (server-side pause duration calculation)
   const resumeDraft = useCallback(async () => {
     if (!draftState || draftState.status !== 'paused') return;
-
-    // Add pause duration to total
-    let additionalPauseMs = 0;
-    if (draftState.pausedAt) {
-      additionalPauseMs = Date.now() - draftState.pausedAt.getTime();
-    }
-    const newTotalPausedMs = draftState.totalPausedDurationMs + additionalPauseMs;
 
     // Optimistic update
     setDraftState({
       ...draftState,
       status: 'active',
       pausedAt: null,
-      totalPausedDurationMs: newTotalPausedMs
     });
 
-    const { error } = await supabase
-      .from('draft_state')
-      .update({
-        status: 'active',
-        paused_at: null,
-        total_paused_duration_ms: newTotalPausedMs
-      })
-      .eq('league_id', leagueId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).rpc('resume_draft', {
+      p_league_id: leagueId!
+    });
 
     if (error) {
       toast.error('Failed to resume draft');
@@ -507,8 +497,20 @@ export const useDraft = () => {
         ...draftState,
         status: 'paused',
         pausedAt: draftState.pausedAt,
-        totalPausedDurationMs: draftState.totalPausedDurationMs
       });
+      return;
+    }
+
+    const result = data as { success?: boolean; reason?: string; total_paused_ms?: number } | null;
+    if (result && !result.success) {
+      toast.error('Failed to resume: ' + (result.reason || 'Unknown'));
+      setDraftState({ ...draftState, status: 'paused', pausedAt: draftState.pausedAt });
+    } else if (result?.total_paused_ms !== undefined) {
+      // Update local state with the server-computed total
+      const currentState = useGameStore.getState().draftState;
+      if (currentState) {
+        setDraftState({ ...currentState, totalPausedDurationMs: result.total_paused_ms! });
+      }
     }
   }, [draftState, setDraftState, leagueId]);
 
