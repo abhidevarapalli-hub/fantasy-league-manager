@@ -344,13 +344,13 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
       return;
     }
 
-    if (isEffectivelyReadOnly) return;
-
     // Permission check: only LM can click any cell. Non-LM can ONLY click the active cell that belongs to them.
     const isActiveCell = round === currentRound && position === currentPosition;
     const isMyTurn = getManagerAtPosition(position)?.id === currentManagerId;
+    const canInteract = isLeagueManager && !isEffectivelyReadOnly;
+    const canPickThisCell = draftState?.isActive && !draftState?.isFinalized && isActiveCell && isMyTurn;
 
-    if (!isLeagueManager && (!isActiveCell || !isMyTurn)) {
+    if (!canInteract && !canPickThisCell) {
       return;
     }
 
@@ -691,17 +691,15 @@ export const DraftBoard = ({ readOnly = false }: DraftBoardProps) => {
       {/* Draft Pick Dialog removed in favor of AvailablePlayersDrawer opening directly */}
 
 
-      {!isEffectivelyReadOnly && (
-        <AvailablePlayersDrawer
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          targetPick={selectedCell || (draftState?.isActive && !draftState.isFinalized ? { round: currentRound, position: currentPosition } : null)}
-          draftedPlayerIds={getDraftedPlayerIds()}
-          canPick={getManagerAtPosition(currentPosition)?.id === useGameStore.getState().currentManagerId}
-          onDraftPlayer={handlePickConfirm}
-          draftTimerProps={currentTimerProps}
-        />
-      )}
+      <AvailablePlayersDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        targetPick={selectedCell || (draftState?.isActive && !draftState.isFinalized ? { round: currentRound, position: currentPosition } : null)}
+        draftedPlayerIds={getDraftedPlayerIds()}
+        canPick={!draftState?.isFinalized && (isLeagueManager || isMyTurn)}
+        onDraftPlayer={handlePickConfirm}
+        draftTimerProps={currentTimerProps}
+      />
 
       {detailPlayer && (
         <PlayerDetailDialog

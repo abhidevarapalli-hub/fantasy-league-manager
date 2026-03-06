@@ -60,10 +60,16 @@ const Login = () => {
     try {
       const isNative = Capacitor.isNativePlatform();
 
+      // Use saved redirect path so user returns to their intended page after auth
+      const savedRedirect = sessionStorage.getItem('redirectAfterLogin');
+      const webRedirectTo = savedRedirect
+        ? `${window.location.origin}${savedRedirect}`
+        : `${window.location.origin}/leagues`;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: isNative ? 'com.cricfantasy.app://callback' : `${window.location.origin}/leagues`,
+          redirectTo: isNative ? 'com.cricfantasy.app://callback' : webRedirectTo,
           skipBrowserRedirect: isNative,
         }
       });

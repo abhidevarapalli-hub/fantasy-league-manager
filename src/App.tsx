@@ -61,9 +61,10 @@ const ProtectedRoute = ({ children, requireUsername = true }: { children: React.
   }
 
   if (!user) {
-    // Save the intended destination for join links
-    if (window.location.pathname.startsWith('/join/')) {
-      sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+    // Save the intended destination so user returns here after auth
+    const currentPath = window.location.pathname;
+    if (currentPath && currentPath !== '/' && currentPath !== '/login' && currentPath !== '/leagues') {
+      sessionStorage.setItem('redirectAfterLogin', currentPath);
     }
     return <Navigate to="/login" replace />;
   }
