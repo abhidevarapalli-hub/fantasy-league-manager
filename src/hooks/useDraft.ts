@@ -200,19 +200,19 @@ export const useDraft = () => {
   const resetDraft = useCallback(async () => {
     if (!leagueId) return;
     try {
-      // Delete all picks for this league
+      // 1. Delete all draft picks
       await supabase.from('draft_picks').delete().eq('league_id', leagueId);
 
-      // Delete all roster entries created from the draft
+      // 2. Delete all roster entries created from the draft
       await supabase.from('manager_roster').delete().eq('league_id', leagueId);
 
-      // Reset draft order for this league
+      // 3. Reset draft order (unassign managers, disable auto-draft)
       await supabase
         .from('draft_order')
         .update({ manager_id: null, auto_draft_enabled: false })
         .eq('league_id', leagueId);
 
-      // Reset draft state
+      // 4. Reset draft state to pre-draft
       const nowIso = new Date().toISOString();
       await supabase
         .from('draft_state')
@@ -226,9 +226,25 @@ export const useDraft = () => {
         })
         .eq('league_id', leagueId);
 
+      // 5. Reset manager stats (wins/losses/points)
+      await supabase
+        .from('managers')
+        .update({ wins: 0, losses: 0, points: 0 })
+        .eq('league_id', leagueId);
+
+      // --- Reset all local state ---
+
+      // Clear draft picks
       setDraftPicks([]);
 
-      // Update local state if we have it
+      // Clear draft order manager assignments
+      setDraftOrder(draftOrder.map(o => ({
+        ...o,
+        managerId: '',
+        autoDraftEnabled: false
+      })));
+
+      // Reset draft state
       if (draftState) {
         setDraftState({
           ...draftState,
@@ -241,12 +257,27 @@ export const useDraft = () => {
         });
       }
 
+      // Clear manager rosters and stats locally
+      const store = useGameStore.getState();
+      const clearedManagers = store.managers.map(m => ({
+        ...m,
+        activeRoster: [] as string[],
+        bench: [] as string[],
+        wins: 0,
+        losses: 0,
+        points: 0,
+      }));
+      useGameStore.setState({
+        managers: clearedManagers,
+        weeklyRosters: {},  // Clear cached weekly roster data
+      });
+
       toast.success('Draft has been reset');
     } catch (error) {
       console.error('Failed to reset draft:', error);
       toast.error('Failed to reset draft');
     }
-  }, [leagueId, draftState, setDraftPicks, setDraftState]);
+  }, [leagueId, draftState, draftOrder, setDraftPicks, setDraftOrder, setDraftState]);
 
   // Randomize draft order and auto-assign all managers
   const randomizeDraftOrder = useCallback(async () => {
