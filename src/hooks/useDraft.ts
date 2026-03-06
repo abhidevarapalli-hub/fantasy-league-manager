@@ -203,6 +203,9 @@ export const useDraft = () => {
       // Delete all picks for this league
       await supabase.from('draft_picks').delete().eq('league_id', leagueId);
 
+      // Delete all roster entries created from the draft
+      await supabase.from('manager_roster').delete().eq('league_id', leagueId);
+
       // Reset draft order for this league
       await supabase
         .from('draft_order')
