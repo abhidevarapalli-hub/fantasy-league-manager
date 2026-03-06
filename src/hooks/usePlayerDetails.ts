@@ -516,7 +516,9 @@ export function usePlayerMatchStats(
     queryFn: async () => {
       if (!playerId || !leagueId) throw new Error('Player ID and League ID required');
 
-      // Helper to build the stats map from rows
+      // Helper to build the stats map from rows.
+      // IMPORTANT: field list must stay in sync with mapDbPlayerMatchStats in store/gameStore/mappers.ts.
+      // If you add a stat column to match_player_stats, update BOTH places.
       function buildStatsMap(
         rows: Array<{
           cricbuzz_match_id?: number | null;
@@ -533,6 +535,10 @@ export function usePlayerMatchStats(
           runs_conceded?: number | null;
           wickets?: number | null;
           economy?: number | string | null;
+          dots?: number | null;
+          wides?: number | null;
+          no_balls?: number | null;
+          lbw_bowled_count?: number | null;
           catches?: number | null;
           stumpings?: number | null;
           run_outs?: number | null;
@@ -567,6 +573,10 @@ export function usePlayerMatchStats(
             runsConceded: row.runs_conceded ?? undefined,
             wickets: row.wickets ?? undefined,
             economy: row.economy != null ? Number(row.economy) : undefined,
+            dots: row.dots ?? undefined,
+            wides: row.wides ?? undefined,
+            noBalls: row.no_balls ?? undefined,
+            lbwBowledCount: row.lbw_bowled_count ?? undefined,
             catches: row.catches ?? undefined,
             stumpings: row.stumpings ?? undefined,
             runOuts: row.run_outs ?? undefined,

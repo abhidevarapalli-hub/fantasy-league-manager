@@ -62,6 +62,13 @@ Key characteristics:
 - Look for servers before starting a new server, kill old ones if a new one needs to start
 - Consider database schema changes with future scalability in mind
 
+### Stat Field Mapping (dual-mapper rule)
+- Player match stats are mapped to camelCase in **two places** that must stay in sync:
+  1. `src/store/gameStore/mappers.ts` → `mapDbPlayerMatchStats` (used by TeamView / Zustand store)
+  2. `src/hooks/usePlayerDetails.ts` → `buildStatsMap` (used by PlayerDetailDialog)
+- When adding or renaming a column on `match_player_stats` or `player_match_stats_compat`, update **both** mappers
+- Both feed into `calculateFantasyPoints()` — missing fields silently default to 0 and produce wrong scores
+
 ### Scoring Data Flow & Cascade Rules
 - Source of truth for individual player scores: `league_player_match_scores`
 - Source of truth for matchup aggregates (finalized weeks): `league_matchups`

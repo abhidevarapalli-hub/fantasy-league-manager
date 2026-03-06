@@ -162,6 +162,8 @@ export const mapDbCricketMatch = (db: Tables<'cricket_matches'>): CricketMatch =
   matchState: db.match_state,
 });
 
+// IMPORTANT: field list must stay in sync with buildStatsMap in hooks/usePlayerDetails.ts.
+// If you add a stat column to match_player_stats, update BOTH places.
 export const mapDbPlayerMatchStats = (db: Tables<'player_match_stats'>): PlayerMatchStats => ({
   id: db.id ?? '',
   playerId: db.player_id,
