@@ -30,6 +30,11 @@ CREATE POLICY "Authenticated users can insert tournament_players"
   ON tournament_players FOR INSERT TO authenticated
   WITH CHECK (true);
 
+CREATE POLICY "Authenticated users can update tournament_players"
+  ON tournament_players FOR UPDATE TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
 -- Service role bypass
 GRANT ALL ON tournament_players TO service_role;
 
